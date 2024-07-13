@@ -1,8 +1,12 @@
 mod piece;
 mod board;
+mod draw;
 
-fn main() {
-    tki()
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    draw::split_blocks("assets/HqGYC5G - Imgur.png")?;
+    tki();
+    Ok(())
 }
 
 fn tki() {
