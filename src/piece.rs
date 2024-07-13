@@ -20,7 +20,7 @@ pub enum Orientation {
     WEST
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Piece {
     I(Cell, Orientation),
     O(Cell, Orientation),
