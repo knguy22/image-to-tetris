@@ -1,5 +1,3 @@
-use std::default;
-
 use crate::board::Board;
 use crate::piece::{Piece, Cell, Orientation};
 use crate::draw::{draw_board, BlockSkin};
@@ -54,8 +52,7 @@ pub fn genetic_algorithm(target_img: &DynamicImage, config: Config) -> DynamicIm
         if best.score > 0.0 {
             best_image = draw_board(&best.board, &config.skin);
         }
-        println!("Iteration: {}", i);
-        println!("Best score: {}", best.score);
+        println!("Iteration: {}, Best score: {}, Population size: {}", i, best.score, population.len());
 
         // let the best 10% survive
         let mut new_population: Vec<Individual> = Vec::new();

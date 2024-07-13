@@ -71,8 +71,3 @@ pub fn draw_board(board: &Board, skin: &BlockSkin) -> DynamicImage {
     img = image::imageops::flip_vertical(&img);
     DynamicImage::from(img)
 }
-
-pub fn draw_board_to_file(board: &Board, skin: &BlockSkin, save_path: &str) {
-    let img = draw_board(board, skin);
-    img.save(save_path).unwrap();
-}
