@@ -1,5 +1,6 @@
-mod tetris;
+mod piece;
+mod board;
 
 fn main() {
-    tetris::print_all_shapes();
+    piece::print_all_shapes();
 }
