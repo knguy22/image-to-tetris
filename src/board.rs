@@ -3,8 +3,8 @@ use crate::piece::{Cell, Piece, Orientation};
 
 pub struct Board {
     pub cells: Vec<char>,
-    width: usize,
-    height: usize
+    pub width: usize,
+    pub height: usize
 }
 
 impl Board {
