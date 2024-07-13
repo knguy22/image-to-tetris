@@ -31,6 +31,8 @@ pub enum Piece {
     Z(Cell, Orientation)
 }
 
+// constants modified from https://github.com/freyhoe/ditzy22/blob/main/common.h
+
 const I_SHAPE: [[Dir; 4]; 4] = [
     [Dir{ x: -1, y: 0 }, Dir{ x: 0, y: 0 }, Dir{ x: 1, y: 0 }, Dir{ x: 2, y: 0 }],
     [Dir{ x: 0, y: 1 }, Dir{ x: 0, y: 0 }, Dir{ x: 0, y: -1 }, Dir{ x: 0, y: -2 }],
@@ -79,17 +81,6 @@ const Z_SHAPE: [[Dir; 4]; 4] = [
     [Dir{ x: -1, y: 0 }, Dir{ x: 0, y: 0 }, Dir{ x: 0, y: -1 }, Dir{ x: 1, y: -1 }],
     [Dir{ x: 0, y: 1 }, Dir{ x: 0, y: 0 }, Dir{ x: -1, y: 0 }, Dir{ x: -1, y: -1 }],
 ];
-
-// constants modified from https://github.com/freyhoe/ditzy22/blob/main/common.h
-pub const SHAPES: [[[Dir; 4]; 4]; 7] = [I_SHAPE, O_SHAPE, T_SHAPE, L_SHAPE, J_SHAPE, S_SHAPE, Z_SHAPE];
-
-pub fn print_all_shapes() {
-    for shape in SHAPES.iter() {
-        for piece in shape.iter() {
-            print_piece(piece);
-        }
-    }
-}
 
 fn print_piece(piece: &[Dir; 4]) {
     let mut canvas: [[char; 5]; 5] = [[' '; 5]; 5];
