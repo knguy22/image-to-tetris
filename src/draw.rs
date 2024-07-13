@@ -1,7 +1,6 @@
 use crate::board::Board;
 
-use image::DynamicImage;
-use imageproc::{image, image::GenericImageView};
+use imageproc::{image, image::GenericImageView, image::DynamicImage};
 
 pub struct BlockSkin {
     empty_img: image::DynamicImage,
@@ -50,7 +49,7 @@ impl BlockSkin {
 }
 
 
-pub fn draw_board(board: &Board, skin: &BlockSkin, save_path: &str) {
+pub fn draw_board(board: &Board, skin: &BlockSkin) -> DynamicImage {
     let mut img = image::RgbaImage::new(board.width as u32 * skin.width, board.height as u32 * skin.height);
 
     for y in 0..board.height {
@@ -68,7 +67,12 @@ pub fn draw_board(board: &Board, skin: &BlockSkin, save_path: &str) {
             image::imageops::overlay(&mut img, block, (x as u32 * skin.width).into(), (y as u32 * skin.height).into());
         }
     }
-    // flip the image
+    // flip the image due to how the board is represented
     img = image::imageops::flip_vertical(&img);
+    DynamicImage::from(img)
+}
+
+pub fn draw_board_to_file(board: &Board, skin: &BlockSkin, save_path: &str) {
+    let img = draw_board(board, skin);
     img.save(save_path).unwrap();
 }
