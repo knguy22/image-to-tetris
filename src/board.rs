@@ -47,6 +47,15 @@ impl Board {
         Ok(())
     }
 
+    pub fn remove_piece(&mut self, piece: &Piece) -> Result<(), Box<dyn Error>> {
+        let to_occupy = piece.get_occupancy()?;
+        for cell in to_occupy.iter() {
+            *self.get(cell)? = ' ';
+        }
+        self.pieces.retain(|p| p != piece);
+        Ok(())
+    }
+
     fn get(&mut self, cell: &Cell) -> Result<&mut char, Box<dyn Error>> {
         if !(cell.x < self.width && cell.y < self.height) {
             return Err(format!("Cell ({}, {}) is out of bounds", cell.x, cell.y).into());

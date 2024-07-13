@@ -119,43 +119,51 @@ fn breed(board1: &Board, board2: &Board) -> Result<Board, Box<dyn std::error::Er
     }
 }
 
-// mutations; try adding a new randomly generated piece
+// mutations
 fn mutate(board: &mut Board) -> Result<(), Box<dyn std::error::Error>> {
     let mut rng = rand::thread_rng();
+    let delete_piece: bool = rng.gen() && board.pieces.len() > 0;
+
+    // delete a piece
+    if delete_piece {
+        let piece_between = rand::distributions::Uniform::from(0..board.pieces.len());
+        let piece = board.pieces[piece_between.sample(&mut rng)].clone();
+        board.remove_piece(&piece).expect(format!("Failed to remove piece {:?}", piece).as_str());
+        return Ok(());
+    }
+
+    // add a piece
     let piece_between = rand::distributions::Uniform::from(0..7);
     let orientation_between = rand::distributions::Uniform::from(0..4);
     let x_between = rand::distributions::Uniform::from(0..board.width);
     let y_between = rand::distributions::Uniform::from(0..board.height);
 
-    // this may fail due to lack of space to place pieces on the board, so try 10 times
-    for _ in 0..10 {
-        let cell = Cell{
-            x: x_between.sample(&mut rng),
-            y: y_between.sample(&mut rng)
-        };
+    let cell = Cell{
+        x: x_between.sample(&mut rng),
+        y: y_between.sample(&mut rng)
+    };
 
-        let orientation = match orientation_between.sample(&mut rng) {
-            0 => Orientation::NORTH,
-            1 => Orientation::EAST,
-            2 => Orientation::SOUTH,
-            3 => Orientation::WEST,
-            _ => unreachable!()
-        };
+    let orientation = match orientation_between.sample(&mut rng) {
+        0 => Orientation::NORTH,
+        1 => Orientation::EAST,
+        2 => Orientation::SOUTH,
+        3 => Orientation::WEST,
+        _ => unreachable!()
+    };
 
-        let piece = match piece_between.sample(&mut rng) {
-            0 => Piece::I(cell, orientation),
-            1 => Piece::J(cell, orientation),
-            2 => Piece::L(cell, orientation),
-            3 => Piece::O(cell, orientation),
-            4 => Piece::S(cell, orientation),
-            5 => Piece::T(cell, orientation),
-            6 => Piece::Z(cell, orientation),
-            _ => unreachable!()
-        };
+    let piece = match piece_between.sample(&mut rng) {
+        0 => Piece::I(cell, orientation),
+        1 => Piece::J(cell, orientation),
+        2 => Piece::L(cell, orientation),
+        3 => Piece::O(cell, orientation),
+        4 => Piece::S(cell, orientation),
+        5 => Piece::T(cell, orientation),
+        6 => Piece::Z(cell, orientation),
+        _ => unreachable!()
+    };
 
-        if board.place(&piece).is_ok() {
-            return Ok(());
-        }
+    if board.place(&piece).is_ok() {
+        return Ok(());
     }
     Err("Failed to generate new board".into())
 }
