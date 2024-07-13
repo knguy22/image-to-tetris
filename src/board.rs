@@ -17,9 +17,11 @@ impl Board {
     }
 
     pub fn print(&self) {
+        println!("+{}+", "-".repeat(self.width));
         for row in self.cells.chunks(self.width).rev() {
-            println!("{}", row.iter().collect::<String>());
+            println!("|{}|", row.iter().collect::<String>());
         }
+        println!("+{}+", "-".repeat(self.width));
     }
 
     pub fn place(&mut self, piece: &Piece) -> Result<(), Box<dyn Error>> {
@@ -35,7 +37,7 @@ impl Board {
 
         // if so, place
         for cell in to_occupy.iter() {
-            *self.get(cell)? = 'X';
+            *self.get(cell)? = piece.get_char();
         }
 
         Ok(())

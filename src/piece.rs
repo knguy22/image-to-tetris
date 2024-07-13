@@ -104,6 +104,18 @@ fn print_piece(piece: &[Dir; 4]) {
 }
 
 impl Piece {
+    pub fn get_char(&self) -> char {
+        match self {
+            Piece::I(_, _) => 'I',
+            Piece::O(_, _) => 'O',
+            Piece::T(_, _) => 'T',
+            Piece::L(_, _) => 'L',
+            Piece::J(_, _) => 'J',
+            Piece::S(_, _) => 'S',
+            Piece::Z(_, _) => 'Z'
+        }
+    }
+
     pub fn get_orientation(&self) -> Orientation {
         match self {
             Piece::I(_, o) => o.clone(),
