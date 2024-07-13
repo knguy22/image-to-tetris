@@ -1,8 +1,10 @@
 use std::error::Error;
 use crate::piece::{Cell, Piece, Orientation};
 
+#[derive(Clone)]
 pub struct Board {
     pub cells: Vec<char>,
+    pub pieces: Vec<Piece>,
     pub width: usize,
     pub height: usize
 }
@@ -11,6 +13,7 @@ impl Board {
     pub fn new(width: usize, height: usize) -> Board {
         Board {
             cells: vec![' '; width * height],
+            pieces: Vec::new(),
             width,
             height
         }
@@ -39,6 +42,7 @@ impl Board {
         for cell in to_occupy.iter() {
             *self.get(cell)? = piece.get_char();
         }
+        self.pieces.push(piece.clone());
 
         Ok(())
     }

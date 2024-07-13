@@ -361,6 +361,7 @@ dependencies = [
  "image",
  "image-compare",
  "imageproc",
+ "rand",
 ]
 
 [[package]]
