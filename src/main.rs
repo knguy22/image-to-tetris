@@ -5,13 +5,13 @@ mod piece;
 mod genetic;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // let source_img = image::open("sources/rick-astley-890513150.jpg")?;
-    let source_img = image::open("sources/only_z.png")?;
+    let source_img = image::open("sources/rick-astley-890513150.jpg")?;
+    // let source_img = image::open("sources/only_z.png")?;
 
     let draw_config = draw::Config {
         skin: draw::BlockSkin::new("assets/HqGYC5G - Imgur.png")?,
-        board_width: 480,
-        board_height: 270,
+        board_width: 960,
+        board_height: 540,
     };
 
     let config = genetic::Config {
