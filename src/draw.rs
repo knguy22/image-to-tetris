@@ -1,7 +1,15 @@
 use crate::board::Board;
 
-use imageproc::{image, image::GenericImageView, image::DynamicImage};
+use imageproc::{image, image::GenericImageView, image::DynamicImage, image::imageops::resize};
 
+#[derive(Clone)]
+pub struct Config {
+    pub skin: BlockSkin,
+    pub board_width: usize,
+    pub board_height: usize,
+}
+
+#[derive(Clone)]
 pub struct BlockSkin {
     empty_img: image::DynamicImage,
     i_img: image::DynamicImage,
@@ -46,6 +54,25 @@ impl BlockSkin {
             height
         })
     }
+
+    pub fn resize(&self, width: u32, height: u32) -> BlockSkin {
+        BlockSkin {
+            empty_img: DynamicImage::from(resize(&self.empty_img, width, height, image::imageops::FilterType::Lanczos3)),
+            i_img: DynamicImage::from(resize(&self.i_img, width, height, image::imageops::FilterType::Lanczos3)),
+            o_img: DynamicImage::from(resize(&self.o_img, width, height, image::imageops::FilterType::Lanczos3)),
+            t_img: DynamicImage::from(resize(&self.t_img, width, height, image::imageops::FilterType::Lanczos3)),
+            l_img: DynamicImage::from(resize(&self.l_img, width, height, image::imageops::FilterType::Lanczos3)),
+            j_img: DynamicImage::from(resize(&self.j_img, width, height, image::imageops::FilterType::Lanczos3)),
+            s_img: DynamicImage::from(resize(&self.s_img, width, height, image::imageops::FilterType::Lanczos3)),
+            z_img: DynamicImage::from(resize(&self.z_img, width, height, image::imageops::FilterType::Lanczos3)),
+            width,
+            height
+        }
+    }
+
+    pub fn as_array(&self) -> [DynamicImage; 8] {
+        [self.empty_img.clone(), self.i_img.clone(), self.o_img.clone(), self.t_img.clone(), self.l_img.clone(), self.j_img.clone(), self.s_img.clone(), self.z_img.clone()]
+    }
 }
 
 
@@ -70,4 +97,48 @@ pub fn draw_board(board: &Board, skin: &BlockSkin) -> DynamicImage {
     // flip the image due to how the board is represented
     img = image::imageops::flip_vertical(&img);
     DynamicImage::from(img)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_init() {
+        let skin = BlockSkin::new("assets/HqGYC5G - Imgur.png").unwrap();
+        assert_eq!(skin.width, 36);
+        assert_eq!(skin.height, 36);
+
+        for i in skin.as_array() {
+            assert_eq!(i.width(), skin.width);
+            assert_eq!(i.height(), skin.height);
+        }
+    }
+
+    #[test]
+    fn test_resize_larger() {
+        let skin = BlockSkin::new("assets/HqGYC5G - Imgur.png").unwrap();
+        let resized = skin.resize(64, 64);
+        assert_eq!(resized.width, 64);
+        assert_eq!(resized.height, 64);
+
+        for i in skin.as_array() {
+            assert_eq!(i.width(), skin.width);
+            assert_eq!(i.height(), skin.height);
+        }
+    }
+
+    #[test]
+    fn test_resize_smaller() {
+        let skin = BlockSkin::new("assets/HqGYC5G - Imgur.png").unwrap();
+        let resized = skin.resize(16, 16);
+        assert_eq!(resized.width, 16);
+        assert_eq!(resized.height, 16);
+
+        for i in skin.as_array() {
+            assert_eq!(i.width(), skin.width);
+            assert_eq!(i.height(), skin.height);
+        }
+    }
+
 }
