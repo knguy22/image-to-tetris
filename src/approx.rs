@@ -2,10 +2,13 @@ use crate::board::Board;
 use crate::draw::{self, Config};
 use crate::piece::{Cell, Piece, Orientation};
 
+use std::any::Any;
 use std::collections::BinaryHeap;
 
 use imageproc::image::{DynamicImage, SubImage, GenericImageView};
 use image_compare::{self, CompareError, rgb_hybrid_compare};
+use dssim::{self, Dssim};
+use rgb;
 
 pub fn approximate(target_img: &DynamicImage, config: &Config) -> Result<DynamicImage, Box<dyn std::error::Error>> {
     // resize the skin
@@ -30,7 +33,10 @@ pub fn approximate(target_img: &DynamicImage, config: &Config) -> Result<Dynamic
     }
 
     // for each cell at the top of the heap:
-    let mut pieces_placed: u32 = 0;
+    let mut pieces_tried: u32 = 0;
+    let mut best_diff: f64 = diff_images(&draw::draw_board(&board, &skin), &target_img)?;
+    println!("Initial diff: {}", best_diff);
+
     while heap.len() > 0 {
         let cell = heap.pop().unwrap();
 
@@ -41,17 +47,22 @@ pub fn approximate(target_img: &DynamicImage, config: &Config) -> Result<Dynamic
 
         // 2. for each possible piece and orientation:
         let mut best_piece: Option<Piece> = None;
-        let mut best_score: f64 = 0.0;
         for orientation in Orientation::all() {
-            for piece in Piece::all(cell, orientation) {
+            for piece in Piece::all(cell, orientation.clone()) {
+                pieces_tried += 1;
+
+            if pieces_tried % 500 == 0 {
+                println!("pieces tried: {}", pieces_tried);
+            }
+
                 // 2.1 check if the piece can be placed
                 match board.place(&piece) {
                     Ok(_) => {
-                        // 2.2 if so, score it
-                        let score = score_board(&draw::draw_board(&board, &skin), &target_img)?;
-                        if score > best_score {
+                        // 2.2 if so, diff it
+                        let diff = diff_images(&draw::draw_board(&board, &skin), &target_img)?;
+                        if diff < best_diff {
                             best_piece = Some(piece);
-                            best_score = score;
+                            best_diff = diff;
                         }
                         board.undo_last_move()?;
                     }
@@ -61,17 +72,12 @@ pub fn approximate(target_img: &DynamicImage, config: &Config) -> Result<Dynamic
         }
 
         // 3. if we found a piece, place it
+
         if best_piece.is_some() {
             let best_piece = best_piece.unwrap();
             board.place(&best_piece)?;
 
-            pieces_placed += 1;
-            if pieces_placed % 100 == 0 {
-                println!("{} pieces placed", pieces_placed);
-                println!("Best score: {}", best_score);
-                let tmp = draw::draw_board(&board, &skin);
-                tmp.save("results/tmp_board.png").unwrap();
-            }
+            println!("diff: {}, pieces placed: {}", best_diff, board.pieces.len());
 
             // check cells above to push into heap
             for piece_cell in best_piece.get_occupancy()? {
@@ -86,6 +92,27 @@ pub fn approximate(target_img: &DynamicImage, config: &Config) -> Result<Dynamic
     Ok(draw::draw_board(&board, &skin))
 }
 
-pub fn score_board(image1: &DynamicImage, image2: &DynamicImage) -> Result<f64, CompareError> {
+pub fn diff_images(image1: &DynamicImage, image2: &DynamicImage) -> Result<f64, Box<dyn std::error::Error>> {
+    Ok(diff_images_image_compare(image1, image2)?)
+    // Ok(diff_images_dssim(image1, image2)?)
+}
+
+pub fn diff_images_image_compare(image1: &DynamicImage, image2: &DynamicImage) -> Result<f64, CompareError> {
     Ok(rgb_hybrid_compare(&image1.clone().to_rgb8(), &image2.clone().into_rgb8())?.score)
+}
+
+pub fn diff_images_dssim(image1: &DynamicImage, image2: &DynamicImage) -> Result<f64, Box<dyn std::error::Error>> {
+    let d = Dssim::new();
+
+    let image1_buffer = image1.to_rgb8();
+    let image2_buffer = image2.to_rgb8();
+
+    let image1_rgb = rgb::FromSlice::as_rgb(image1_buffer.as_raw().as_slice());
+    let image2_rgb = rgb::FromSlice::as_rgb(image2_buffer.as_raw().as_slice());
+
+    let d_image1 = d.create_image_rgb(image1_rgb, image1.width() as usize, image1.height() as usize).unwrap();
+    let d_image2 = d.create_image_rgb(image2_rgb, image2.width() as usize, image2.height() as usize).unwrap();
+
+    let (diff, _) = d.compare(&d_image1, &d_image2);
+    Ok(diff.into())
 }

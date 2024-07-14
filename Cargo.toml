@@ -4,7 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+dssim = "3.3.2"
+dssim-core = "3.2.10"
 image = "0.25.1"
 image-compare = "0.4.1"
 imageproc = "0.25.0"
 rand = "0.8.5"
+rgb = "0.8.44"
