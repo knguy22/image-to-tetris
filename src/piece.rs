@@ -41,10 +41,10 @@ const I_SHAPE: [[Dir; 4]; 4] = [
 ];
 
 const O_SHAPE: [[Dir; 4]; 4] = [
-    [Dir{ x: 0, y: 0 }, Dir{ x: 1, y: 0 }, Dir{ x: 0, y: 1 }, Dir{ x: 1, y: 1 }],
-    [Dir{ x: 0, y: 0 }, Dir{ x: 0, y: 1 }, Dir{ x: 1, y: 0 }, Dir{ x: 1, y: 1 }],
-    [Dir{ x: 0, y: 0 }, Dir{ x: 1, y: 0 }, Dir{ x: 0, y: 1 }, Dir{ x: 1, y: 1 }],
-    [Dir{ x: 0, y: 0 }, Dir{ x: 0, y: 1 }, Dir{ x: 1, y: 0 }, Dir{ x: 1, y: 1 }],
+    [Dir{ x: 0, y: 0 }, Dir{ x: -1, y: 0 }, Dir{ x: 0, y: -1 }, Dir{ x: -1, y: -1 }],
+    [Dir{ x: 0, y: 0 }, Dir{ x: 0, y: -1 }, Dir{ x: -1, y: 0 }, Dir{ x: -1, y: -1 }],
+    [Dir{ x: 0, y: 0 }, Dir{ x: -1, y: 0 }, Dir{ x: 0, y: -1 }, Dir{ x: -1, y: -1 }],
+    [Dir{ x: 0, y: 0 }, Dir{ x: 0, y: -1 }, Dir{ x: -1, y: 0 }, Dir{ x: -1, y: -1 }],
 ];
 
 const T_SHAPE: [[Dir; 4]; 4] = [
