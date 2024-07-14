@@ -70,6 +70,7 @@ impl BlockSkin {
         }
     }
 
+    #[allow(dead_code)]
     pub fn as_array_ref(&self) -> [&DynamicImage; 8] {
         [&self.empty_img, &self.i_img, &self.o_img, &self.t_img, &self.l_img, &self.j_img, &self.s_img, &self.z_img]
     }
