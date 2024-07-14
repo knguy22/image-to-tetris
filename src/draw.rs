@@ -73,6 +73,14 @@ impl BlockSkin {
     pub fn as_array_ref(&self) -> [&DynamicImage; 8] {
         [&self.empty_img, &self.i_img, &self.o_img, &self.t_img, &self.l_img, &self.j_img, &self.s_img, &self.z_img]
     }
+
+    pub fn width(&self) -> u32 {
+        self.width
+    }
+
+    pub fn height(&self) -> u32 {
+        self.height
+    }
 }
 
 
