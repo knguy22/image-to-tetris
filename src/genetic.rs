@@ -1,19 +1,17 @@
 use crate::board::Board;
 use crate::piece::{Piece, Cell, Orientation};
-use crate::draw::{draw_board, BlockSkin};
+use crate::draw::{self, draw_board};
 
 use imageproc::image::DynamicImage;
 use image_compare::{self, CompareError, rgb_hybrid_compare};
-use rand::{self, Rng};
-use rand::distributions::Distribution;
+use rand::{self, Rng, distributions::Distribution, distributions::Uniform};
 
 pub struct Config {
     pub max_iterations: usize,
     pub population_size: usize,
     pub max_breed_attempts: usize,
-    pub skin: BlockSkin,
-    pub board_width: usize,
-    pub board_height: usize,
+    pub mutation_rate: usize,
+    pub draw_config: draw::Config,
 }
 
 #[derive(Clone)]
@@ -22,7 +20,7 @@ struct Individual {
     score: f64,
 }
 
-pub fn genetic_algorithm(target_img: &DynamicImage, config: Config) -> DynamicImage {
+pub fn genetic_algorithm(target_img: &DynamicImage, config: &Config) -> DynamicImage {
     let mut best_image: DynamicImage = Default::default();
     let mut rng = rand::thread_rng();
 
@@ -34,7 +32,7 @@ pub fn genetic_algorithm(target_img: &DynamicImage, config: Config) -> DynamicIm
     while population.len() < config.population_size {
         assert!(attempts < config.max_breed_attempts);
 
-        let board = Board::new(config.board_width, config.board_height);
+        let board = Board::new(config.draw_config.board_width, config.draw_config.board_height);
         let individual = Individual::new(board, &config, target_img);
         match individual {
             Ok(individual) => population.push(individual),
@@ -50,7 +48,8 @@ pub fn genetic_algorithm(target_img: &DynamicImage, config: Config) -> DynamicIm
         population.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
         let best = &population[0];
         if best.score > 0.0 {
-            best_image = draw_board(&best.board, &config.skin);
+            best_image = draw_board(&best.board, &config.draw_config.skin);
+            best_image.save("results/tmp_board.png").unwrap();
         }
         println!("Iteration: {}, Best score: {}, Population size: {}", i, best.score, population.len());
 
@@ -67,7 +66,7 @@ pub fn genetic_algorithm(target_img: &DynamicImage, config: Config) -> DynamicIm
 
             let parent1 = &population[rng.gen_range(0..num_survive)];
             let parent2 = &population[rng.gen_range(0..num_survive)];
-            let breed_res = breed(&parent1.board, &parent2.board);
+            let breed_res = breed(&parent1.board, &parent2.board, config);
             let child = match breed_res {
                 Ok(child) => child,
                 Err(_) => continue
@@ -85,8 +84,12 @@ pub fn genetic_algorithm(target_img: &DynamicImage, config: Config) -> DynamicIm
     best_image
 }
 
-fn breed(board1: &Board, board2: &Board) -> Result<Board, Box<dyn std::error::Error>> {
+fn breed(board1: &Board, board2: &Board, config: &Config) -> Result<Board, Box<dyn std::error::Error>> {
     let mut board = Board::new(board1.width, board1.height);
+
+    for _ in 0..config.mutation_rate {
+        mutate(&mut board)?;
+    }
 
     // share genetics
     // place pieces if possible in order from both boards choosing randomly using 2 pointers
@@ -113,30 +116,27 @@ fn breed(board1: &Board, board2: &Board) -> Result<Board, Box<dyn std::error::Er
         j += 1;
     }
 
-    match mutate(&mut board) {
-        Ok(_) => Ok(board),
-        Err(e) => Err(e)
-    }
+    Ok(board)
 }
 
 // mutations
 fn mutate(board: &mut Board) -> Result<(), Box<dyn std::error::Error>> {
     let mut rng = rand::thread_rng();
-    let delete_piece: bool = rng.gen() && board.pieces.len() > 0;
+    let delete_piece: bool = Uniform::from(0..5).sample(&mut rng) < 2 && board.pieces.len() > 0;
 
     // delete a piece
     if delete_piece {
-        let piece_between = rand::distributions::Uniform::from(0..board.pieces.len());
+        let piece_between = Uniform::from(0..board.pieces.len());
         let piece = board.pieces[piece_between.sample(&mut rng)].clone();
         board.remove_piece(&piece).expect(format!("Failed to remove piece {:?}", piece).as_str());
         return Ok(());
     }
 
     // add a piece
-    let piece_between = rand::distributions::Uniform::from(0..7);
-    let orientation_between = rand::distributions::Uniform::from(0..4);
-    let x_between = rand::distributions::Uniform::from(0..board.width);
-    let y_between = rand::distributions::Uniform::from(0..board.height);
+    let piece_between = Uniform::from(0..7);
+    let orientation_between = Uniform::from(0..4);
+    let x_between = Uniform::from(0..board.width);
+    let y_between = Uniform::from(0..board.height);
 
     let cell = Cell{
         x: x_between.sample(&mut rng),
@@ -174,7 +174,7 @@ pub fn score(image1: &DynamicImage, image2: &DynamicImage) -> Result<f64, Compar
 
 impl Individual {
     pub fn new(board: Board, config: &Config, target_img: &DynamicImage) -> Result<Individual, Box<dyn std::error::Error>> {
-        let score = score(&draw_board(&board, &config.skin), target_img)?;
+        let score = score(&draw_board(&board, &config.draw_config.skin), target_img)?;
         Ok(Individual { board, score })
     }
 }
