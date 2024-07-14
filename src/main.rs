@@ -21,18 +21,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         draw_config: draw_config,
     };
 
-    let example_result = draw::draw_board(&tki(config.draw_config.board_width, config.draw_config.board_height), &config.draw_config.skin);
-    let resized_source_buffer = image::imageops::resize(&source_img, example_result.width(), example_result.height(), image::imageops::FilterType::Lanczos3);
-    let source_img = image::DynamicImage::from(resized_source_buffer);
+    // let example_result = draw::draw_board(&tki(config.draw_config.board_width, config.draw_config.board_height), &config.draw_config.skin);
+    // let resized_source_buffer = image::imageops::resize(&source_img, example_result.width(), example_result.height(), image::imageops::FilterType::Lanczos3);
+    // let source_img = image::DynamicImage::from(resized_source_buffer);
 
-    let result_img = genetic::genetic_algorithm(&source_img, &config);
+    // let result_img = genetic::genetic_algorithm(&source_img, &config);
+    // result_img.save("results/board.png")?;
+
+    let result_img = approx::approximate(&source_img, &config.draw_config)?;
     result_img.save("results/board.png")?;
 
     Ok(())
 }
 
-fn tki(width: u32, height: u32) -> board::Board {
-    let mut board = board::Board::new(width as usize, height as usize);
+fn tki(width: usize, height: usize) -> board::Board {
+    let mut board = board::Board::new(width, height);
     board.place(&piece::Piece::O(piece::Cell { x: 0, y: 0 }, piece::Orientation::NORTH)).unwrap();
     board.place(&piece::Piece::I(piece::Cell { x: 4, y: 0 }, piece::Orientation::NORTH)).unwrap();
     board.place(&piece::Piece::Z(piece::Cell { x: 2, y: 1 }, piece::Orientation::EAST)).unwrap();

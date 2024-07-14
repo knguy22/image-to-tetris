@@ -6,7 +6,7 @@ pub struct Dir {
     pub y: i32
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Cell {
     pub x: usize,
     pub y: usize
@@ -94,7 +94,25 @@ fn print_piece(piece: &[Dir; 4]) {
     }
 }
 
+impl Orientation {
+    pub fn all() -> [Orientation; 4] {
+        [Orientation::NORTH, Orientation::EAST, Orientation::SOUTH, Orientation::WEST]
+    }
+}
+
 impl Piece {
+    pub fn all(cell: Cell, orientation: Orientation) -> Vec<Piece> {
+        let mut pieces = Vec::new();
+        pieces.push(Piece::I(cell.clone(), orientation.clone()));
+        pieces.push(Piece::O(cell.clone(), orientation.clone()));
+        pieces.push(Piece::T(cell.clone(), orientation.clone()));
+        pieces.push(Piece::L(cell.clone(), orientation.clone()));
+        pieces.push(Piece::J(cell.clone(), orientation.clone()));
+        pieces.push(Piece::S(cell.clone(), orientation.clone()));
+        pieces.push(Piece::Z(cell, orientation));
+        pieces
+    }
+
     pub fn get_char(&self) -> char {
         match self {
             Piece::I(_, _) => 'I',
