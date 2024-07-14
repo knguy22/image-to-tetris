@@ -5,7 +5,8 @@ mod piece;
 mod genetic;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let source_img = image::open("sources/rick-astley-890513150.jpg")?;
+    // let source_img = image::open("sources/rick-astley-890513150.jpg")?;
+    let source_img = image::open("sources/red.jpg")?;
 
     let draw_config = draw::Config {
         skin: draw::BlockSkin::new("assets/HqGYC5G - Imgur.png")?,
