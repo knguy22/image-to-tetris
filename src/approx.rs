@@ -42,7 +42,7 @@ pub fn approximate(target_img: &DynamicImage, config: &Config) -> Result<Dynamic
 
         // 2. for each possible piece and orientation:
         let mut best_piece: Option<Piece> = None;
-        let mut best_piece_diff = std::f64::MAX;
+        let mut best_piece_diff = avg_grid_pixel_diff(&cell, &board, &skin, &target_img)?;
         for orientation in Orientation::all() {
             for piece in Piece::all(cell, orientation.clone()) {
                 if board.can_place(&piece) {
@@ -119,6 +119,36 @@ fn avg_piece_pixel_diff(piece: &Piece, board: &Board, skin: &BlockSkin, target_i
                 total_diff += (target_pixel[1] as i32 - skin_pixel[1] as i32).abs() as f64;
                 total_diff += (target_pixel[2] as i32 - skin_pixel[2] as i32).abs() as f64;
                 total_pixels += 3;
+            }
+        }
+    }
+
+    Ok(total_diff / total_pixels as f64)
+}
+
+
+// 3 x 3 grid centered around the cell
+fn avg_grid_pixel_diff(cell: &Cell, board: &Board, skin: &BlockSkin, target_img: &DynamicImage) -> Result<f64, Box<dyn std::error::Error>> {
+    let mut total_diff: f64 = 0.0;
+    let mut total_pixels: u32 = 0;
+
+    for cell_y in 0..3 {
+        for cell_x in 0..3 {
+            let curr_cell = Cell { x: cell.x + cell_x - 1, y: cell.y + cell_y - 1 };
+            match board.get(&curr_cell) {
+                Err(_) => continue,
+                _ => (),
+            }
+
+            for y in 0..skin.height() {
+                for x in 0..skin.width() {
+                    let target_pixel = target_img.get_pixel((curr_cell.x as u32 * skin.width() + x) as u32, (curr_cell.y as u32 * skin.height() + y) as u32);
+                    let skin_pixel = skin.i_img.get_pixel(x, y);
+                    total_diff += (target_pixel[0] as i32 - skin_pixel[0] as i32).abs() as f64;
+                    total_diff += (target_pixel[1] as i32 - skin_pixel[1] as i32).abs() as f64;
+                    total_diff += (target_pixel[2] as i32 - skin_pixel[2] as i32).abs() as f64;
+                    total_pixels += 3;
+                }
             }
         }
     }
