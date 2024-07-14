@@ -14,8 +14,8 @@ impl Board {
         Board {
             cells: vec![' '; width * height],
             pieces: Vec::new(),
-            width,
-            height
+            width: width,
+            height: height,
         }
     }
 

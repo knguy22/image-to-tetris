@@ -5,8 +5,8 @@ use imageproc::{image, image::GenericImageView, image::DynamicImage, image::imag
 #[derive(Clone)]
 pub struct Config {
     pub skin: BlockSkin,
-    pub board_width: usize,
-    pub board_height: usize,
+    pub board_width: u32,
+    pub board_height: u32,
 }
 
 #[derive(Clone)]
