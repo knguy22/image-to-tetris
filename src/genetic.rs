@@ -32,7 +32,7 @@ pub fn genetic_algorithm(target_img: &DynamicImage, config: &Config) -> DynamicI
     while population.len() < config.population_size {
         assert!(attempts < config.max_breed_attempts);
 
-        let board = Board::new(config.draw_config.board_width, config.draw_config.board_height);
+        let board = Board::new(config.draw_config.board_width as usize, config.draw_config.board_height as usize);
         let individual = Individual::new(board, &config, target_img);
         match individual {
             Ok(individual) => population.push(individual),
