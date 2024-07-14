@@ -27,6 +27,23 @@ impl Board {
         println!("+{}+", "-".repeat(self.width));
     }
 
+    pub fn can_place(&self, piece: &Piece) -> bool {
+        let to_occupy = piece.get_occupancy();
+        match to_occupy {
+            Err(_) => return false,
+            _ => {}
+        }
+        let to_occupy = to_occupy.unwrap();
+
+        for cell in to_occupy.iter() {
+            let curr = self.get(cell);
+            if curr.is_err() || *curr.unwrap() != ' ' {
+                return false;
+            }
+        }
+        true
+    }
+
     pub fn place(&mut self, piece: &Piece) -> Result<(), Box<dyn Error>> {
         let to_occupy = piece.get_occupancy()?;
 
@@ -40,7 +57,7 @@ impl Board {
 
         // if so, place
         for cell in to_occupy.iter() {
-            *self.get(cell)? = piece.get_char();
+            *self.get_mut(cell)? = piece.get_char();
         }
         self.pieces.push(piece.clone());
 
@@ -53,7 +70,7 @@ impl Board {
         }
         let piece = self.pieces.pop().unwrap();
         for cell in piece.get_occupancy()? {
-            *self.get(&cell)? = ' ';
+            *self.get_mut(&cell)? = ' ';
         }
         Ok(())
     }
@@ -61,13 +78,20 @@ impl Board {
     pub fn remove_piece(&mut self, piece: &Piece) -> Result<(), Box<dyn Error>> {
         let to_occupy = piece.get_occupancy()?;
         for cell in to_occupy.iter() {
-            *self.get(cell)? = ' ';
+            *self.get_mut(cell)? = ' ';
         }
         self.pieces.retain(|p| p != piece);
         Ok(())
     }
 
-    fn get(&mut self, cell: &Cell) -> Result<&mut char, Box<dyn Error>> {
+    pub fn get(&self, cell: &Cell) -> Result<&char, Box<dyn Error>> {
+        if !(cell.x < self.width && cell.y < self.height) {
+            return Err(format!("Cell ({}, {}) is out of bounds", cell.x, cell.y).into());
+        }
+        Ok(&self.cells[cell.y * self.width + cell.x])
+    }
+
+    pub fn get_mut(&mut self, cell: &Cell) -> Result<&mut char, Box<dyn Error>> {
         if !(cell.x < self.width && cell.y < self.height) {
             return Err(format!("Cell ({}, {}) is out of bounds", cell.x, cell.y).into());
         }
