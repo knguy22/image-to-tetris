@@ -10,8 +10,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let draw_config = draw::Config {
         skin: draw::BlockSkin::new("assets/HqGYC5G - Imgur.png")?,
-        board_width: 960,
-        board_height: 540,
+        board_width: 192,
+        board_height: 108,
     };
 
     let config = genetic::Config {
@@ -49,11 +49,11 @@ fn test_draw_all_pieces() {
     };
 
     for orientation in piece::Orientation::all() {
-        for piece in piece::Piece::all(piece::Cell { x: 2, y: 2 }, orientation) {
+        for piece in piece::Piece::all(piece::Cell { x: 4, y: 4 }, orientation) {
             let mut board = board::Board::new(10, 20);
             board.place(&piece).unwrap();
             let img = draw::draw_board(&board, &draw_config.skin);
-            img.save(format!("results/{:?}.png", piece)).unwrap();
+            img.save(format!("results/{:?} {:?}.png", piece, piece.get_orientation())).unwrap();
         }
     }
 }
