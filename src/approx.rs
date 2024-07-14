@@ -1,8 +1,7 @@
 use crate::board::Board;
-use crate::draw::{self, Config};
+use crate::draw::{self, BlockSkin, Config};
 use crate::piece::{Cell, Piece, Orientation};
 
-use std::any::Any;
 use std::collections::BinaryHeap;
 
 use imageproc::image::{DynamicImage, SubImage, GenericImageView};
@@ -33,10 +32,6 @@ pub fn approximate(target_img: &DynamicImage, config: &Config) -> Result<Dynamic
     }
 
     // for each cell at the top of the heap:
-    let mut pieces_tried: u32 = 0;
-    let mut best_diff: f64 = diff_images(&draw::draw_board(&board, &skin), &target_img)?;
-    println!("Initial diff: {}", best_diff);
-
     while heap.len() > 0 {
         let cell = heap.pop().unwrap();
 
@@ -47,37 +42,23 @@ pub fn approximate(target_img: &DynamicImage, config: &Config) -> Result<Dynamic
 
         // 2. for each possible piece and orientation:
         let mut best_piece: Option<Piece> = None;
+        let mut best_piece_diff = std::f64::MAX;
         for orientation in Orientation::all() {
             for piece in Piece::all(cell, orientation.clone()) {
-                pieces_tried += 1;
-
-            if pieces_tried % 500 == 0 {
-                println!("pieces tried: {}", pieces_tried);
-            }
-
-                // 2.1 check if the piece can be placed
-                match board.place(&piece) {
-                    Ok(_) => {
-                        // 2.2 if so, diff it
-                        let diff = diff_images(&draw::draw_board(&board, &skin), &target_img)?;
-                        if diff < best_diff {
-                            best_piece = Some(piece);
-                            best_diff = diff;
-                        }
-                        board.undo_last_move()?;
+                if board.can_place(&piece) {
+                    let diff = avg_piece_pixel_diff(&piece, &board, &skin, &target_img)?;
+                    if diff < best_piece_diff {
+                        best_piece = Some(piece);
+                        best_piece_diff = diff;
                     }
-                    Err(_) => {}
                 }
             }
         }
 
         // 3. if we found a piece, place it
-
         if best_piece.is_some() {
             let best_piece = best_piece.unwrap();
             board.place(&best_piece)?;
-
-            println!("diff: {}, pieces placed: {}", best_diff, board.pieces.len());
 
             // check cells above to push into heap
             for piece_cell in best_piece.get_occupancy()? {
@@ -97,11 +78,11 @@ pub fn diff_images(image1: &DynamicImage, image2: &DynamicImage) -> Result<f64, 
     // Ok(diff_images_dssim(image1, image2)?)
 }
 
-pub fn diff_images_image_compare(image1: &DynamicImage, image2: &DynamicImage) -> Result<f64, CompareError> {
+fn diff_images_image_compare(image1: &DynamicImage, image2: &DynamicImage) -> Result<f64, CompareError> {
     Ok(rgb_hybrid_compare(&image1.clone().to_rgb8(), &image2.clone().into_rgb8())?.score)
 }
 
-pub fn diff_images_dssim(image1: &DynamicImage, image2: &DynamicImage) -> Result<f64, Box<dyn std::error::Error>> {
+fn diff_images_dssim(image1: &DynamicImage, image2: &DynamicImage) -> Result<f64, Box<dyn std::error::Error>> {
     let d = Dssim::new();
 
     let image1_buffer = image1.to_rgb8();
@@ -115,4 +96,32 @@ pub fn diff_images_dssim(image1: &DynamicImage, image2: &DynamicImage) -> Result
 
     let (diff, _) = d.compare(&d_image1, &d_image2);
     Ok(diff.into())
+}
+
+fn avg_piece_pixel_diff(piece: &Piece, board: &Board, skin: &BlockSkin, target_img: &DynamicImage) -> Result<f64, Box<dyn std::error::Error>> {
+    let mut total_diff: f64 = 0.0;
+    let mut total_pixels: u32 = 0;
+    for cell in piece.get_occupancy()? {
+        for y in 0..skin.height() {
+            for x in 0..skin.width() {
+                let target_pixel = target_img.get_pixel((cell.x as u32 * skin.width() + x) as u32, (cell.y as u32 * skin.height() + y) as u32);
+                let skin_pixel = match piece {
+                    Piece::I(_, _) => skin.i_img.get_pixel(x, y),
+                    Piece::O(_, _) => skin.o_img.get_pixel(x, y),
+                    Piece::T(_, _) => skin.t_img.get_pixel(x, y),
+                    Piece::L(_, _) => skin.l_img.get_pixel(x, y),
+                    Piece::J(_, _) => skin.j_img.get_pixel(x, y),
+                    Piece::S(_, _) => skin.s_img.get_pixel(x, y),
+                    Piece::Z(_, _) => skin.z_img.get_pixel(x, y),
+                };
+
+                total_diff += (target_pixel[0] as i32 - skin_pixel[0] as i32).abs() as f64;
+                total_diff += (target_pixel[1] as i32 - skin_pixel[1] as i32).abs() as f64;
+                total_diff += (target_pixel[2] as i32 - skin_pixel[2] as i32).abs() as f64;
+                total_pixels += 3;
+            }
+        }
+    }
+
+    Ok(total_diff / total_pixels as f64)
 }
