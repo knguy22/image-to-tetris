@@ -47,6 +47,17 @@ impl Board {
         Ok(())
     }
 
+    pub fn undo_last_move(&mut self) -> Result<(), Box<dyn Error>> {
+        if self.pieces.len() == 0 {
+            return Err("No moves to undo".into());
+        }
+        let piece = self.pieces.pop().unwrap();
+        for cell in piece.get_occupancy()? {
+            *self.get(&cell)? = ' ';
+        }
+        Ok(())
+    }
+
     pub fn remove_piece(&mut self, piece: &Piece) -> Result<(), Box<dyn Error>> {
         let to_occupy = piece.get_occupancy()?;
         for cell in to_occupy.iter() {
