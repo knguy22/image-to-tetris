@@ -4,10 +4,7 @@ use crate::piece::{Cell, Piece, Orientation};
 
 use std::collections::BinaryHeap;
 
-use imageproc::image::{DynamicImage, SubImage, GenericImageView};
-use image_compare::{self, CompareError, rgb_hybrid_compare};
-use dssim::{self, Dssim};
-use rgb;
+use imageproc::image::{DynamicImage, GenericImageView};
 
 pub fn approximate(target_img: &DynamicImage, config: &Config) -> Result<DynamicImage, Box<dyn std::error::Error>> {
     // resize the skin
@@ -46,7 +43,7 @@ pub fn approximate(target_img: &DynamicImage, config: &Config) -> Result<Dynamic
         for orientation in Orientation::all() {
             for piece in Piece::all(cell, orientation.clone()) {
                 if board.can_place(&piece) {
-                    let diff = avg_piece_pixel_diff(&piece, &board, &skin, &target_img)?;
+                    let diff = avg_piece_pixel_diff(&piece, &skin, &target_img)?;
                     if diff < best_piece_diff {
                         best_piece = Some(piece);
                         best_piece_diff = diff;
@@ -73,32 +70,7 @@ pub fn approximate(target_img: &DynamicImage, config: &Config) -> Result<Dynamic
     Ok(draw::draw_board(&board, &skin))
 }
 
-pub fn diff_images(image1: &DynamicImage, image2: &DynamicImage) -> Result<f64, Box<dyn std::error::Error>> {
-    Ok(diff_images_image_compare(image1, image2)?)
-    // Ok(diff_images_dssim(image1, image2)?)
-}
-
-fn diff_images_image_compare(image1: &DynamicImage, image2: &DynamicImage) -> Result<f64, CompareError> {
-    Ok(rgb_hybrid_compare(&image1.clone().to_rgb8(), &image2.clone().into_rgb8())?.score)
-}
-
-fn diff_images_dssim(image1: &DynamicImage, image2: &DynamicImage) -> Result<f64, Box<dyn std::error::Error>> {
-    let d = Dssim::new();
-
-    let image1_buffer = image1.to_rgb8();
-    let image2_buffer = image2.to_rgb8();
-
-    let image1_rgb = rgb::FromSlice::as_rgb(image1_buffer.as_raw().as_slice());
-    let image2_rgb = rgb::FromSlice::as_rgb(image2_buffer.as_raw().as_slice());
-
-    let d_image1 = d.create_image_rgb(image1_rgb, image1.width() as usize, image1.height() as usize).unwrap();
-    let d_image2 = d.create_image_rgb(image2_rgb, image2.width() as usize, image2.height() as usize).unwrap();
-
-    let (diff, _) = d.compare(&d_image1, &d_image2);
-    Ok(diff.into())
-}
-
-fn avg_piece_pixel_diff(piece: &Piece, board: &Board, skin: &BlockSkin, target_img: &DynamicImage) -> Result<f64, Box<dyn std::error::Error>> {
+fn avg_piece_pixel_diff(piece: &Piece, skin: &BlockSkin, target_img: &DynamicImage) -> Result<f64, Box<dyn std::error::Error>> {
     let mut total_diff: f64 = 0.0;
     let mut total_pixels: u32 = 0;
     for cell in piece.get_occupancy()? {

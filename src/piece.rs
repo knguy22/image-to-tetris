@@ -82,18 +82,6 @@ const Z_SHAPE: [[Dir; 4]; 4] = [
     [Dir{ x: 0, y: 0 }, Dir{ x: 0, y: -1 }, Dir{ x: -1, y: -1 }, Dir{ x: -1, y: -2 }],
 ];
 
-fn print_piece(piece: &[Dir; 4]) {
-    let mut canvas: [[char; 5]; 5] = [[' '; 5]; 5];
-    for i in 0..4 {
-        // array can include negative numbers; adjust
-        canvas[(piece[i].y + 2) as usize][(piece[i].x + 2) as usize] = 'X';
-    }
-
-    for row in canvas.iter() {
-        println!("{}", row.iter().collect::<String>());
-    }
-}
-
 impl Orientation {
     pub fn all() -> [Orientation; 4] {
         [Orientation::NORTH, Orientation::EAST, Orientation::SOUTH, Orientation::WEST]

@@ -1,5 +1,5 @@
 use std::error::Error;
-use crate::piece::{Cell, Piece, Orientation};
+use crate::piece::{Cell, Piece};
 
 #[derive(Clone)]
 pub struct Board {
@@ -19,6 +19,7 @@ impl Board {
         }
     }
 
+    #[allow(dead_code)]
     pub fn print(&self) {
         println!("+{}+", "-".repeat(self.width));
         for row in self.cells.chunks(self.width).rev() {
@@ -64,6 +65,7 @@ impl Board {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn undo_last_move(&mut self) -> Result<(), Box<dyn Error>> {
         if self.pieces.len() == 0 {
             return Err("No moves to undo".into());
@@ -75,6 +77,7 @@ impl Board {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn remove_piece(&mut self, piece: &Piece) -> Result<(), Box<dyn Error>> {
         let to_occupy = piece.get_occupancy()?;
         for cell in to_occupy.iter() {
@@ -102,6 +105,7 @@ impl Board {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::piece::Orientation;
 
     #[test]
     fn test_place_empty_board() {
