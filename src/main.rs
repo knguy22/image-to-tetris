@@ -22,13 +22,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         draw_config: draw_config,
     };
 
-    // let example_result = draw::draw_board(&tki(config.draw_config.board_width, config.draw_config.board_height), &config.draw_config.skin);
-    // let resized_source_buffer = image::imageops::resize(&source_img, example_result.width(), example_result.height(), image::imageops::FilterType::Lanczos3);
-    // let source_img = image::DynamicImage::from(resized_source_buffer);
-
-    // let result_img = genetic::genetic_algorithm(&source_img, &config);
-    // result_img.save("results/board.png")?;
-
     let result_img = approx::approximate(&source_img, &config.draw_config)?;
     result_img.save("results/board.png")?;
 
