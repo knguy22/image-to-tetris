@@ -6,12 +6,12 @@ mod genetic;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // let source_img = image::open("sources/rick-astley-890513150.jpg")?;
-    let source_img = image::open("sources/red.jpg")?;
+    let source_img = image::open("sources/only_z.png")?;
 
     let draw_config = draw::Config {
         skin: draw::BlockSkin::new("assets/HqGYC5G - Imgur.png")?,
-        board_width: 120,
-        board_height: 67,
+        board_width: 480,
+        board_height: 270,
     };
 
     let config = genetic::Config {
@@ -39,4 +39,21 @@ fn tki(width: usize, height: usize) -> board::Board {
     board.print();
 
     board
+}
+
+fn test_draw_all_pieces() {
+    let draw_config = draw::Config {
+        skin: draw::BlockSkin::new("assets/HqGYC5G - Imgur.png").unwrap(),
+        board_width: 120,
+        board_height: 67,
+    };
+
+    for orientation in piece::Orientation::all() {
+        for piece in piece::Piece::all(piece::Cell { x: 2, y: 2 }, orientation) {
+            let mut board = board::Board::new(10, 20);
+            board.place(&piece).unwrap();
+            let img = draw::draw_board(&board, &draw_config.skin);
+            img.save(format!("results/{:?}.png", piece)).unwrap();
+        }
+    }
 }

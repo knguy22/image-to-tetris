@@ -11,14 +11,14 @@ pub struct Config {
 
 #[derive(Clone)]
 pub struct BlockSkin {
-    empty_img: image::DynamicImage,
-    i_img: image::DynamicImage,
-    o_img: image::DynamicImage,
-    t_img: image::DynamicImage,
-    l_img: image::DynamicImage,
-    j_img: image::DynamicImage,
-    s_img: image::DynamicImage,
-    z_img: image::DynamicImage,
+    pub empty_img: image::DynamicImage,
+    pub i_img: image::DynamicImage,
+    pub o_img: image::DynamicImage,
+    pub t_img: image::DynamicImage,
+    pub l_img: image::DynamicImage,
+    pub j_img: image::DynamicImage,
+    pub s_img: image::DynamicImage,
+    pub z_img: image::DynamicImage,
 
     width: u32,
     height: u32
