@@ -94,8 +94,6 @@ pub fn draw_board(board: &Board, skin: &BlockSkin) -> DynamicImage {
             image::imageops::overlay(&mut img, block, (x as u32 * skin.width).into(), (y as u32 * skin.height).into());
         }
     }
-    // flip the image due to how the board is represented
-    img = image::imageops::flip_vertical(&img);
     DynamicImage::from(img)
 }
 
