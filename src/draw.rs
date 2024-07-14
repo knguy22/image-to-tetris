@@ -70,8 +70,8 @@ impl BlockSkin {
         }
     }
 
-    pub fn as_array(&self) -> [DynamicImage; 8] {
-        [self.empty_img.clone(), self.i_img.clone(), self.o_img.clone(), self.t_img.clone(), self.l_img.clone(), self.j_img.clone(), self.s_img.clone(), self.z_img.clone()]
+    pub fn as_array_ref(&self) -> [&DynamicImage; 8] {
+        [&self.empty_img, &self.i_img, &self.o_img, &self.t_img, &self.l_img, &self.j_img, &self.s_img, &self.z_img]
     }
 }
 
@@ -109,7 +109,7 @@ mod tests {
         assert_eq!(skin.width, 36);
         assert_eq!(skin.height, 36);
 
-        for i in skin.as_array() {
+        for i in skin.as_array_ref() {
             assert_eq!(i.width(), skin.width);
             assert_eq!(i.height(), skin.height);
         }
@@ -122,7 +122,7 @@ mod tests {
         assert_eq!(resized.width, 64);
         assert_eq!(resized.height, 64);
 
-        for i in skin.as_array() {
+        for i in skin.as_array_ref() {
             assert_eq!(i.width(), skin.width);
             assert_eq!(i.height(), skin.height);
         }
@@ -135,7 +135,7 @@ mod tests {
         assert_eq!(resized.width, 16);
         assert_eq!(resized.height, 16);
 
-        for i in skin.as_array() {
+        for i in skin.as_array_ref() {
             assert_eq!(i.width(), skin.width);
             assert_eq!(i.height(), skin.height);
         }
