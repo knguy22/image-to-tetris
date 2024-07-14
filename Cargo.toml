@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+clap = { version = "4.5.9", features = ["derive"] }
 dssim = "3.3.2"
 dssim-core = "3.2.10"
 image = "0.25.1"
