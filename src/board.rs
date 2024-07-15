@@ -9,7 +9,7 @@ pub struct Board {
     pub height: usize
 }
 
-pub const BLOCKED_CELL: char = 'X';
+pub const BLOCKED_CELL: char = 'B';
 pub const EMPTY_CELL: char = ' ';
 
 impl Board {
