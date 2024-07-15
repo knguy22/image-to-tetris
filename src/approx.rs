@@ -42,7 +42,7 @@ pub fn approximate(target_img: &DynamicImage, config: Config) -> Result<DynamicI
         let mut best_skin_id: Option<usize> = None;
         
         for skin in board.iter_skins() {
-            // try empty
+            // try black garbage
             let diff = avg_grid_pixel_diff(&cell, &board.board, skin, &target_img)?;
             if diff < best_piece_diff {
                 best_piece = None;
@@ -80,6 +80,9 @@ pub fn approximate(target_img: &DynamicImage, config: Config) -> Result<DynamicI
         // assign the empty block the skin
         else {
             board.place_empty_cell(&cell, best_skin_id.unwrap())?;
+            if cell.y > 0 {
+                heap.push(Cell { x: cell.x, y: cell.y - 1 });
+            }
         }
     }
 
@@ -130,7 +133,7 @@ fn avg_grid_pixel_diff(cell: &Cell, board: &Board, skin: &BlockSkin, target_img:
             for y in 0..skin.height() {
                 for x in 0..skin.width() {
                     let target_pixel = target_img.get_pixel((curr_cell.x as u32 * skin.width() + x) as u32, (curr_cell.y as u32 * skin.height() + y) as u32);
-                    let skin_pixel = skin.i_img.get_pixel(x, y);
+                    let skin_pixel = skin.black_garbage.get_pixel(x, y);
                     total_diff += (target_pixel[0] as i32 - skin_pixel[0] as i32).pow(2) as f64;
                     total_diff += (target_pixel[1] as i32 - skin_pixel[1] as i32).pow(2) as f64;
                     total_diff += (target_pixel[2] as i32 - skin_pixel[2] as i32).pow(2) as f64;

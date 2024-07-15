@@ -17,7 +17,9 @@ pub struct SkinnedBoard {
 
 #[derive(Clone)]
 pub struct BlockSkin {
-    pub empty_img: image::DynamicImage,
+    pub black_garbage: image::DynamicImage,
+    pub gray_garbage: image::DynamicImage,
+
     pub i_img: image::DynamicImage,
     pub o_img: image::DynamicImage,
     pub t_img: image::DynamicImage,
@@ -123,7 +125,8 @@ impl BlockSkin {
         
         // return the skin
         Ok(BlockSkin {
-            empty_img: new_images[0].clone(),
+            black_garbage: new_images[0].clone(),
+            gray_garbage: new_images[1].clone(),
             i_img: new_images[6].clone(),
             o_img: new_images[4].clone(),
             t_img: new_images[8].clone(),
@@ -138,7 +141,8 @@ impl BlockSkin {
     }
 
     pub fn resize(&mut self, width: u32, height: u32) {
-        self.empty_img = DynamicImage::from(resize(&self.empty_img, width, height, image::imageops::FilterType::Lanczos3));
+        self.black_garbage = DynamicImage::from(resize(&self.black_garbage, width, height, image::imageops::FilterType::Lanczos3));
+        self.gray_garbage = DynamicImage::from(resize(&self.gray_garbage, width, height, image::imageops::FilterType::Lanczos3));
         self.i_img = DynamicImage::from(resize(&self.i_img, width, height, image::imageops::FilterType::Lanczos3));
         self.o_img = DynamicImage::from(resize(&self.o_img, width, height, image::imageops::FilterType::Lanczos3));
         self.t_img = DynamicImage::from(resize(&self.t_img, width, height, image::imageops::FilterType::Lanczos3));
@@ -151,8 +155,8 @@ impl BlockSkin {
     }
 
     #[allow(dead_code)]
-    pub fn as_array_ref(&self) -> [&DynamicImage; 8] {
-        [&self.empty_img, &self.i_img, &self.o_img, &self.t_img, &self.l_img, &self.j_img, &self.s_img, &self.z_img]
+    pub fn as_array_ref(&self) -> [&DynamicImage; 9] {
+        [&self.black_garbage, &self.gray_garbage, &self.i_img, &self.o_img, &self.t_img, &self.l_img, &self.j_img, &self.s_img, &self.z_img]
     }
 
     pub fn width(&self) -> u32 {
@@ -186,7 +190,8 @@ pub fn draw_board(skin_board: &SkinnedBoard) -> DynamicImage {
                 'J' => &skin.j_img,
                 'S' => &skin.s_img,
                 'Z' => &skin.z_img,
-                _ => &skin.empty_img,
+                'G' => &skin.gray_garbage,
+                _ => &skin.black_garbage,
             };
             image::imageops::overlay(&mut img, block, (x as u32 * skin.width).into(), (y as u32 * skin.height).into());
         }
