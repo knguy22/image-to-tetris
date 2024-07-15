@@ -93,7 +93,8 @@ impl SkinnedBoard {
         Ok(())
     }
 
-    pub fn place_empty_cell(&mut self, cell: &Cell, skin_id: usize) -> Result<(), Box<dyn std::error::Error>> {
+    // assigns a cell to a skin and blocks it
+    pub fn place_cell(&mut self, cell: &Cell, skin_id: usize) -> Result<(), Box<dyn std::error::Error>> {
         let board_width = self.board_width();
         match *self.board.get(cell)? {
             ' ' => {
