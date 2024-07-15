@@ -98,15 +98,13 @@ fn avg_piece_pixel_diff(piece: &Piece, skin: &BlockSkin, target_img: &DynamicIma
     Ok(total_diff / total_pixels as f64)
 }
 
-
-// 3 x 3 grid centered around the cell
 fn avg_grid_pixel_diff(cell: &Cell, board: &Board, skin: &BlockSkin, target_img: &DynamicImage) -> Result<f64, Box<dyn std::error::Error>> {
     let mut total_diff: f64 = 0.0;
     let mut total_pixels: u32 = 0;
 
-    for cell_y in 0..3 {
-        for cell_x in 0..3 {
-            let curr_cell = Cell { x: cell.x + cell_x - 1, y: cell.y + cell_y - 1 };
+    for cell_y in 0..5 {
+        for cell_x in 0..5 {
+            let curr_cell = Cell { x: cell.x + cell_x - 3, y: cell.y + cell_y - 3 };
             match board.get(&curr_cell) {
                 Err(_) => continue,
                 _ => (),
