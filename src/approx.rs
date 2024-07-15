@@ -104,9 +104,9 @@ fn avg_piece_pixel_diff(piece: &Piece, skin: &BlockSkin, target_img: &DynamicIma
                     Piece::Z(_, _) => skin.z_img.get_pixel(x, y),
                 };
 
-                total_diff += (target_pixel[0] as i32 - skin_pixel[0] as i32).abs() as f64;
-                total_diff += (target_pixel[1] as i32 - skin_pixel[1] as i32).abs() as f64;
-                total_diff += (target_pixel[2] as i32 - skin_pixel[2] as i32).abs() as f64;
+                total_diff += (target_pixel[0] as i32 - skin_pixel[0] as i32).pow(2) as f64;
+                total_diff += (target_pixel[1] as i32 - skin_pixel[1] as i32).pow(2) as f64;
+                total_diff += (target_pixel[2] as i32 - skin_pixel[2] as i32).pow(2) as f64;
                 total_pixels += 3;
             }
         }
@@ -131,9 +131,9 @@ fn avg_grid_pixel_diff(cell: &Cell, board: &Board, skin: &BlockSkin, target_img:
                 for x in 0..skin.width() {
                     let target_pixel = target_img.get_pixel((curr_cell.x as u32 * skin.width() + x) as u32, (curr_cell.y as u32 * skin.height() + y) as u32);
                     let skin_pixel = skin.i_img.get_pixel(x, y);
-                    total_diff += (target_pixel[0] as i32 - skin_pixel[0] as i32).abs() as f64;
-                    total_diff += (target_pixel[1] as i32 - skin_pixel[1] as i32).abs() as f64;
-                    total_diff += (target_pixel[2] as i32 - skin_pixel[2] as i32).abs() as f64;
+                    total_diff += (target_pixel[0] as i32 - skin_pixel[0] as i32).pow(2) as f64;
+                    total_diff += (target_pixel[1] as i32 - skin_pixel[1] as i32).pow(2) as f64;
+                    total_diff += (target_pixel[2] as i32 - skin_pixel[2] as i32).pow(2) as f64;
                     total_pixels += 3;
                 }
             }
