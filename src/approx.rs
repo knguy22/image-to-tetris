@@ -1,31 +1,30 @@
 use crate::board::Board;
-use crate::draw::{self, BlockSkin, Config};
+use crate::draw::{self, BlockSkin, SkinnedBoard, Config};
 use crate::piece::{Cell, Piece, Orientation};
 
 use std::collections::BinaryHeap;
 
 use imageproc::image::{DynamicImage, GenericImageView};
 
-pub fn approximate(target_img: &DynamicImage, config: &Config) -> Result<DynamicImage, Box<dyn std::error::Error>> {
-    // resize the skin
-    let (width, height) = target_img.dimensions();
-    let skin = config.skin.resize(width / u32::try_from(config.board_width)?, height / u32::try_from(config.board_height)?);
-
+pub fn approximate(target_img: &DynamicImage, config: Config) -> Result<DynamicImage, Box<dyn std::error::Error>> {
     // initialize the board
-    let mut board = Board::new(config.board_width, config.board_height);
+    let mut board = SkinnedBoard::new(config.board_width, config.board_height);
+
+    // resize the skins
+    let (img_width, img_height) = target_img.dimensions();
+    board.resize_skins(img_width / u32::try_from(board.board_width())?, img_height / u32::try_from(board.board_height())?);
 
     // resize the target image to account for rounding errors
-    let resized_target_width = skin.width() * u32::try_from(board.width)?;
-    let resized_target_height = skin.height() * u32::try_from(board.height)?;
+    let resized_target_width = board.skins_width() * u32::try_from(board.board_width())?;
+    let resized_target_height = board.skins_height() * u32::try_from(board.board_height())?;
     let resized_target_buffer = image::imageops::resize(target_img, resized_target_width, resized_target_height, image::imageops::FilterType::Lanczos3);
     let target_img = image::DynamicImage::from(resized_target_buffer);
-    target_img.save("results/tmp_target.png")?;
 
     // init the heap and push the first row of cells into it
     // the first row is the highest row in number because we are using a max heap
     let mut heap = BinaryHeap::new();
-    for x in 0..config.board_width {
-        heap.push(Cell { x: x, y: config.board_height - 1 });
+    for x in 0..board.board_width() {
+        heap.push(Cell { x: x, y: board.board_height() - 1 });
     }
 
     // for each cell at the top of the heap:
@@ -33,20 +32,34 @@ pub fn approximate(target_img: &DynamicImage, config: &Config) -> Result<Dynamic
         let cell = heap.pop().unwrap();
 
         // 1. check if the cell is unoccupied
-        if *board.get(&cell)? != ' ' {
+        if !board.empty_at(&cell) {
             continue;
         }
 
-        // 2. for each possible piece and orientation:
+        // 2. for each possible skin, piece, and orientation:
         let mut best_piece: Option<Piece> = None;
-        let mut best_piece_diff = avg_grid_pixel_diff(&cell, &board, &skin, &target_img)?;
-        for orientation in Orientation::all() {
-            for piece in Piece::all(cell, orientation.clone()) {
-                if board.can_place(&piece) {
-                    let diff = avg_piece_pixel_diff(&piece, &skin, &target_img)?;
-                    if diff < best_piece_diff {
-                        best_piece = Some(piece);
-                        best_piece_diff = diff;
+        let mut best_piece_diff = f64::MAX;
+        let mut best_skin_id: Option<usize> = None;
+        
+        for skin in board.iter_skins() {
+            // try empty
+            let diff = avg_grid_pixel_diff(&cell, &board.board, skin, &target_img)?;
+            if diff < best_piece_diff {
+                best_piece = None;
+                best_piece_diff = diff;
+                best_skin_id = Some(skin.id());
+            }
+            
+            // try placing pieces
+            for orientation in Orientation::all() {
+                for piece in Piece::all(cell, orientation.clone()) {
+                    if board.board.can_place(&piece) {
+                        let diff = avg_piece_pixel_diff(&piece, &skin, &target_img)?;
+                        if diff < best_piece_diff {
+                            best_piece = Some(piece);
+                            best_piece_diff = diff;
+                            best_skin_id = Some(skin.id());
+                        }
                     }
                 }
             }
@@ -55,7 +68,7 @@ pub fn approximate(target_img: &DynamicImage, config: &Config) -> Result<Dynamic
         // 3. if we found a piece, place it
         if best_piece.is_some() {
             let best_piece = best_piece.unwrap();
-            board.place(&best_piece)?;
+            board.place(&best_piece, best_skin_id.unwrap())?;
 
             // check cells above to push into heap
             for piece_cell in best_piece.get_occupancy()? {
@@ -63,11 +76,15 @@ pub fn approximate(target_img: &DynamicImage, config: &Config) -> Result<Dynamic
                     heap.push(Cell { x: piece_cell.x, y: piece_cell.y - 1 });
                 }
             }
+        } 
+        // assign the empty block the skin
+        else {
+            board.place_empty_cell(&cell, best_skin_id.unwrap())?;
         }
     }
 
     // draw the board
-    Ok(draw::draw_board(&board, &skin))
+    Ok(draw::draw_board(&board))
 }
 
 fn avg_piece_pixel_diff(piece: &Piece, skin: &BlockSkin, target_img: &DynamicImage) -> Result<f64, Box<dyn std::error::Error>> {

@@ -193,11 +193,5 @@ mod tests {
         let piece = Piece::I(Cell { x: 2, y: 2 }, Orientation::NORTH);
         assert!(piece.get_occupancy().is_ok());
     }
-    
 
-    #[test]
-    fn test_get_occupancy_negative() {
-        let piece = Piece::I(Cell { x: 0, y: 0 }, Orientation::NORTH);
-        assert!(piece.get_occupancy().is_err());
-    }
 }

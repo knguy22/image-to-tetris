@@ -40,33 +40,31 @@ fn main() {
     };
 
     let config = draw::Config {
-        skin: draw::BlockSkin::new("assets/HqGYC5G - Imgur.png").unwrap(),
         board_width: board_width,
         board_height: board_height,
     };
 
     let source_img = image::open(cli.source_img).unwrap();
-    let result_img = approx::approximate(&source_img, &config).unwrap();
+    println!("Loaded {}x{} image", source_img.width(), source_img.height());
+
+    let result_img = approx::approximate(&source_img, config).unwrap();
     result_img.save(cli.output_img).unwrap();
 }
 
 #[cfg(test)]
 mod tests {
+    use draw::SkinnedBoard;
+
     use super::*;
 
     #[test]
     fn test_draw_all_pieces() {
-        let draw_config = draw::Config {
-            skin: draw::BlockSkin::new("assets/HqGYC5G - Imgur.png").unwrap(),
-            board_width: 120,
-            board_height: 67,
-        };
-
         for orientation in piece::Orientation::all() {
             for piece in piece::Piece::all(piece::Cell { x: 4, y: 4 }, orientation) {
-                let mut board = board::Board::new(10, 20);
-                board.place(&piece).unwrap();
-                let img = draw::draw_board(&board, &draw_config.skin);
+                let mut board = SkinnedBoard::new(10, 20);
+
+                board.place(&piece, 0).unwrap();
+                let img = draw::draw_board(&board);
                 img.save(format!("results/{:?} {:?}.png", piece, piece.get_orientation())).unwrap();
             }
         }

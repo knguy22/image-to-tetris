@@ -1,12 +1,18 @@
-use crate::board::Board;
+use crate::board::{Board, EMPTY_CELL, BLOCKED_CELL};
+use crate::piece::{Cell, Piece};
 
 use imageproc::{image, image::GenericImageView, image::DynamicImage, image::imageops::resize};
 
 #[derive(Clone)]
 pub struct Config {
-    pub skin: BlockSkin,
     pub board_width: usize,
     pub board_height: usize,
+}
+
+pub struct SkinnedBoard {
+    pub board: Board,
+    cells_skin: Vec<usize>,
+    skins: Vec<BlockSkin>,
 }
 
 #[derive(Clone)]
@@ -21,11 +27,86 @@ pub struct BlockSkin {
     pub z_img: image::DynamicImage,
 
     width: u32,
-    height: u32
+    height: u32,
+    id: usize,
 }
 
+impl SkinnedBoard {
+    pub fn new(width: usize, height: usize) -> SkinnedBoard {
+        let mut skins = Vec::new();
+        for file in std::fs::read_dir("assets").unwrap() {
+            let path = file.unwrap().path();
+            if path.is_file() && path.extension().unwrap() == "png" {
+                skins.push(BlockSkin::new(path.to_str().unwrap(), skins.len()).unwrap());
+            }
+        }
+
+        // cells skin must have the same dimensions as board
+        SkinnedBoard {
+            board: Board::new(width, height),
+            cells_skin: vec![0; width * height],
+            skins: skins
+        }
+    }
+
+    pub fn iter_skins(&self) -> std::slice::Iter<BlockSkin> {
+        self.skins.iter()
+    }
+
+    pub fn skins_width(&self) -> u32 {
+        self.skins[0].width
+    }
+
+    pub fn skins_height(&self) -> u32 {
+        self.skins[0].height
+    }
+
+    pub fn board_width(&self) -> usize {
+        self.board.width
+    }
+
+    pub fn board_height(&self) -> usize {
+        self.board.height
+    }
+
+    pub fn resize_skins(&mut self, width: u32, height: u32) {
+        for skin in self.skins.iter_mut() {
+            skin.resize(width, height);
+        }
+    }
+
+    pub fn empty_at(&self, cell: &Cell) -> bool {
+        *self.board.get(cell).unwrap_or(&BLOCKED_CELL) == EMPTY_CELL
+    }
+
+    pub fn place(&mut self, piece: &Piece, skin_id: usize) -> Result<(), Box<dyn std::error::Error>>{
+        let board_width = self.board_width();
+
+        // place the piece for both the skin and the boardj
+        self.board.place(piece)?;
+        for cell in piece.get_occupancy()? {
+            self.cells_skin[cell.y * board_width + cell.x] = skin_id;
+        }
+
+        Ok(())
+    }
+
+    pub fn place_empty_cell(&mut self, cell: &Cell, skin_id: usize) -> Result<(), Box<dyn std::error::Error>> {
+        let board_width = self.board_width();
+        match *self.board.get(cell)? {
+            ' ' => {
+                self.cells_skin[cell.y * board_width + cell.x] = skin_id;
+                *self.board.get_mut(cell)? = BLOCKED_CELL;
+                Ok(())
+            },
+            _ => Err("Cell is occupied".into())
+        }
+    }
+}
+
+
 impl BlockSkin {
-    pub fn new(skin_path: &str) -> Result<BlockSkin, Box<dyn std::error::Error>> {
+    pub fn new(skin_path: &str, id: usize) -> Result<BlockSkin, Box<dyn std::error::Error>> {
         let img = imageproc::image::open(skin_path)?;
 
         const NUM_SECTIONS: usize = 9;
@@ -51,23 +132,22 @@ impl BlockSkin {
             s_img: new_images[5].clone(),
             z_img: new_images[2].clone(),
             width: section_width,
-            height
+            height: height,
+            id: id,
         })
     }
 
-    pub fn resize(&self, width: u32, height: u32) -> BlockSkin {
-        BlockSkin {
-            empty_img: DynamicImage::from(resize(&self.empty_img, width, height, image::imageops::FilterType::Lanczos3)),
-            i_img: DynamicImage::from(resize(&self.i_img, width, height, image::imageops::FilterType::Lanczos3)),
-            o_img: DynamicImage::from(resize(&self.o_img, width, height, image::imageops::FilterType::Lanczos3)),
-            t_img: DynamicImage::from(resize(&self.t_img, width, height, image::imageops::FilterType::Lanczos3)),
-            l_img: DynamicImage::from(resize(&self.l_img, width, height, image::imageops::FilterType::Lanczos3)),
-            j_img: DynamicImage::from(resize(&self.j_img, width, height, image::imageops::FilterType::Lanczos3)),
-            s_img: DynamicImage::from(resize(&self.s_img, width, height, image::imageops::FilterType::Lanczos3)),
-            z_img: DynamicImage::from(resize(&self.z_img, width, height, image::imageops::FilterType::Lanczos3)),
-            width,
-            height
-        }
+    pub fn resize(&mut self, width: u32, height: u32) {
+        self.empty_img = DynamicImage::from(resize(&self.empty_img, width, height, image::imageops::FilterType::Lanczos3));
+        self.i_img = DynamicImage::from(resize(&self.i_img, width, height, image::imageops::FilterType::Lanczos3));
+        self.o_img = DynamicImage::from(resize(&self.o_img, width, height, image::imageops::FilterType::Lanczos3));
+        self.t_img = DynamicImage::from(resize(&self.t_img, width, height, image::imageops::FilterType::Lanczos3));
+        self.l_img = DynamicImage::from(resize(&self.l_img, width, height, image::imageops::FilterType::Lanczos3));
+        self.j_img = DynamicImage::from(resize(&self.j_img, width, height, image::imageops::FilterType::Lanczos3));
+        self.s_img = DynamicImage::from(resize(&self.s_img, width, height, image::imageops::FilterType::Lanczos3));
+        self.z_img = DynamicImage::from(resize(&self.z_img, width, height, image::imageops::FilterType::Lanczos3));
+        self.width = width;
+        self.height = height;
     }
 
     #[allow(dead_code)]
@@ -82,14 +162,22 @@ impl BlockSkin {
     pub fn height(&self) -> u32 {
         self.height
     }
+
+    pub fn id(&self) -> usize {
+        self.id
+    }
 }
 
 
-pub fn draw_board(board: &Board, skin: &BlockSkin) -> DynamicImage {
-    let mut img = image::RgbaImage::new(board.width as u32 * skin.width, board.height as u32 * skin.height);
+pub fn draw_board(skin_board: &SkinnedBoard) -> DynamicImage {
+    let board = &skin_board.board;
+    let skins = &skin_board.skins;
+    let cells_skin = &skin_board.cells_skin;
 
+    let mut img = image::RgbaImage::new(board.width as u32 * skins[0].width, board.height as u32 * skins[0].height);
     for y in 0..board.height {
         for x in 0..board.width {
+            let skin = &skins[cells_skin[y * board.width + x]];
             let block = match board.cells[y * board.width + x] {
                 'I' => &skin.i_img,
                 'O' => &skin.o_img,
@@ -112,7 +200,7 @@ mod tests {
 
     #[test]
     fn test_init() {
-        let skin = BlockSkin::new("assets/HqGYC5G - Imgur.png").unwrap();
+        let skin = BlockSkin::new("assets/HqGYC5G - Imgur.png", 0).unwrap();
         assert_eq!(skin.width, 36);
         assert_eq!(skin.height, 36);
 
@@ -124,10 +212,10 @@ mod tests {
 
     #[test]
     fn test_resize_larger() {
-        let skin = BlockSkin::new("assets/HqGYC5G - Imgur.png").unwrap();
-        let resized = skin.resize(64, 64);
-        assert_eq!(resized.width, 64);
-        assert_eq!(resized.height, 64);
+        let mut skin = BlockSkin::new("assets/HqGYC5G - Imgur.png", 0).unwrap();
+        skin.resize(64, 64);
+        assert_eq!(skin.width, 64);
+        assert_eq!(skin.height, 64);
 
         for i in skin.as_array_ref() {
             assert_eq!(i.width(), skin.width);
@@ -137,14 +225,25 @@ mod tests {
 
     #[test]
     fn test_resize_smaller() {
-        let skin = BlockSkin::new("assets/HqGYC5G - Imgur.png").unwrap();
-        let resized = skin.resize(16, 16);
-        assert_eq!(resized.width, 16);
-        assert_eq!(resized.height, 16);
+        let mut skin = BlockSkin::new("assets/HqGYC5G - Imgur.png", 0).unwrap();
+        skin.resize(16, 16);
+        assert_eq!(skin.width, 16);
+        assert_eq!(skin.height, 16);
 
         for i in skin.as_array_ref() {
             assert_eq!(i.width(), skin.width);
             assert_eq!(i.height(), skin.height);
+        }
+    }
+
+    #[test]
+    fn test_skinned_board_resize() {
+        let mut board = SkinnedBoard::new(36, 36);
+        board.resize_skins(64, 64);
+
+        for skin in board.skins.iter() {
+            assert_eq!(skin.width, 64);
+            assert_eq!(skin.height, 64);
         }
     }
 
