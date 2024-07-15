@@ -6,7 +6,8 @@ use std::collections::BinaryHeap;
 
 use imageproc::image::{DynamicImage, GenericImageView};
 
-pub fn approximate(target_img: &DynamicImage, config: Config) -> Result<DynamicImage, Box<dyn std::error::Error>> {
+// the target image will be changed in order to fit the scaling of the board
+pub fn approximate(target_img: &mut DynamicImage, config: &Config) -> Result<DynamicImage, Box<dyn std::error::Error>> {
     // initialize the board
     let mut board = SkinnedBoard::new(config.board_width, config.board_height);
 
@@ -15,10 +16,7 @@ pub fn approximate(target_img: &DynamicImage, config: Config) -> Result<DynamicI
     board.resize_skins(img_width / u32::try_from(board.board_width())?, img_height / u32::try_from(board.board_height())?);
 
     // resize the target image to account for rounding errors
-    let resized_target_width = board.skins_width() * u32::try_from(board.board_width())?;
-    let resized_target_height = board.skins_height() * u32::try_from(board.board_height())?;
-    let resized_target_buffer = image::imageops::resize(target_img, resized_target_width, resized_target_height, image::imageops::FilterType::Lanczos3);
-    let target_img = image::DynamicImage::from(resized_target_buffer);
+    *target_img = resize_img_from_board(&board, target_img)?;
 
     // init the heap and push the first row of cells into it
     // the first row is the highest row in number because we are using a max heap
@@ -90,6 +88,14 @@ pub fn approximate(target_img: &DynamicImage, config: Config) -> Result<DynamicI
 
     // draw the board
     Ok(draw::draw_board(&board))
+}
+
+fn resize_img_from_board(board: &SkinnedBoard, target_img: &DynamicImage) -> Result<DynamicImage, Box<dyn std::error::Error>> {
+    // resize the target image to account for rounding errors
+    let resized_target_width = board.skins_width() * u32::try_from(board.board_width())?;
+    let resized_target_height = board.skins_height() * u32::try_from(board.board_height())?;
+    let resized_target_buffer = image::imageops::resize(target_img, resized_target_width, resized_target_height, image::imageops::FilterType::Lanczos3);
+    Ok(image::DynamicImage::from(resized_target_buffer))
 }
 
 fn avg_piece_pixel_diff(piece: &Piece, skin: &BlockSkin, target_img: &DynamicImage) -> Result<f64, Box<dyn std::error::Error>> {
