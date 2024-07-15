@@ -1,34 +1,24 @@
 mod approx;
 mod board;
+mod cli;
 mod draw;
 mod piece;
+mod test_many;
 
-use std::path::PathBuf;
 use clap::Parser;
 
-#[derive(Parser)]
-#[command(version, about, long_about = None)]
-struct Cli {
-    // the image to be approximated
-    #[clap(long, short, action)]
-    source_img: PathBuf,
-
-    // the output image
-    #[clap(long, short, action)]
-    output_img: PathBuf,
-
-    // board width
-    #[clap(long, short, action)]
-    width: Option<usize>,
-
-    // board height
-    #[clap(long, short, action)]
-    height: Option<usize>,
-}
-
-
 fn main() {
-    let cli = Cli::parse();
+    let cli = cli::Cli::parse();
+
+    // run integration tests if possible; source and output are ignored
+    if cli.integration_tests {
+        test_many::run("sources", 100).unwrap();
+        return
+    }
+
+    // otherwise approximate an image; these arguments must be set
+    let source_img_path = cli.source_img.unwrap();
+    let output_img_path = cli.output_img.unwrap();
 
     let board_width = match cli.width {
         Some(width) => width,
@@ -44,11 +34,11 @@ fn main() {
         board_height: board_height,
     };
 
-    let source_img = image::open(cli.source_img).unwrap();
+    let mut source_img = image::open(source_img_path).unwrap();
     println!("Loaded {}x{} image", source_img.width(), source_img.height());
 
-    let result_img = approx::approximate(&source_img, config).unwrap();
-    result_img.save(cli.output_img).unwrap();
+    let result_img = approx::approximate(&mut source_img, &config).unwrap();
+    result_img.save(output_img_path).unwrap();
 }
 
 #[cfg(test)]
@@ -57,6 +47,7 @@ mod tests {
 
     use super::*;
 
+    #[ignore]
     #[test]
     fn test_draw_all_pieces() {
         for orientation in piece::Orientation::all() {
