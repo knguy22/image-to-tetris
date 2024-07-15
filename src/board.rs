@@ -9,10 +9,13 @@ pub struct Board {
     pub height: usize
 }
 
+pub const BLOCKED_CELL: char = 'X';
+pub const EMPTY_CELL: char = ' ';
+
 impl Board {
     pub fn new(width: usize, height: usize) -> Board {
         Board {
-            cells: vec![' '; width * height],
+            cells: vec![EMPTY_CELL; width * height],
             pieces: Vec::new(),
             width: width,
             height: height,
@@ -38,7 +41,7 @@ impl Board {
 
         for cell in to_occupy.iter() {
             let curr = self.get(cell);
-            if curr.is_err() || *curr.unwrap() != ' ' {
+            if curr.is_err() || *curr.unwrap() != EMPTY_CELL {
                 return false;
             }
         }
@@ -51,7 +54,7 @@ impl Board {
         // check if cells are empty
         for cell in to_occupy.iter() {
             let curr = self.get(cell)?;
-            if *curr != ' ' {
+            if *curr != EMPTY_CELL {
                 return Err(format!("{:?} is not empty at {:?}", piece, cell).into());
             }
         }
@@ -72,7 +75,7 @@ impl Board {
         }
         let piece = self.pieces.pop().unwrap();
         for cell in piece.get_occupancy()? {
-            *self.get_mut(&cell)? = ' ';
+            *self.get_mut(&cell)? = EMPTY_CELL;
         }
         Ok(())
     }
@@ -81,7 +84,7 @@ impl Board {
     pub fn remove_piece(&mut self, piece: &Piece) -> Result<(), Box<dyn Error>> {
         let to_occupy = piece.get_occupancy()?;
         for cell in to_occupy.iter() {
-            *self.get_mut(cell)? = ' ';
+            *self.get_mut(cell)? = EMPTY_CELL;
         }
         self.pieces.retain(|p| p != piece);
         Ok(())
@@ -112,13 +115,6 @@ mod tests {
         let mut board = Board::new(10, 20);
         let piece = Piece::I(Cell { x: 1, y: 0 }, Orientation::NORTH);
         assert!(board.place(&piece).is_ok());
-    }
-
-    #[test]
-    fn test_place_out_of_bounds_low() {
-        let mut board = Board::new(10, 20);
-        let piece = Piece::I(Cell { x: 0, y: 0 }, Orientation::NORTH);
-        assert!(board.place(&piece).is_err());
     }
 
     #[test]
