@@ -2,7 +2,7 @@ use crate::board::Board;
 use crate::draw::{self, BlockSkin, SkinnedBoard, Config};
 use crate::piece::{Cell, Piece, Orientation};
 
-use std::collections::VecDeque;
+use std::collections::BinaryHeap;
 
 use imageproc::image::{DynamicImage, GenericImageView};
 
@@ -20,16 +20,16 @@ pub fn approximate(target_img: &mut DynamicImage, config: &Config) -> Result<Dyn
 
     // init the heap and push the first row of cells into it
     // the first row is the highest row in number because we are using a max heap
-    let mut heap = VecDeque::new();
+    let mut heap = BinaryHeap::new();
     for y in (0..board.board_height()).rev() {
         for x in 0..board.board_width() {
-            heap.push_back(Cell { x: x, y: y });
+            heap.push(Cell { x: x, y: y });
         }
     }
 
     // for each cell at the top of the heap:
     while heap.len() > 0 {
-        let cell = heap.pop_front().unwrap();
+        let cell = heap.pop().unwrap();
 
         // 1. check if the cell is unoccupied
         if !board.empty_at(&cell) {
