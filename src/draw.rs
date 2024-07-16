@@ -3,6 +3,8 @@ use crate::piece::{Cell, Piece};
 
 use imageproc::{image, image::GenericImageView, image::DynamicImage, image::imageops::resize};
 
+const INVALID_SKIN_ID: usize = usize::MAX;
+
 #[derive(Clone)]
 pub struct Config {
     pub board_width: usize,
@@ -46,7 +48,7 @@ impl SkinnedBoard {
         // cells skin must have the same dimensions as board
         SkinnedBoard {
             board: Board::new(width, height),
-            cells_skin: vec![0; width * height],
+            cells_skin: vec![INVALID_SKIN_ID; width * height],
             skins: skins
         }
     }
@@ -97,7 +99,7 @@ impl SkinnedBoard {
     pub fn place_cell(&mut self, cell: &Cell, skin_id: usize) -> Result<(), Box<dyn std::error::Error>> {
         let board_width = self.board_width();
         match *self.board.get(cell)? {
-            ' ' => {
+            EMPTY_CELL => {
                 self.cells_skin[cell.y * board_width + cell.x] = skin_id;
                 *self.board.get_mut(cell)? = BLOCKED_CELL;
                 Ok(())
