@@ -54,7 +54,7 @@ pub fn approximate(target_img: &mut DynamicImage, config: &Config) -> Result<Dyn
             
             // try placing pieces
             for orientation in Orientation::all() {
-                for piece in Piece::all_normal(cell, orientation.clone()) {
+                for piece in Piece::all_normal(cell, orientation) {
                     if board.board.can_place(&piece) {
                         let diff = avg_piece_pixel_diff(&piece, &skin, &target_img)?;
                         if diff < best_piece_diff {
@@ -87,21 +87,22 @@ fn resize_img_from_board(board: &SkinnedBoard, target_img: &DynamicImage) -> Res
 fn avg_piece_pixel_diff(piece: &Piece, skin: &BlockSkin, target_img: &DynamicImage) -> Result<f64, Box<dyn std::error::Error>> {
     let mut total_diff: f64 = 0.0;
     let mut total_pixels: u32 = 0;
+    let block_skin: &DynamicImage = match piece {
+        Piece::I(_, _) => &skin.i_img,
+        Piece::O(_, _) => &skin.o_img,
+        Piece::T(_, _) => &skin.t_img,
+        Piece::L(_, _) => &skin.l_img,
+        Piece::J(_, _) => &skin.j_img,
+        Piece::S(_, _) => &skin.s_img,
+        Piece::Z(_, _) => &skin.z_img,
+        _ => panic!("Garbage or black piece has no skin")
+    };
+
     for cell in piece.get_occupancy()? {
         for y in 0..skin.height() {
             for x in 0..skin.width() {
                 let target_pixel = target_img.get_pixel((cell.x as u32 * skin.width() + x) as u32, (cell.y as u32 * skin.height() + y) as u32);
-                let skin_pixel = match piece {
-                    Piece::I(_, _) => skin.i_img.get_pixel(x, y),
-                    Piece::O(_, _) => skin.o_img.get_pixel(x, y),
-                    Piece::T(_, _) => skin.t_img.get_pixel(x, y),
-                    Piece::L(_, _) => skin.l_img.get_pixel(x, y),
-                    Piece::J(_, _) => skin.j_img.get_pixel(x, y),
-                    Piece::S(_, _) => skin.s_img.get_pixel(x, y),
-                    Piece::Z(_, _) => skin.z_img.get_pixel(x, y),
-                    _ => panic!("Garbage or black piece has no skin")
-                };
-
+                let skin_pixel = block_skin.get_pixel(x, y);
                 total_diff += (target_pixel[0] as i32 - skin_pixel[0] as i32).pow(2) as f64;
                 total_diff += (target_pixel[1] as i32 - skin_pixel[1] as i32).pow(2) as f64;
                 total_diff += (target_pixel[2] as i32 - skin_pixel[2] as i32).pow(2) as f64;
@@ -123,8 +124,8 @@ fn avg_grid_pixel_diff(piece: &Piece, board: &Board, skin: &BlockSkin, target_im
         _ => panic!("Piece is not garbage or black"),
     };
 
+    // searches a grid around this cell
     let cell = piece.get_cell();
-
     for cell_y in 0..2 {
         for cell_x in 0..2 {
             let curr_cell = Cell { x: cell.x + cell_x - 1, y: cell.y + cell_y - 1 };
