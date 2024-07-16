@@ -2,19 +2,55 @@ use crate::approx::approximate;
 use crate::draw;
 
 use std::fs;
+use std::path::PathBuf;
 use std::time;
+use std::thread;
+
 use imageproc::image::DynamicImage;
+use itertools::Itertools;
 use dssim::Dssim;
 
 // tests all image in the directory
 pub fn run(dir: &str, board_width: u32) -> Result<(), Box<dyn std::error::Error>> {
+    const NUM_THREADS: usize = 4;
+
     let start = time::Instant::now();
     let num_files = fs::read_dir(dir)?.count();
-    let mut total_diff = 0.0;
 
-    for entry in fs::read_dir(dir)? {
-        let path = entry?.path();
+    let mut handles = Vec::new();
+    let mut total_diff = 0.0;
+    let mut thread_id = 0;
+
+    for entry in &fs::read_dir(dir)?.chunks(NUM_THREADS) {
+        // assign each chunk to a thread
+        let paths = entry
+            .into_iter()
+            .map(|res| res.unwrap().path())
+            .collect::<Vec<PathBuf>>();
+
+        // run the thread
+        let handle = thread::spawn( move || {
+            run_thread(thread_id, paths, board_width).unwrap()
+        });
         
+        handles.push(handle);
+        thread_id += 1;
+    }
+
+    for handle in handles {
+        total_diff += handle.join().unwrap();
+    }
+
+    println!("Number of images={}", num_files);
+    println!("Total Dssim diff={}", total_diff);
+    println!("Average Dssim diff={}", total_diff / (num_files as f64));
+    println!("Time Elapsed: {:?}", start.elapsed());
+    Ok(())
+}
+
+fn run_thread(thread_id: usize, paths: Vec<PathBuf>, board_width: u32) -> Result<f64, Box<dyn std::error::Error>> {
+    let mut total_diff = 0.0;
+    for path in paths {
         let mut target_img = image::open(path.clone())?;
         
         // set the board height to scale to the image
@@ -29,14 +65,10 @@ pub fn run(dir: &str, board_width: u32) -> Result<(), Box<dyn std::error::Error>
         // handle scoring
         let dssim_diff = diff_images_dssim(&approx_img, &target_img)?;
         total_diff += dssim_diff;
-        println!("Diff: {}, Source: {}", dssim_diff, path.display());
+        println!("Thread: {}, Diff: {}, Source: {}", thread_id, dssim_diff, path.display());
     }
 
-    println!("Number of images={}", num_files);
-    println!("Total Dssim diff={}", total_diff);
-    println!("Average Dssim diff={}", total_diff / (num_files as f64));
-    println!("Time Elapsed: {:?}", start.elapsed());
-    Ok(())
+    Ok(total_diff)
 }
 
 fn diff_images_dssim(image1: &DynamicImage, image2: &DynamicImage) -> Result<f64, Box<dyn std::error::Error>> {

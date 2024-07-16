@@ -569,6 +569,7 @@ dependencies = [
  "image",
  "image-compare",
  "imageproc",
+ "itertools 0.13.0",
  "rand",
  "rgb",
 ]
