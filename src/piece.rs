@@ -48,7 +48,7 @@ const O_SHAPE: [[Dir; 4]; 4] = [
 ];
 
 const T_SHAPE: [[Dir; 4]; 4] = [
-    [Dir{ x: -1, y: 0 }, Dir{ x: -2, y: -1 }, Dir{ x: -1, y: -1 }, Dir{ x: 0, y: -1 }],
+    [Dir{ x: 0, y: 1 }, Dir{ x: -1, y: 0 }, Dir{ x: 0, y: 0 }, Dir{ x: 1, y: 0 }],
     [Dir{ x: 0, y: 0 }, Dir{ x: -1, y: 1 }, Dir{ x: -1, y: 0 }, Dir{ x: -1, y: -1 }],
     [Dir{ x: -1, y: -1 }, Dir{ x: 0, y: 0 }, Dir{ x: -1, y: 0 }, Dir{ x: -2, y: 0 }],
     [Dir{ x: -1, y: -1 }, Dir{ x: 0, y: -2 }, Dir{ x: 0, y: -1 }, Dir{ x: 0, y: 0 }],
@@ -56,13 +56,13 @@ const T_SHAPE: [[Dir; 4]; 4] = [
 
 const L_SHAPE: [[Dir; 4]; 4] = [
     [Dir{ x: -2, y: -1 }, Dir{ x: -1, y: -1 }, Dir{ x: 0, y: -1 }, Dir{ x: 0, y: 0 }],
-    [Dir{ x: 0, y: -2 }, Dir{ x: -1, y: 0 }, Dir{ x: -1, y: -1 }, Dir{ x: -1, y: -2 }],
+    [Dir{ x: 1, y: -1 }, Dir{ x: 0, y: 1 }, Dir{ x: 0, y: 0 }, Dir{ x: 0, y: -1 }],
     [Dir{ x: 0, y: 0 }, Dir{ x: -1, y: 0 }, Dir{ x: -2, y: 0 }, Dir{ x: -2, y: -1 }],
     [Dir{ x: -1, y: 0 }, Dir{ x: 0, y: 0 }, Dir{ x: 0, y: -1 }, Dir{ x: 0, y: -2 }],
 ];
 
 const J_SHAPE: [[Dir; 4]; 4] = [
-    [Dir{ x: -2, y: -1 }, Dir{ x: -1, y: -1 }, Dir{ x: 0, y: -1 }, Dir{ x: -2, y: 0 }],
+    [Dir{ x: -1, y: 0 }, Dir{ x: 0, y: 0 }, Dir{ x: 1, y: 0 }, Dir{ x: -1, y: -1 }],
     [Dir{ x: -1, y: -2 }, Dir{ x: 0, y: 0 }, Dir{ x: 0, y: -1 }, Dir{ x: 0, y: -2 }],
     [Dir{ x: 0, y: 0 }, Dir{ x: -1, y: 0 }, Dir{ x: -2, y: 0 }, Dir{ x: 0, y: -1 }],
     [Dir{ x: 0, y: 0 }, Dir{ x: -1, y: -2 }, Dir{ x: -1, y: -1 }, Dir{ x: -1, y: 0 }],
@@ -70,15 +70,15 @@ const J_SHAPE: [[Dir; 4]; 4] = [
 
 const S_SHAPE: [[Dir; 4]; 4] = [
     [Dir{ x: -2, y: -1 }, Dir{ x: -1, y: -1 }, Dir{ x: -1, y: 0 }, Dir{ x: 0, y: 0 }],
-    [Dir{ x: -1, y: 0 }, Dir{ x: -1, y: -1 }, Dir{ x: 0, y: -1 }, Dir{ x: 0, y: -2 }],
+    [Dir{ x: 0, y: 1 }, Dir{ x: 0, y: 0 }, Dir{ x: 1, y: 0 }, Dir{ x: 1, y: -1 }],
     [Dir{ x: 0, y: 0 }, Dir{ x: -1, y: 0 }, Dir{ x: -1, y: -1 }, Dir{ x: -2, y: -1 }],
-    [Dir{ x: 0, y: -2 }, Dir{ x: 0, y: -1 }, Dir{ x: -1, y: -1 }, Dir{ x: -1, y: 0 }],
+    [Dir{ x: 1, y: -1 }, Dir{ x: 1, y: 0 }, Dir{ x: 0, y: 0 }, Dir{ x: 0, y: 1 }],
 ];
 
 const Z_SHAPE: [[Dir; 4]; 4] = [
-    [Dir{ x: 0, y: -1 }, Dir{ x: -1, y: -1 }, Dir{ x: -1, y: 0 }, Dir{ x: -2, y: 0 }],
+    [Dir{ x: 1, y: 0 }, Dir{ x: 0, y: 0 }, Dir{ x: 0, y: 1 }, Dir{ x: -1, y: 1 }],
     [Dir{ x: -1, y: -2 }, Dir{ x: -1, y: -1 }, Dir{ x: 0, y: -1 }, Dir{ x: 0, y: 0 }],
-    [Dir{ x: -2, y: 0 }, Dir{ x: -1, y: 0 }, Dir{ x: -1, y: -1 }, Dir{ x: 0, y: -1 }],
+    [Dir{ x: -1, y: 1 }, Dir{ x: 0, y: 1 }, Dir{ x: 0, y: 0 }, Dir{ x: 1, y: 0 }],
     [Dir{ x: 0, y: 0 }, Dir{ x: 0, y: -1 }, Dir{ x: -1, y: -1 }, Dir{ x: -1, y: -2 }],
 ];
 
