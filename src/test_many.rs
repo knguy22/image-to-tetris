@@ -2,11 +2,13 @@ use crate::approx::approximate;
 use crate::draw;
 
 use std::fs;
+use std::time;
 use imageproc::image::DynamicImage;
 use dssim::Dssim;
 
 // tests all image in the directory
 pub fn run(dir: &str, board_width: u32) -> Result<(), Box<dyn std::error::Error>> {
+    let start = time::Instant::now();
     let num_files = fs::read_dir(dir)?.count();
     let mut total_diff = 0.0;
 
@@ -33,6 +35,7 @@ pub fn run(dir: &str, board_width: u32) -> Result<(), Box<dyn std::error::Error>
     println!("Number of images={}", num_files);
     println!("Total Dssim diff={}", total_diff);
     println!("Average Dssim diff={}", total_diff / (num_files as f64));
+    println!("Time Elapsed: {:?}", start.elapsed());
     Ok(())
 }
 
