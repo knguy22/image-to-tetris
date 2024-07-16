@@ -2,7 +2,7 @@ use crate::board::Board;
 use crate::draw::{self, BlockSkin, SkinnedBoard, Config};
 use crate::piece::{Cell, Piece, Orientation};
 
-use std::collections::BinaryHeap;
+use std::collections::VecDeque;
 
 use imageproc::image::{DynamicImage, GenericImageView};
 
@@ -20,14 +20,16 @@ pub fn approximate(target_img: &mut DynamicImage, config: &Config) -> Result<Dyn
 
     // init the heap and push the first row of cells into it
     // the first row is the highest row in number because we are using a max heap
-    let mut heap = BinaryHeap::new();
-    for x in 0..board.board_width() {
-        heap.push(Cell { x: x, y: board.board_height() - 1 });
+    let mut heap = VecDeque::new();
+    for y in (0..board.board_height()).rev() {
+        for x in 0..board.board_width() {
+            heap.push_back(Cell { x: x, y: y });
+        }
     }
 
     // for each cell at the top of the heap:
     while heap.len() > 0 {
-        let cell = heap.pop().unwrap();
+        let cell = heap.pop_front().unwrap();
 
         // 1. check if the cell is unoccupied
         if !board.empty_at(&cell) {
@@ -69,20 +71,10 @@ pub fn approximate(target_img: &mut DynamicImage, config: &Config) -> Result<Dyn
         if best_piece.is_some() {
             let best_piece = best_piece.unwrap();
             board.place(&best_piece, best_skin_id.unwrap())?;
-
-            // check cells above to push into heap
-            for piece_cell in best_piece.get_occupancy()? {
-                if piece_cell.y > 0 {
-                    heap.push(Cell { x: piece_cell.x, y: piece_cell.y - 1 });
-                }
-            }
         } 
         // assign the empty/garbage block the skin
         else {
             board.place_cell(&cell, best_skin_id.unwrap())?;
-            if cell.y > 0 {
-                heap.push(Cell { x: cell.x, y: cell.y - 1 });
-            }
         }
     }
 
