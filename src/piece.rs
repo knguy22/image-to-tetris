@@ -28,7 +28,9 @@ pub enum Piece {
     L(Cell, Orientation),
     J(Cell, Orientation),
     S(Cell, Orientation),
-    Z(Cell, Orientation)
+    Z(Cell, Orientation),
+    Garbage(Cell),
+    Black(Cell),
 }
 
 // constants modified from https://github.com/freyhoe/ditzy22/blob/main/common.h
@@ -89,7 +91,7 @@ impl Orientation {
 }
 
 impl Piece {
-    pub fn all(cell: Cell, orientation: Orientation) -> Vec<Piece> {
+    pub fn all_normal(cell: Cell, orientation: Orientation) -> Vec<Piece> {
         let mut pieces = Vec::new();
         pieces.push(Piece::I(cell.clone(), orientation.clone()));
         pieces.push(Piece::O(cell.clone(), orientation.clone()));
@@ -101,6 +103,10 @@ impl Piece {
         pieces
     }
 
+    pub fn all_garbage(cell: Cell) -> Vec<Piece> {
+        vec![Piece::Garbage(cell), Piece::Black(cell)]
+    }
+
     pub fn get_char(&self) -> char {
         match self {
             Piece::I(_, _) => 'I',
@@ -109,7 +115,9 @@ impl Piece {
             Piece::L(_, _) => 'L',
             Piece::J(_, _) => 'J',
             Piece::S(_, _) => 'S',
-            Piece::Z(_, _) => 'Z'
+            Piece::Z(_, _) => 'Z',
+            Piece::Garbage(_) => 'G',
+            Piece::Black(_) => 'B'
         }
     }
 
@@ -121,7 +129,8 @@ impl Piece {
             Piece::L(_, o) => o.clone(),
             Piece::J(_, o) => o.clone(),
             Piece::S(_, o) => o.clone(),
-            Piece::Z(_, o) => o.clone()
+            Piece::Z(_, o) => o.clone(),
+            _ => panic!("Garbage or black piece has no orientation")
         }
     }
 
@@ -133,11 +142,20 @@ impl Piece {
             Piece::L(c, _) => c.clone(),
             Piece::J(c, _) => c.clone(),
             Piece::S(c, _) => c.clone(),
-            Piece::Z(c, _) => c.clone()
+            Piece::Z(c, _) => c.clone(),
+            Piece::Garbage(c) => c.clone(),
+            Piece::Black(c) => c.clone()
         }
     }
 
-    pub fn get_occupancy(&self) -> Result<[Cell; 4], Box<dyn Error>> {
+    pub fn get_occupancy(&self) -> Result<Vec<Cell>, Box<dyn Error>> {
+        // handle garbage and black
+        match self {
+            Piece::Garbage(c) | Piece::Black(c) => return Ok(vec![*c]),
+            _ => {}
+        }
+
+        // handle normal pieces
         let shape: &[[Dir; 4]; 4] = match self {
             Piece::I(_, _) => &I_SHAPE,
             Piece::O(_, _) => &O_SHAPE,
@@ -145,7 +163,8 @@ impl Piece {
             Piece::L(_, _) => &L_SHAPE,
             Piece::J(_, _) => &J_SHAPE,
             Piece::S(_, _) => &S_SHAPE,
-            Piece::Z(_, _) => &Z_SHAPE
+            Piece::Z(_, _) => &Z_SHAPE,
+            _ => panic!("Garbage or black piece has no shape")
         };
 
         let orien = self.get_orientation();
@@ -156,8 +175,7 @@ impl Piece {
             Orientation::WEST => shape[3].clone()
         };
 
-        
-        let mut occupancy: [Cell; 4] = [Cell { x: 0, y: 0 }; 4];
+        let mut occupancy = Vec::new();
         for i in 0..4 {
             let x = self.get_cell().x as i32 + dirs[i].x;
             let y = self.get_cell().y as i32 + dirs[i].y;
@@ -165,7 +183,7 @@ impl Piece {
                 return Err(format!("Cell ({}, {}) contains negative values", x, y).into());
             }
 
-            occupancy[i] = Cell { x: x as usize, y: y as usize };
+            occupancy.push(Cell { x: x as usize, y: y as usize });
         }
         Ok(occupancy)
     }
