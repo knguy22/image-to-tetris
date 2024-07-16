@@ -51,7 +51,7 @@ mod tests {
     #[test]
     fn test_draw_all_pieces() {
         for orientation in piece::Orientation::all() {
-            for piece in piece::Piece::all(piece::Cell { x: 4, y: 4 }, orientation) {
+            for piece in piece::Piece::all_normal(piece::Cell { x: 4, y: 4 }, orientation) {
                 let mut board = SkinnedBoard::new(10, 20);
 
                 board.place(&piece, 0).unwrap();
