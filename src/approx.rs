@@ -12,7 +12,12 @@ pub fn approximate(target_img: &mut DynamicImage, config: &Config) -> Result<Dyn
 
     // resize the skins
     let (img_width, img_height) = target_img.dimensions();
-    board.resize_skins(img_width / u32::try_from(board.board_width())?, img_height / u32::try_from(board.board_height())?);
+    let skin_width = img_width / u32::try_from(board.board_width())?;
+    let skin_height = img_height / u32::try_from(board.board_height())?;
+    if skin_width == 0 || skin_height == 0 {
+        return Err("Skin dimensions must be greater than 0".into());
+    }
+    board.resize_skins(skin_height, skin_width);
 
     // resize the target image to account for rounding errors
     *target_img = resize_img_from_board(&board, target_img)?;
@@ -39,7 +44,7 @@ pub fn approximate(target_img: &mut DynamicImage, config: &Config) -> Result<Dyn
         let mut best_piece: Option<Piece> = None;
         let mut best_piece_diff = f64::MAX;
         let mut best_skin_id: Option<usize> = None;
-        
+
         for skin in board.iter_skins() {
             // try black or gray garbage
             for piece in Piece::all_garbage(cell) {
