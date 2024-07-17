@@ -1,5 +1,5 @@
 use crate::board::EMPTY_CELL;
-use crate::draw::{self, BlockSkin, SkinnedBoard, Config};
+use crate::draw::{self, BlockImage, BlockSkin, Config, SkinnedBoard};
 use crate::piece::{Cell, Piece, Orientation};
 
 use std::collections::BinaryHeap;
@@ -92,7 +92,7 @@ fn resize_img_from_board(board: &SkinnedBoard, target_img: &DynamicImage) -> Res
 fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, target_img: &DynamicImage) -> Result<f64, Box<dyn std::error::Error>> {
     let mut total_diff: f64 = 0.0;
     let mut total_pixels: u32 = 0;
-    let block_skin: &DynamicImage = match piece {
+    let block_image: &BlockImage = match piece {
         Piece::I(_, _) => &skin.i_img,
         Piece::O(_, _) => &skin.o_img,
         Piece::T(_, _) => &skin.t_img,
@@ -126,7 +126,7 @@ fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, t
         for context_cell in &context_cells {
             let skin_id = board.get_cells_skin(&context_cell);
             let context_skin = board.get_skin(skin_id);
-            let context_block_skin = match *board.board.get(&context_cell)? {
+            let context_block_image = match *board.board.get(&context_cell)? {
                 'I' => &context_skin.i_img,
                 'O' => &context_skin.o_img,
                 'T' => &context_skin.t_img,
@@ -142,8 +142,8 @@ fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, t
                 for x in 0..skin.width() {
                     let target_context_pixel = target_img.get_pixel((context_cell.x as u32 * skin.width() + x) as u32, (context_cell.y as u32 * skin.height() + y) as u32);
                     let target_pixel = target_img.get_pixel((cell.x as u32 * skin.width() + x) as u32, (cell.y as u32 * skin.height() + y) as u32);
-                    let approx_context_pixel = context_block_skin.get_pixel(x, y);
-                    let approx_pixel = block_skin.get_pixel(x, y);
+                    let approx_context_pixel = context_block_image.get_pixel(x, y);
+                    let approx_pixel = block_image.get_pixel(x, y);
 
                     let target_delta = (target_pixel[0] as i32 - target_context_pixel[0] as i32).abs() as f64
                         + (target_pixel[1] as i32 - target_context_pixel[1] as i32).abs() as f64
@@ -162,7 +162,7 @@ fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, t
         for y in 0..skin.height() {
             for x in 0..skin.width() {
                 let target_pixel = target_img.get_pixel((cell.x as u32 * skin.width() + x) as u32, (cell.y as u32 * skin.height() + y) as u32);
-                let approx_pixel = block_skin.get_pixel(x, y);
+                let approx_pixel = block_image.get_pixel(x, y);
 
                 total_diff += (target_pixel[0] as i32 - approx_pixel[0] as i32).pow(2) as f64;
                 total_diff += (target_pixel[1] as i32 - approx_pixel[1] as i32).pow(2) as f64;

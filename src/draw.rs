@@ -1,6 +1,7 @@
 use crate::board::{Board, EMPTY_CELL, BLOCKED_CELL};
 use crate::piece::{Cell, Piece};
 
+use image::Rgba;
 use imageproc::{image, image::GenericImageView, image::DynamicImage, image::imageops::resize};
 
 const INVALID_SKIN_ID: usize = usize::MAX;
@@ -19,20 +20,26 @@ pub struct SkinnedBoard {
 
 #[derive(Clone)]
 pub struct BlockSkin {
-    pub black_img: image::DynamicImage,
-    pub gray_img: image::DynamicImage,
+    pub black_img: BlockImage,
+    pub gray_img: BlockImage,
 
-    pub i_img: image::DynamicImage,
-    pub o_img: image::DynamicImage,
-    pub t_img: image::DynamicImage,
-    pub l_img: image::DynamicImage,
-    pub j_img: image::DynamicImage,
-    pub s_img: image::DynamicImage,
-    pub z_img: image::DynamicImage,
+    pub i_img: BlockImage,
+    pub o_img: BlockImage,
+    pub t_img: BlockImage,
+    pub l_img: BlockImage,
+    pub j_img: BlockImage,
+    pub s_img: BlockImage,
+    pub z_img: BlockImage,
 
     width: u32,
     height: u32,
     id: usize,
+}
+
+#[derive(Clone)]
+pub struct BlockImage {
+    img: image::DynamicImage,
+    avg_pixel: Rgba<u8>,
 }
 
 impl SkinnedBoard {
@@ -116,10 +123,10 @@ impl BlockSkin {
         let img_buffer = img.into_rgb8();
 
         // split the skin into sections
-        let mut new_images: [DynamicImage; NUM_SECTIONS] = Default::default();
+        let mut new_images = Vec::new();
         for i in 0..NUM_SECTIONS as u32 {
             let section = image::SubImage::new(&img_buffer, i * section_width, 0, section_width, height);
-            new_images[i as usize] = section.to_image().into();
+            new_images.push(BlockImage::new(section.to_image().into())?);
         }
         
         // return the skin
@@ -140,22 +147,20 @@ impl BlockSkin {
     }
 
     pub fn resize(&mut self, width: u32, height: u32) {
-        self.black_img = DynamicImage::from(resize(&self.black_img, width, height, image::imageops::FilterType::Lanczos3));
-        self.gray_img = DynamicImage::from(resize(&self.gray_img, width, height, image::imageops::FilterType::Lanczos3));
-        self.i_img = DynamicImage::from(resize(&self.i_img, width, height, image::imageops::FilterType::Lanczos3));
-        self.o_img = DynamicImage::from(resize(&self.o_img, width, height, image::imageops::FilterType::Lanczos3));
-        self.t_img = DynamicImage::from(resize(&self.t_img, width, height, image::imageops::FilterType::Lanczos3));
-        self.l_img = DynamicImage::from(resize(&self.l_img, width, height, image::imageops::FilterType::Lanczos3));
-        self.j_img = DynamicImage::from(resize(&self.j_img, width, height, image::imageops::FilterType::Lanczos3));
-        self.s_img = DynamicImage::from(resize(&self.s_img, width, height, image::imageops::FilterType::Lanczos3));
-        self.z_img = DynamicImage::from(resize(&self.z_img, width, height, image::imageops::FilterType::Lanczos3));
+        for block in self.as_array_ref_mut() {
+            block.resize(width, height);
+        }
         self.width = width;
         self.height = height;
     }
 
     #[allow(dead_code)]
-    pub fn as_array_ref(&self) -> [&DynamicImage; 9] {
+    pub fn as_array_ref(&self) -> [&BlockImage; 9] {
         [&self.black_img, &self.gray_img, &self.i_img, &self.o_img, &self.t_img, &self.l_img, &self.j_img, &self.s_img, &self.z_img]
+    }
+
+    pub fn as_array_ref_mut(&mut self) -> [&mut BlockImage; 9] {
+        [&mut self.black_img, &mut self.gray_img, &mut self.i_img, &mut self.o_img, &mut self.t_img, &mut self.l_img, &mut self.j_img, &mut self.s_img, &mut self.z_img]
     }
 
     pub fn width(&self) -> u32 {
@@ -171,6 +176,47 @@ impl BlockSkin {
     }
 }
 
+impl BlockImage {
+    pub fn new(img: DynamicImage) -> Result<BlockImage, Box<dyn std::error::Error>> {
+        let num_pixels: u32 = (img.width() * img.height()) as u32;
+        let avg_pixel: Rgba<u8> = img
+            .pixels()
+            // use u32 for summation instead of u8 to prevent overflow
+            .fold([0, 0, 0, 0],
+                |acc, (_x, _y, p) |
+                [acc[0] + p[0] as u32, acc[1] + p[1] as u32, acc[2] + p[2] as u32, acc[3] + p[3] as u32])
+            // divide by number of pixels
+            .map(|x| u8::try_from(x / num_pixels).unwrap())
+            .into();
+
+        Ok(BlockImage {
+            img,
+            avg_pixel,
+        })
+    }
+
+    pub fn resize(&mut self, width: u32, height: u32) {
+        self.img = DynamicImage::from(resize(&self.img, width, height, image::imageops::FilterType::Lanczos3));
+    }
+
+    #[allow(dead_code)]
+    pub fn width(&self) -> u32 {
+        self.img.width()
+    }
+
+    #[allow(dead_code)]
+    pub fn height(&self) -> u32 {
+        self.img.height()
+    }
+
+    pub fn get_pixel(&self, x: u32, y: u32) -> Rgba<u8> {
+        self.img.get_pixel(x, y)
+    }
+
+    pub fn get_average_pixel(&self) -> Rgba<u8> {
+        self.avg_pixel
+    }
+}
 
 pub fn draw_board(skin_board: &SkinnedBoard) -> DynamicImage {
     let board = &skin_board.board;
@@ -193,7 +239,7 @@ pub fn draw_board(skin_board: &SkinnedBoard) -> DynamicImage {
                 'G' => &skin.gray_img,
                 _ => &skin.black_img,
             };
-            image::imageops::overlay(&mut img, block, (x as u32 * skin.width).into(), (y as u32 * skin.height).into());
+            image::imageops::overlay(&mut img, &block.img, (x as u32 * skin.width).into(), (y as u32 * skin.height).into());
         }
     }
     DynamicImage::from(img)
