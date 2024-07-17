@@ -4,6 +4,7 @@ use crate::piece::{Cell, Piece, Orientation};
 
 use std::collections::BinaryHeap;
 
+use image::Rgba;
 use imageproc::image::{DynamicImage, GenericImageView};
 
 // the target image will be changed in order to fit the scaling of the board
@@ -125,12 +126,12 @@ fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, t
                     let approx_context_pixel = context_block_image.get_pixel(x, y);
                     let approx_pixel = block_image.get_pixel(x, y);
 
-                    let target_delta = (target_pixel[0] as i32 - target_context_pixel[0] as i32).abs() as f64
-                        + (target_pixel[1] as i32 - target_context_pixel[1] as i32).abs() as f64
-                        + (target_pixel[2] as i32 - target_context_pixel[2] as i32).abs() as f64;
-                    let approx_delta = (approx_pixel[0] as i32 - approx_context_pixel[0] as i32).abs() as f64
-                        + (approx_pixel[1] as i32 - approx_context_pixel[1] as i32).abs() as f64
-                        + (approx_pixel[2] as i32 - approx_context_pixel[2] as i32).abs() as f64;
+                    let target_delta: f64 = subtract_pixels(&target_pixel, &target_context_pixel)
+                        .iter()
+                        .fold(0.0, |acc, x| acc + (x.abs() as f64));
+                    let approx_delta: f64 = subtract_pixels(&approx_pixel, &approx_context_pixel)
+                        .iter()
+                        .fold(0.0, |acc, x| acc + (x.abs() as f64));
 
                     total_diff += target_delta - approx_delta;
                     total_pixels += 3;
@@ -143,14 +144,21 @@ fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, t
             for x in 0..skin.width() {
                 let target_pixel = target_img.get_pixel((cell.x as u32 * skin.width() + x) as u32, (cell.y as u32 * skin.height() + y) as u32);
                 let approx_pixel = block_image.get_pixel(x, y);
-
-                total_diff += (target_pixel[0] as i32 - approx_pixel[0] as i32).pow(2) as f64;
-                total_diff += (target_pixel[1] as i32 - approx_pixel[1] as i32).pow(2) as f64;
-                total_diff += (target_pixel[2] as i32 - approx_pixel[2] as i32).pow(2) as f64;
+                total_diff += subtract_pixels(&target_pixel, &approx_pixel)
+                    .iter()
+                    .fold(0.0, |acc, x| acc + x.pow(2) as f64);
                 total_pixels += 3;
             }
         }
     }
 
     Ok(total_diff / total_pixels as f64)
+}
+
+fn subtract_pixels(a: &Rgba<u8>, b: &Rgba<u8>) -> [i32; 3] {
+    [
+        a[0] as i32 - b[0] as i32,
+        a[1] as i32 - b[1] as i32,
+        a[2] as i32 - b[2] as i32,
+    ]
 }
