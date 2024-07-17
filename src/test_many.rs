@@ -7,12 +7,11 @@ use std::time;
 use std::thread;
 
 use imageproc::image::DynamicImage;
-use itertools::Itertools;
 use dssim::Dssim;
 
 // tests all image in the directory
 pub fn run(dir: &str, board_width: u32) -> Result<(), Box<dyn std::error::Error>> {
-    const NUM_THREADS: usize = 4;
+    const NUM_THREADS: usize = 8;
 
     let start = time::Instant::now();
     let num_files = fs::read_dir(dir)?.count();
@@ -21,9 +20,10 @@ pub fn run(dir: &str, board_width: u32) -> Result<(), Box<dyn std::error::Error>
     let mut total_diff = 0.0;
     let mut thread_id = 0;
 
-    for entry in &fs::read_dir(dir)?.chunks(NUM_THREADS) {
+    println!("Processing {} files at {} using {} threads", num_files, dir, NUM_THREADS);
+    for chunk in split_into_n_chunks(fs::read_dir(dir)?, NUM_THREADS) {
         // assign each chunk to a thread
-        let paths = entry
+        let paths = chunk
             .into_iter()
             .map(|res| res.unwrap().path())
             .collect::<Vec<PathBuf>>();
@@ -46,6 +46,20 @@ pub fn run(dir: &str, board_width: u32) -> Result<(), Box<dyn std::error::Error>
     println!("Average Dssim diff={}", total_diff / (num_files as f64));
     println!("Time Elapsed: {:?}", start.elapsed());
     Ok(())
+}
+
+fn split_into_n_chunks<T, I>(iter: I, n: usize) -> Vec<Vec<T>> 
+    where I: Iterator<Item = T>
+{
+    let mut chunks = Vec::new();
+    for _ in 0..n {
+        chunks.push(Vec::new());
+    }
+
+    for (i, item) in iter.enumerate() {
+        chunks[i % n].push(item);
+    }
+    chunks
 }
 
 fn run_thread(thread_id: usize, paths: Vec<PathBuf>, board_width: u32) -> Result<f64, Box<dyn std::error::Error>> {
