@@ -145,12 +145,12 @@ fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, t
                     let approx_context_pixel = context_block_skin.get_pixel(x, y);
                     let approx_pixel = block_skin.get_pixel(x, y);
 
-                    let target_delta = (target_pixel[0] as i32 - target_context_pixel[0] as i32).pow(2) as f64
-                        + (target_pixel[1] as i32 - target_context_pixel[1] as i32).pow(2) as f64
-                        + (target_pixel[2] as i32 - target_context_pixel[2] as i32).pow(2) as f64;
-                    let approx_delta = (approx_pixel[0] as i32 - approx_context_pixel[0] as i32).pow(2) as f64
-                        + (approx_pixel[1] as i32 - approx_context_pixel[1] as i32).pow(2) as f64
-                        + (approx_pixel[2] as i32 - approx_context_pixel[2] as i32).pow(2) as f64;
+                    let target_delta = (target_pixel[0] as i32 - target_context_pixel[0] as i32).abs() as f64
+                        + (target_pixel[1] as i32 - target_context_pixel[1] as i32).abs() as f64
+                        + (target_pixel[2] as i32 - target_context_pixel[2] as i32).abs() as f64;
+                    let approx_delta = (approx_pixel[0] as i32 - approx_context_pixel[0] as i32).abs() as f64
+                        + (approx_pixel[1] as i32 - approx_context_pixel[1] as i32).abs() as f64
+                        + (approx_pixel[2] as i32 - approx_context_pixel[2] as i32).abs() as f64;
 
                     total_diff += target_delta - approx_delta;
                     total_pixels += 3;
