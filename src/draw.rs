@@ -57,6 +57,10 @@ impl SkinnedBoard {
         self.skins.iter()
     }
 
+    pub fn get_skin(&self, index: usize) -> &BlockSkin {
+        &self.skins[index]
+    }
+
     pub fn skins_width(&self) -> u32 {
         self.skins[0].width
     }
@@ -94,6 +98,10 @@ impl SkinnedBoard {
         }
 
         Ok(())
+    }
+
+    pub fn get_cells_skin(&self, cell: &Cell) -> usize {
+        self.cells_skin[cell.y * self.board_width() + cell.x]
     }
 }
 
@@ -172,7 +180,8 @@ pub fn draw_board(skin_board: &SkinnedBoard) -> DynamicImage {
     let mut img = image::RgbaImage::new(board.width as u32 * skins[0].width, board.height as u32 * skins[0].height);
     for y in 0..board.height {
         for x in 0..board.width {
-            let skin = &skins[cells_skin[y * board.width + x]];
+            let skin_id = cells_skin[y * board.width + x];
+            let skin = skin_board.get_skin(skin_id);
             let block = match board.cells[y * board.width + x] {
                 'I' => &skin.i_img,
                 'O' => &skin.o_img,
