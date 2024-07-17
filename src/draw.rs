@@ -74,6 +74,7 @@ impl SkinnedBoard {
     }
 
     pub fn resize_skins(&mut self, width: u32, height: u32) {
+        assert!(width != 0 && height != 0);
         for skin in self.skins.iter_mut() {
             skin.resize(width, height);
         }
