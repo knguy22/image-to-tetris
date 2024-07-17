@@ -48,7 +48,7 @@ pub fn approximate(target_img: &mut DynamicImage, config: &Config) -> Result<Dyn
         for skin in board.iter_skins() {
             // try black or gray garbage
             for piece in Piece::all_garbage(cell) {
-                let diff = avg_grid_pixel_diff(&piece, skin, &target_img)?;
+                let diff = avg_piece_pixel_diff(&piece, skin, &target_img)?;
                 if diff < best_piece_diff {
                     best_piece = Some(piece);
                     best_piece_diff = diff;
@@ -99,7 +99,8 @@ fn avg_piece_pixel_diff(piece: &Piece, skin: &BlockSkin, target_img: &DynamicIma
         Piece::J(_, _) => &skin.j_img,
         Piece::S(_, _) => &skin.s_img,
         Piece::Z(_, _) => &skin.z_img,
-        _ => panic!("Garbage or black piece has no skin")
+        Piece::Garbage(_) => &skin.gray_img,
+        Piece::Black(_) => &skin.black_img,
     };
 
     for cell in piece.get_occupancy()? {
@@ -112,32 +113,6 @@ fn avg_piece_pixel_diff(piece: &Piece, skin: &BlockSkin, target_img: &DynamicIma
                 total_diff += (target_pixel[2] as i32 - skin_pixel[2] as i32).pow(2) as f64;
                 total_pixels += 3;
             }
-        }
-    }
-
-    Ok(total_diff / total_pixels as f64)
-}
-
-fn avg_grid_pixel_diff(piece: &Piece, skin: &BlockSkin, target_img: &DynamicImage) -> Result<f64, Box<dyn std::error::Error>> {
-    let mut total_diff: f64 = 0.0;
-    let mut total_pixels: u32 = 0;
-
-    let block_skin: &DynamicImage = match piece {
-        Piece::Garbage(_) => &skin.gray_img,
-        Piece::Black(_) => &skin.black_img,
-        _ => panic!("Piece is not garbage or black"),
-    };
-
-    // searches a grid around this cell
-    let cell = piece.get_cell();
-    for y in 0..skin.height() {
-        for x in 0..skin.width() {
-            let target_pixel = target_img.get_pixel((cell.x as u32 * skin.width() + x) as u32, (cell.y as u32 * skin.height() + y) as u32);
-            let skin_pixel = block_skin.get_pixel(x, y);
-            total_diff += (target_pixel[0] as i32 - skin_pixel[0] as i32).pow(2) as f64;
-            total_diff += (target_pixel[1] as i32 - skin_pixel[1] as i32).pow(2) as f64;
-            total_diff += (target_pixel[2] as i32 - skin_pixel[2] as i32).pow(2) as f64;
-            total_pixels += 3;
         }
     }
 
