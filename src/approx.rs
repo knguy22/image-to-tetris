@@ -91,8 +91,12 @@ fn resize_img_from_board(board: &SkinnedBoard, target_img: &DynamicImage) -> Res
 }
 
 fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, target_img: &DynamicImage) -> Result<f64, Box<dyn std::error::Error>> {
-    let mut total_diff: f64 = 0.0;
-    let mut total_pixels: u32 = 0;
+    let mut curr_pixel_diff: f64 = 0.0;
+    let mut total_curr_pixels: u32 = 0;
+
+    let mut context_pixel_diff: f64 = 0.0;
+    let mut total_context_pixels: u32 = 0;
+
     let block_image = skin.block_image_from_piece(piece);
 
     let center_cell = piece.get_cell();
@@ -100,8 +104,8 @@ fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, t
     let mut context_cells: Vec<Cell> = Vec::new();
 
     // you want the context to be the opposite direction of the new cells, ie (dy, dx) > 0
-    for dy in 0..2 {
-        for dx in 0..2 {
+    for dy in 0..10 {
+        for dx in 0..10 {
             let context_cell = Cell { x: center_cell.x + dx + 1, y: center_cell.y + dy + 1 };
             let context_char = board.board().get(&context_cell);
 
@@ -112,47 +116,46 @@ fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, t
         }
     }
 
+    let avg_cell_pixel = block_image.get_average_pixel();
     for cell in occupancy {
-        // first analyze the context
+        // first analyze the context using average pixels
         for context_cell in &context_cells {
+            let cell_char = board.board().get(&cell)?;
             let skin_id = board.get_cells_skin(&context_cell);
+
             let context_skin = board.get_skin(skin_id);
-            let context_block_image = context_skin.block_image_from_char(board.board().get(&context_cell)?);
+            let context_block_image = context_skin.block_image_from_char(cell_char);
+            let avg_context_pixel = context_block_image.get_average_pixel();
 
-            for y in 0..skin.height() {
-                for x in 0..skin.width() {
-                    let target_context_pixel = target_img.get_pixel((context_cell.x as u32 * skin.width() + x) as u32, (context_cell.y as u32 * skin.height() + y) as u32);
-                    let target_pixel = target_img.get_pixel((cell.x as u32 * skin.width() + x) as u32, (cell.y as u32 * skin.height() + y) as u32);
-                    let approx_context_pixel = context_block_image.get_pixel(x, y);
-                    let approx_pixel = block_image.get_pixel(x, y);
-
-                    let target_delta: f64 = subtract_pixels(&target_pixel, &target_context_pixel)
-                        .iter()
-                        .fold(0.0, |acc, x| acc + (x.abs() as f64));
-                    let approx_delta: f64 = subtract_pixels(&approx_pixel, &approx_context_pixel)
-                        .iter()
-                        .fold(0.0, |acc, x| acc + (x.abs() as f64));
-
-                    total_diff += target_delta - approx_delta;
-                    total_pixels += 3;
-                }
-            }
+            context_pixel_diff += subtract_pixels(&avg_cell_pixel, &avg_context_pixel)
+                .iter()
+                .fold(0.0, |acc, x| acc + *x as f64);
+            total_context_pixels += 1;
         }
 
-        // then analyze the difference between the current cells
+        // then analyze the individual cell to find the pixel difference between the current cells
         for y in 0..skin.height() {
             for x in 0..skin.width() {
                 let target_pixel = target_img.get_pixel((cell.x as u32 * skin.width() + x) as u32, (cell.y as u32 * skin.height() + y) as u32);
                 let approx_pixel = block_image.get_pixel(x, y);
-                total_diff += subtract_pixels(&target_pixel, &approx_pixel)
+                curr_pixel_diff += subtract_pixels(&target_pixel, &approx_pixel)
                     .iter()
                     .fold(0.0, |acc, x| acc + x.pow(2) as f64);
-                total_pixels += 3;
+                total_curr_pixels += 1;
             }
         }
     }
 
-    Ok(total_diff / total_pixels as f64)
+    // weight the context diff in comparison with the current diff
+    let avg_pixel_diff = 
+        if total_context_pixels != 0 {
+            curr_pixel_diff / total_curr_pixels as f64 + context_pixel_diff / total_context_pixels as f64 
+        } else {
+            curr_pixel_diff / total_curr_pixels as f64
+        };
+
+
+    Ok(avg_pixel_diff)
 }
 
 fn subtract_pixels(a: &Rgba<u8>, b: &Rgba<u8>) -> [i32; 3] {
