@@ -1,5 +1,5 @@
 use crate::board::EMPTY_CELL;
-use crate::draw::{self, BlockImage, BlockSkin, Config, SkinnedBoard};
+use crate::draw::{self, BlockSkin, Config, SkinnedBoard};
 use crate::piece::{Cell, Piece, Orientation};
 
 use std::collections::BinaryHeap;
@@ -60,7 +60,7 @@ pub fn approximate(target_img: &mut DynamicImage, config: &Config) -> Result<Dyn
             // try placing pieces
             for orientation in Orientation::all() {
                 for piece in Piece::all_normal(cell, orientation) {
-                    if board.board.can_place(&piece) {
+                    if board.board().can_place(&piece) {
                         let diff = avg_piece_pixel_diff(&piece, &board, &skin, &target_img)?;
                         if diff < best_piece_diff {
                             best_piece = Some(piece);
@@ -92,17 +92,7 @@ fn resize_img_from_board(board: &SkinnedBoard, target_img: &DynamicImage) -> Res
 fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, target_img: &DynamicImage) -> Result<f64, Box<dyn std::error::Error>> {
     let mut total_diff: f64 = 0.0;
     let mut total_pixels: u32 = 0;
-    let block_image: &BlockImage = match piece {
-        Piece::I(_, _) => &skin.i_img,
-        Piece::O(_, _) => &skin.o_img,
-        Piece::T(_, _) => &skin.t_img,
-        Piece::L(_, _) => &skin.l_img,
-        Piece::J(_, _) => &skin.j_img,
-        Piece::S(_, _) => &skin.s_img,
-        Piece::Z(_, _) => &skin.z_img,
-        Piece::Garbage(_) => &skin.gray_img,
-        Piece::Black(_) => &skin.black_img,
-    };
+    let block_image = skin.block_image_from_piece(piece);
 
     let center_cell = piece.get_cell();
     let occupancy = piece.get_occupancy()?;
@@ -112,7 +102,7 @@ fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, t
     for dy in 0..2 {
         for dx in 0..2 {
             let context_cell = Cell { x: center_cell.x + dx + 1, y: center_cell.y + dy + 1 };
-            let context_char = board.board.get(&context_cell);
+            let context_char = board.board().get(&context_cell);
 
             // only append contexts that are occupied with other pieces we already placed
             if context_char.is_ok() && *context_char.unwrap() != EMPTY_CELL && !occupancy.contains(&context_cell) {
@@ -126,17 +116,7 @@ fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, t
         for context_cell in &context_cells {
             let skin_id = board.get_cells_skin(&context_cell);
             let context_skin = board.get_skin(skin_id);
-            let context_block_image = match *board.board.get(&context_cell)? {
-                'I' => &context_skin.i_img,
-                'O' => &context_skin.o_img,
-                'T' => &context_skin.t_img,
-                'L' => &context_skin.l_img,
-                'J' => &context_skin.j_img,
-                'S' => &context_skin.s_img,
-                'Z' => &context_skin.z_img,
-                'G' => &context_skin.gray_img,
-                _ => &context_skin.black_img,
-            };
+            let context_block_image = context_skin.block_image_from_char(board.board().get(&context_cell)?);
 
             for y in 0..skin.height() {
                 for x in 0..skin.width() {

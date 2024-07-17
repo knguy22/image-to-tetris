@@ -13,23 +13,23 @@ pub struct Config {
 }
 
 pub struct SkinnedBoard {
-    pub board: Board,
+    board: Board,
     cells_skin: Vec<usize>,
     skins: Vec<BlockSkin>,
 }
 
 #[derive(Clone)]
 pub struct BlockSkin {
-    pub black_img: BlockImage,
-    pub gray_img: BlockImage,
+    black_img: BlockImage,
+    gray_img: BlockImage,
 
-    pub i_img: BlockImage,
-    pub o_img: BlockImage,
-    pub t_img: BlockImage,
-    pub l_img: BlockImage,
-    pub j_img: BlockImage,
-    pub s_img: BlockImage,
-    pub z_img: BlockImage,
+    i_img: BlockImage,
+    o_img: BlockImage,
+    t_img: BlockImage,
+    l_img: BlockImage,
+    j_img: BlockImage,
+    s_img: BlockImage,
+    z_img: BlockImage,
 
     width: u32,
     height: u32,
@@ -74,6 +74,10 @@ impl SkinnedBoard {
 
     pub fn skins_height(&self) -> u32 {
         self.skins[0].height
+    }
+
+    pub fn board(&self) -> &Board {
+        &self.board
     }
 
     pub fn board_width(&self) -> usize {
@@ -163,6 +167,35 @@ impl BlockSkin {
         [&mut self.black_img, &mut self.gray_img, &mut self.i_img, &mut self.o_img, &mut self.t_img, &mut self.l_img, &mut self.j_img, &mut self.s_img, &mut self.z_img]
     }
 
+    pub fn block_image_from_piece(&self, piece: &Piece) -> &BlockImage {
+        match piece {
+            Piece::I(_, _) => &self.i_img,
+            Piece::O(_, _) => &self.o_img,
+            Piece::T(_, _) => &self.t_img,
+            Piece::L(_, _) => &self.l_img,
+            Piece::J(_, _) => &self.j_img,
+            Piece::S(_, _) => &self.s_img,
+            Piece::Z(_, _) => &self.z_img,
+            Piece::Garbage(_) => &self.gray_img,
+            Piece::Black(_) => &self.black_img,
+        }
+    }
+
+    pub fn block_image_from_char(&self, cell_val: &char) -> &BlockImage {
+        match *cell_val {
+            'I' => &self.i_img,
+            'O' => &self.o_img,
+            'T' => &self.t_img,
+            'L' => &self.l_img,
+            'J' => &self.j_img,
+            'S' => &self.s_img,
+            'Z' => &self.z_img,
+            'G' => &self.gray_img,
+            _ => &self.black_img,
+        }
+        
+    }
+
     pub fn width(&self) -> u32 {
         self.width
     }
@@ -237,7 +270,8 @@ pub fn draw_board(skin_board: &SkinnedBoard) -> DynamicImage {
                 'S' => &skin.s_img,
                 'Z' => &skin.z_img,
                 'G' => &skin.gray_img,
-                _ => &skin.black_img,
+                'B' => &skin.black_img,
+                _ => panic!("Invalid cell value: {}", board.cells[y * board.width + x]),
             };
             image::imageops::overlay(&mut img, &block.img, (x as u32 * skin.width).into(), (y as u32 * skin.height).into());
         }
