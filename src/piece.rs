@@ -149,13 +149,7 @@ impl Piece {
     }
 
     pub fn get_occupancy(&self) -> Result<Vec<Cell>, Box<dyn Error>> {
-        // handle garbage and black
-        match self {
-            Piece::Garbage(c) | Piece::Black(c) => return Ok(vec![*c]),
-            _ => {}
-        }
-
-        // handle normal pieces
+        // only non-garbage pieces should have a shape
         let shape: &[[Dir; 4]; 4] = match self {
             Piece::I(_, _) => &I_SHAPE,
             Piece::O(_, _) => &O_SHAPE,
@@ -164,7 +158,7 @@ impl Piece {
             Piece::J(_, _) => &J_SHAPE,
             Piece::S(_, _) => &S_SHAPE,
             Piece::Z(_, _) => &Z_SHAPE,
-            _ => panic!("Garbage or black piece has no shape")
+            Piece::Garbage(c) | Piece::Black(c) => return Ok(vec![*c]),
         };
 
         let orien = self.get_orientation();
