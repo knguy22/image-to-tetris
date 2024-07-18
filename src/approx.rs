@@ -209,7 +209,7 @@ fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, t
 
             context_pixel_diff += f64::sqrt(
                 (board_context_diff[0] - target_context_diff[0]).pow(2) as f64 +
-                (board_context_diff[1] - target_context_diff[1]).pow(2) as f64 * 1.3 +
+                (board_context_diff[1] - target_context_diff[1]).pow(2) as f64 * 1.7 +
                 (board_context_diff[2] - target_context_diff[2]).pow(2) as f64
             );
             total_context_pixels += 1;
@@ -223,7 +223,7 @@ fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, t
                 let curr_diff = subtract_pixels(&target_pixel, &approx_pixel);
                 curr_pixel_diff += 
                     curr_diff[0].pow(2) as f64 +
-                    curr_diff[1].pow(2) as f64 * 1.3 +
+                    curr_diff[1].pow(2) as f64 * 1.7 +
                     curr_diff[2].pow(2) as f64
                 ;
                 total_curr_pixels += 1;
