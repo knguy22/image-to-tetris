@@ -209,7 +209,7 @@ fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, t
 
             context_pixel_diff += f64::sqrt(
                 (board_context_diff[0] - target_context_diff[0]).pow(2) as f64 +
-                (board_context_diff[1] - target_context_diff[1]).pow(2) as f64 +
+                (board_context_diff[1] - target_context_diff[1]).pow(2) as f64 * 1.3 +
                 (board_context_diff[2] - target_context_diff[2]).pow(2) as f64
             );
             total_context_pixels += 1;
@@ -220,9 +220,12 @@ fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, t
             for x in 0..skin.width() {
                 let target_pixel = target_img.get_pixel((cell.x as u32 * skin.width() + x) as u32, (cell.y as u32 * skin.height() + y) as u32);
                 let approx_pixel = block_image.get_pixel(x, y);
-                curr_pixel_diff += subtract_pixels(&target_pixel, &approx_pixel)
-                    .iter()
-                    .fold(0.0, |acc, x| acc + x.pow(2) as f64);
+                let curr_diff = subtract_pixels(&target_pixel, &approx_pixel);
+                curr_pixel_diff += 
+                    curr_diff[0].pow(2) as f64 +
+                    curr_diff[1].pow(2) as f64 * 1.3 +
+                    curr_diff[2].pow(2) as f64
+                ;
                 total_curr_pixels += 1;
             }
         }
