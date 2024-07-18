@@ -6,6 +6,7 @@ mod piece;
 mod test_many;
 
 use clap::Parser;
+use imageproc::image;
 
 fn main() {
     let cli = cli::Cli::parse();

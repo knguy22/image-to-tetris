@@ -45,10 +45,10 @@ pub struct BlockImage {
 impl SkinnedBoard {
     pub fn new(width: usize, height: usize) -> SkinnedBoard {
         let mut skins = Vec::new();
-        for file in std::fs::read_dir("assets").unwrap() {
-            let path = file.unwrap().path();
-            if path.is_file() && path.extension().unwrap() == "png" {
-                skins.push(BlockSkin::new(path.to_str().unwrap(), skins.len()).unwrap());
+        for file in std::fs::read_dir("assets").expect("assets directory not found") {
+            let path = file.expect("failed to read file").path();
+            if path.is_file() && path.extension().expect("no file extension found") == "png" {
+                skins.push(BlockSkin::new(path.to_str().expect("failed to convert path to string"), skins.len()).expect("failed to load skin"));
             }
         }
 
@@ -219,7 +219,7 @@ impl BlockImage {
                 |acc, (_x, _y, p) |
                 [acc[0] + p[0] as u32, acc[1] + p[1] as u32, acc[2] + p[2] as u32, acc[3] + p[3] as u32])
             // divide by number of pixels
-            .map(|x| u8::try_from(x / num_pixels).unwrap())
+            .map(|x| u8::try_from(x / num_pixels).expect("could not convert pixel sum to u8"))
             .into();
 
         Ok(BlockImage {
@@ -285,7 +285,7 @@ mod tests {
 
     #[test]
     fn test_init() {
-        let skin = BlockSkin::new("assets/HqGYC5G - Imgur.png", 0).unwrap();
+        let skin = BlockSkin::new("assets/HqGYC5G - Imgur.png", 0).expect("could not load skin");
         assert_eq!(skin.width, 36);
         assert_eq!(skin.height, 36);
 
@@ -297,7 +297,7 @@ mod tests {
 
     #[test]
     fn test_resize_larger() {
-        let mut skin = BlockSkin::new("assets/HqGYC5G - Imgur.png", 0).unwrap();
+        let mut skin = BlockSkin::new("assets/HqGYC5G - Imgur.png", 0).expect("could not load skin");
         skin.resize(64, 64);
         assert_eq!(skin.width, 64);
         assert_eq!(skin.height, 64);
@@ -310,7 +310,7 @@ mod tests {
 
     #[test]
     fn test_resize_smaller() {
-        let mut skin = BlockSkin::new("assets/HqGYC5G - Imgur.png", 0).unwrap();
+        let mut skin = BlockSkin::new("assets/HqGYC5G - Imgur.png", 0).expect("could not load skin");
         skin.resize(16, 16);
         assert_eq!(skin.width, 16);
         assert_eq!(skin.height, 16);

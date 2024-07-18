@@ -94,8 +94,8 @@ fn diff_images_dssim(image1: &DynamicImage, image2: &DynamicImage) -> Result<f64
     let image1_rgb = rgb::FromSlice::as_rgb(image1_buffer.as_raw().as_slice());
     let image2_rgb = rgb::FromSlice::as_rgb(image2_buffer.as_raw().as_slice());
 
-    let d_image1 = d.create_image_rgb(image1_rgb, image1.width() as usize, image1.height() as usize).unwrap();
-    let d_image2 = d.create_image_rgb(image2_rgb, image2.width() as usize, image2.height() as usize).unwrap();
+    let d_image1 = d.create_image_rgb(image1_rgb, image1.width() as usize, image1.height() as usize).expect("Failed to create dssim image");
+    let d_image2 = d.create_image_rgb(image2_rgb, image2.width() as usize, image2.height() as usize).expect("Failed to create dssim image");
 
     let (diff, _) = d.compare(&d_image1, &d_image2);
     Ok(diff.into())
