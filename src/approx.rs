@@ -146,49 +146,7 @@ fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, t
 
     let center_cell = piece.get_cell();
     let occupancy = piece.get_occupancy()?;
-    let mut context_cells: Vec<Cell> = Vec::new();
-
-    // get the context cells
-    const MIN_DX: i32 = 0;
-    const MIN_DY: i32 = 0;
-    const MAX_DX: i32 = 8;
-    const MAX_DY: i32 = 8;
-
-    let mut dy: i32 = MIN_DY;
-    while dy < MAX_DY {
-        // compute and check the new y coordinate
-        let new_y = usize::try_from((center_cell.y as i32) + dy);
-        let new_y = match new_y {
-            Ok(y) => y,
-            Err(_) => {
-                dy += 1;
-                continue
-            }
-        };
-
-        let mut dx: i32 = MIN_DX;
-        while dx < MAX_DX {
-            // compute and check the new x coordinate
-            let new_x = usize::try_from((center_cell.x as i32) + dx);
-            let new_x = match new_x {
-                Ok(x) => x,
-                Err(_) => {
-                    dx += 1;
-                    continue
-                }
-            };
-
-            // only append contexts that are occupied with other pieces we already placed
-            let context_cell = Cell {x: new_x, y: new_y};
-            let context_char = board.board().get(&context_cell);
-            if context_char.is_ok() && *context_char.expect("there must be a context char") != EMPTY_CELL && !occupancy.contains(&context_cell) {
-                context_cells.push(context_cell);
-            }
-            dx += 1;
-        }
-
-        dy += 1;
-    }
+    let context_cells = find_context_cells(board, &occupancy, &center_cell);
 
     // used to weigh the importance of each diff
     const RED_WEIGHT: f64 = 1.0;
@@ -246,6 +204,54 @@ fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, t
 
 
     Ok(avg_pixel_diff)
+}
+
+fn find_context_cells(board: &SkinnedBoard, occupancy: &Vec<Cell>, center_cell: &Cell) -> Vec<Cell> {
+    let mut context_cells: Vec<Cell> = Vec::new();
+
+    // get the context cells
+    const MIN_DX: i32 = 0;
+    const MIN_DY: i32 = 0;
+    const MAX_DX: i32 = 8;
+    const MAX_DY: i32 = 8;
+
+    let mut dy: i32 = MIN_DY;
+    while dy < MAX_DY {
+        // compute and check the new y coordinate
+        let new_y = usize::try_from((center_cell.y as i32) + dy);
+        let new_y = match new_y {
+            Ok(y) => y,
+            Err(_) => {
+                dy += 1;
+                continue
+            }
+        };
+
+        let mut dx: i32 = MIN_DX;
+        while dx < MAX_DX {
+            // compute and check the new x coordinate
+            let new_x = usize::try_from((center_cell.x as i32) + dx);
+            let new_x = match new_x {
+                Ok(x) => x,
+                Err(_) => {
+                    dx += 1;
+                    continue
+                }
+            };
+
+            // only append contexts that are occupied with other pieces we already placed
+            let context_cell = Cell {x: new_x, y: new_y};
+            let context_char = board.board().get(&context_cell);
+            if context_char.is_ok() && *context_char.expect("there must be a context char") != EMPTY_CELL && !occupancy.contains(&context_cell) {
+                context_cells.push(context_cell);
+            }
+            dx += 1;
+        }
+
+        dy += 1;
+    }
+
+    context_cells
 }
 
 fn subtract_pixels(a: &Rgba<u8>, b: &Rgba<u8>) -> [i32; 3] {
