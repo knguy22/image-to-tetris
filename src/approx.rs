@@ -13,9 +13,9 @@ pub fn approximate(target_img: &mut DynamicImage, config: &Config) -> Result<Dyn
     let mut board = SkinnedBoard::new(config.board_width, config.board_height);
 
     // resize the skins
-    let (img_width, img_height) = target_img.dimensions();
-    let skin_width = img_width / u32::try_from(board.board_width())?;
-    let skin_height = img_height / u32::try_from(board.board_height())?;
+    let (pixels_width, pixels_height) = target_img.dimensions();
+    let skin_width = pixels_width / u32::try_from(board.board_width())?;
+    let skin_height = pixels_height / u32::try_from(board.board_height())?;
     if skin_width == 0 || skin_height == 0 {
         return Err("Skin dimensions must be greater than 0".into());
     }
@@ -23,6 +23,9 @@ pub fn approximate(target_img: &mut DynamicImage, config: &Config) -> Result<Dyn
 
     // resize the target image to account for rounding errors
     *target_img = resize_img_from_board(&board, target_img)?;
+
+    // initialize average pixels for context reasons during approximation
+    let avg_pixel_grid = average_pixel_grid(&target_img, board.skins_width(), board.skins_height())?;
 
     // init the heap and push the first row of cells into it
     // the first row is the highest row in number because we are using a max heap
@@ -50,7 +53,7 @@ pub fn approximate(target_img: &mut DynamicImage, config: &Config) -> Result<Dyn
         for skin in board.iter_skins() {
             // try black or gray garbage
             for piece in Piece::all_garbage(cell) {
-                let diff = avg_piece_pixel_diff(&piece, &board, skin, &target_img)?;
+                let diff = avg_piece_pixel_diff(&piece, &board, skin, &target_img, &avg_pixel_grid)?;
                 if diff < best_piece_diff {
                     best_piece = Some(piece);
                     best_piece_diff = diff;
@@ -62,7 +65,7 @@ pub fn approximate(target_img: &mut DynamicImage, config: &Config) -> Result<Dyn
             for orientation in Orientation::all() {
                 for piece in Piece::all_normal(cell, orientation) {
                     if board.board().can_place(&piece) {
-                        let diff = avg_piece_pixel_diff(&piece, &board, &skin, &target_img)?;
+                        let diff = avg_piece_pixel_diff(&piece, &board, &skin, &target_img, &avg_pixel_grid)?;
                         if diff < best_piece_diff {
                             best_piece = Some(piece);
                             best_piece_diff = diff;
@@ -90,7 +93,49 @@ fn resize_img_from_board(board: &SkinnedBoard, target_img: &DynamicImage) -> Res
     Ok(image::DynamicImage::from(resized_target_buffer))
 }
 
-fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, target_img: &DynamicImage) -> Result<f64, Box<dyn std::error::Error>> {
+fn average_pixel_grid(target_img: &DynamicImage, pixels_grid_width: u32, pixels_grid_height: u32) -> Result<Vec<Rgba<u8>>, Box<dyn std::error::Error>> {
+    // check pixels are evenly divided into the grid
+    let (pixels_w, pixels_h) = target_img.dimensions();
+    if pixels_w % pixels_grid_width != 0 || pixels_h % pixels_grid_height != 0 {
+        return Err("Pixels must be evenly divided into the grid".into());
+    }
+
+    // now divide pixels into the grid and compute the average pixel for each
+    let pixels_per_grid = pixels_grid_width * pixels_grid_height;
+    let mut avg_pixels = Vec::new();
+
+    // for each grid in the image, calculate an average
+    for pixels_y_range in (0..pixels_h).step_by(pixels_grid_height as usize) {
+        for pixels_x_range in (0..pixels_w).step_by(pixels_grid_width as usize) {
+            let mut pixel_sum: [u32; 4]= [0, 0, 0, 0];
+
+            // calculate the sum using each pixel in the grid
+            for y in 0..pixels_grid_height {
+                for x in 0..pixels_grid_width {
+                    let pixel = target_img.get_pixel(pixels_x_range + x, pixels_y_range + y);
+                    pixel_sum[0] += pixel[0] as u32;
+                    pixel_sum[1] += pixel[1] as u32;
+                    pixel_sum[2] += pixel[2] as u32;
+                    pixel_sum[3] += pixel[3] as u32;
+                }
+            }
+
+            // divide by the number of pixels in the grid
+            let pixel_avg: Rgba<u8> = [
+                u8::try_from(pixel_sum[0] / pixels_per_grid)?,
+                u8::try_from(pixel_sum[1] / pixels_per_grid)?,
+                u8::try_from(pixel_sum[2] / pixels_per_grid)?,
+                u8::try_from(pixel_sum[3] / pixels_per_grid)?,
+            ].into();
+
+            avg_pixels.push(pixel_avg);
+        }
+    }
+
+    Ok(avg_pixels)
+}
+
+fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, target_img: &DynamicImage, avg_pixel_grid: &Vec<Rgba<u8>>) -> Result<f64, Box<dyn std::error::Error>> {
     let mut curr_pixel_diff: f64 = 0.0;
     let mut total_curr_pixels: u32 = 0;
 
@@ -116,7 +161,8 @@ fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, t
         }
     }
 
-    let avg_cell_pixel = block_image.get_average_pixel();
+    let avg_board_cell_pixel = block_image.get_average_pixel();
+    let avg_target_cell_pixel = avg_pixel_grid[(center_cell.y * board.board_width() + center_cell.x) as usize];
     for cell in occupancy {
         // first analyze the context using average pixels
         for context_cell in &context_cells {
@@ -125,11 +171,17 @@ fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, t
 
             let context_skin = board.get_skin(skin_id);
             let context_block_image = context_skin.block_image_from_char(cell_char);
-            let avg_context_pixel = context_block_image.get_average_pixel();
+            let avg_board_context_pixel = context_block_image.get_average_pixel();
 
-            context_pixel_diff += subtract_pixels(&avg_cell_pixel, &avg_context_pixel)
-                .iter()
-                .fold(0.0, |acc, x| acc + *x as f64);
+            let avg_target_context_pixel = avg_pixel_grid[(context_cell.y * board.board_width() + context_cell.x) as usize];
+
+            let board_context_diff = subtract_pixels(&avg_board_cell_pixel, &avg_board_context_pixel);
+            let target_context_diff = subtract_pixels(&avg_target_cell_pixel, &avg_target_context_pixel);
+
+            context_pixel_diff += 
+                (board_context_diff[0] - target_context_diff[0]).pow(2) as f64 +
+                (board_context_diff[1] - target_context_diff[1]).pow(2) as f64 +
+                (board_context_diff[2] - target_context_diff[2]).pow(2) as f64;
             total_context_pixels += 1;
         }
 
