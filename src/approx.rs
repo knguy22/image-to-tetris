@@ -148,17 +148,46 @@ fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, t
     let occupancy = piece.get_occupancy()?;
     let mut context_cells: Vec<Cell> = Vec::new();
 
-    // you want the context to be the opposite direction of the new cells, ie (dy, dx) > 0
-    for dy in 0..8 {
-        for dx in 0..8 {
-            let context_cell = Cell { x: center_cell.x + dx, y: center_cell.y + dy };
-            let context_char = board.board().get(&context_cell);
+    // get the context cells
+    const MIN_DX: i32 = 0;
+    const MIN_DY: i32 = 0;
+    const MAX_DX: i32 = 8;
+    const MAX_DY: i32 = 8;
+
+    let mut dy: i32 = MIN_DY;
+    while dy < MAX_DY {
+        // compute and check the new y coordinate
+        let new_y = usize::try_from((center_cell.y as i32) + dy);
+        let new_y = match new_y {
+            Ok(y) => y,
+            Err(_) => {
+                dy += 1;
+                continue
+            }
+        };
+
+        let mut dx: i32 = MIN_DX;
+        while dx < MAX_DX {
+            // compute and check the new x coordinate
+            let new_x = usize::try_from((center_cell.x as i32) + dx);
+            let new_x = match new_x {
+                Ok(x) => x,
+                Err(_) => {
+                    dx += 1;
+                    continue
+                }
+            };
 
             // only append contexts that are occupied with other pieces we already placed
+            let context_cell = Cell {x: new_x, y: new_y};
+            let context_char = board.board().get(&context_cell);
             if context_char.is_ok() && *context_char.unwrap() != EMPTY_CELL && !occupancy.contains(&context_cell) {
                 context_cells.push(context_cell);
             }
+            dx += 1;
         }
+
+        dy += 1;
     }
 
     let avg_board_cell_pixel = block_image.get_average_pixel();
