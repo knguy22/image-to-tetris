@@ -178,10 +178,11 @@ fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, t
             let board_context_diff = subtract_pixels(&avg_board_cell_pixel, &avg_board_context_pixel);
             let target_context_diff = subtract_pixels(&avg_target_cell_pixel, &avg_target_context_pixel);
 
-            context_pixel_diff += 
+            context_pixel_diff += f64::sqrt(
                 (board_context_diff[0] - target_context_diff[0]).pow(2) as f64 +
                 (board_context_diff[1] - target_context_diff[1]).pow(2) as f64 +
-                (board_context_diff[2] - target_context_diff[2]).pow(2) as f64;
+                (board_context_diff[2] - target_context_diff[2]).pow(2) as f64
+            );
             total_context_pixels += 1;
         }
 
