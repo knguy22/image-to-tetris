@@ -149,9 +149,9 @@ fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, t
     let mut context_cells: Vec<Cell> = Vec::new();
 
     // you want the context to be the opposite direction of the new cells, ie (dy, dx) > 0
-    for dy in 0..10 {
-        for dx in 0..10 {
-            let context_cell = Cell { x: center_cell.x + dx + 1, y: center_cell.y + dy + 1 };
+    for dy in 0..8 {
+        for dx in 0..8 {
+            let context_cell = Cell { x: center_cell.x + dx, y: center_cell.y + dy };
             let context_char = board.board().get(&context_cell);
 
             // only append contexts that are occupied with other pieces we already placed
