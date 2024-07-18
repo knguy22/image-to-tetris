@@ -38,7 +38,7 @@ pub fn approximate(target_img: &mut DynamicImage, config: &Config) -> Result<Dyn
 
     // for each cell at the top of the heap:
     while heap.len() > 0 {
-        let cell = heap.pop().unwrap();
+        let cell = heap.pop().expect("heap should not be empty");
 
         // 1. check if the cell is unoccupied
         if !board.empty_at(&cell) {
@@ -77,8 +77,8 @@ pub fn approximate(target_img: &mut DynamicImage, config: &Config) -> Result<Dyn
         }
 
         // place the best piece; there must be a best piece
-        let best_piece = best_piece.unwrap();
-        board.place(&best_piece, best_skin_id.unwrap())?;
+        let best_piece = best_piece.expect("there must be a best piece");
+        board.place(&best_piece, best_skin_id.expect("there must be a best skin"))?;
     }
 
     // draw the board
@@ -181,7 +181,7 @@ fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, t
             // only append contexts that are occupied with other pieces we already placed
             let context_cell = Cell {x: new_x, y: new_y};
             let context_char = board.board().get(&context_cell);
-            if context_char.is_ok() && *context_char.unwrap() != EMPTY_CELL && !occupancy.contains(&context_cell) {
+            if context_char.is_ok() && *context_char.expect("there must be a context char") != EMPTY_CELL && !occupancy.contains(&context_cell) {
                 context_cells.push(context_cell);
             }
             dx += 1;

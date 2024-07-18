@@ -32,16 +32,17 @@ impl Board {
     }
 
     pub fn can_place(&self, piece: &Piece) -> bool {
-        let to_occupy = piece.get_occupancy();
-        match to_occupy {
+        let to_occupy = match piece.get_occupancy() {
+            Ok(to_occupy) => to_occupy,
             Err(_) => return false,
-            _ => {}
-        }
-        let to_occupy = to_occupy.unwrap();
+        };
 
         for cell in to_occupy.iter() {
-            let curr = self.get(cell);
-            if curr.is_err() || *curr.unwrap() != EMPTY_CELL {
+            let curr = match self.get(cell) {
+                Ok(curr) => curr,
+                Err(_) => return false,
+            };
+            if *curr != EMPTY_CELL {
                 return false;
             }
         }
@@ -73,7 +74,7 @@ impl Board {
         if self.pieces.len() == 0 {
             return Err("No moves to undo".into());
         }
-        let piece = self.pieces.pop().unwrap();
+        let piece = self.pieces.pop().expect("pieces should not be empty");
         for cell in piece.get_occupancy()? {
             *self.get_mut(&cell)? = EMPTY_CELL;
         }
