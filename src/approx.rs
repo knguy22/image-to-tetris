@@ -190,6 +190,11 @@ fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, t
         dy += 1;
     }
 
+    // used to weigh the importance of each diff
+    const RED_WEIGHT: f64 = 1.0;
+    const GREEN_WEIGHT: f64 = 1.7;
+    const BLUE_WEIGHT: f64 = 0.8;
+
     let avg_board_cell_pixel = block_image.get_average_pixel();
     let avg_target_cell_pixel = avg_pixel_grid[(center_cell.y * board.board_width() + center_cell.x) as usize];
     for cell in occupancy {
@@ -208,9 +213,9 @@ fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, t
             let target_context_diff = subtract_pixels(&avg_target_cell_pixel, &avg_target_context_pixel);
 
             context_pixel_diff += f64::sqrt(
-                (board_context_diff[0] - target_context_diff[0]).pow(2) as f64 +
-                (board_context_diff[1] - target_context_diff[1]).pow(2) as f64 * 1.7 +
-                (board_context_diff[2] - target_context_diff[2]).pow(2) as f64
+                (board_context_diff[0] - target_context_diff[0]).pow(2) as f64 * RED_WEIGHT +
+                (board_context_diff[1] - target_context_diff[1]).pow(2) as f64 * GREEN_WEIGHT +
+                (board_context_diff[2] - target_context_diff[2]).pow(2) as f64 * BLUE_WEIGHT
             );
             total_context_pixels += 1;
         }
@@ -222,9 +227,9 @@ fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, t
                 let approx_pixel = block_image.get_pixel(x, y);
                 let curr_diff = subtract_pixels(&target_pixel, &approx_pixel);
                 curr_pixel_diff += 
-                    curr_diff[0].pow(2) as f64 +
-                    curr_diff[1].pow(2) as f64 * 1.7 +
-                    curr_diff[2].pow(2) as f64
+                    curr_diff[0].pow(2) as f64 * RED_WEIGHT +
+                    curr_diff[1].pow(2) as f64 * GREEN_WEIGHT +
+                    curr_diff[2].pow(2) as f64 * BLUE_WEIGHT
                 ;
                 total_curr_pixels += 1;
             }
