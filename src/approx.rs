@@ -154,7 +154,7 @@ fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, t
     const BLUE_WEIGHT: f64 = 0.8;
 
     let avg_board_cell_pixel = block_image.get_average_pixel();
-    let avg_target_cell_pixel = avg_pixel_grid[(center_cell.y * board.board_width() + center_cell.x) as usize];
+    let avg_target_cell_pixel = find_average_target_cell_pixel(avg_pixel_grid, &occupancy, board);
     for cell in occupancy {
         // first analyze the context using average pixels
         for context_cell in &context_cells {
@@ -252,6 +252,20 @@ fn find_context_cells(board: &SkinnedBoard, occupancy: &Vec<Cell>, center_cell: 
     }
 
     context_cells
+}
+
+fn find_average_target_cell_pixel(avg_pixel_grid: &Vec<Rgba<u8>>, occupancy: &Vec<Cell>, board: &SkinnedBoard) -> Rgba<u8> {
+    let mut pixel_sum: [u32; 4] = [0, 0, 0, 0];
+
+    for cell in occupancy {
+        let pixel = &avg_pixel_grid[cell.y * board.board_width() + cell.x];
+        pixel_sum[0] += pixel[0] as u32;
+        pixel_sum[1] += pixel[1] as u32;
+        pixel_sum[2] += pixel[2] as u32;
+        pixel_sum[3] += pixel[3] as u32;
+    }
+
+    pixel_sum.map(|x| u8::try_from(x / occupancy.len() as u32).expect("pixel should be in range")).into()
 }
 
 fn subtract_pixels(a: &Rgba<u8>, b: &Rgba<u8>) -> [i32; 3] {
