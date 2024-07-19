@@ -1,4 +1,5 @@
 mod approx;
+mod approx_video;
 mod board;
 mod cli;
 mod draw;
@@ -9,6 +10,10 @@ use clap::Parser;
 use imageproc::image;
 
 fn main() {
+    ffmpeg_next::init().unwrap();
+    let frames = approx_video::extract_rgb_frames("test_results/test.mp4");
+    return;
+
     let cli = cli::Cli::parse();
 
     // run integration tests if possible; source and output are ignored
