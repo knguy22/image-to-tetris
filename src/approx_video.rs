@@ -1,6 +1,6 @@
-use crate::{approx, draw, utils};
+use crate::{approx, draw};
 
-use std::{path::PathBuf, thread};
+use std::path::PathBuf;
 
 use ffmpeg_next::{codec, format, Rational, Packet, Error};
 use ffmpeg_next::frame::Video;
@@ -8,22 +8,52 @@ use ffmpeg_next::software::scaling::{context::Context, flag::Flags};
 use ffmpeg_next::util::format::pixel::Pixel;
 use image::{DynamicImage, ImageBuffer};
 
-type RawFrame = Vec<u8>;
-type RawFrames = Vec<Vec<u8>>;
+pub fn run(source: &PathBuf, output: &PathBuf, board_width: usize, board_height: usize) {
+    const NUM_THREADS: usize = 8;
 
+    ffmpeg_next::init().expect("failed to initialize ffmpeg");
+    let (meta_data, input) = VideoInput::new(source);
+    let mut output = VideoOutput::new(output, &meta_data);
+    let config = draw::Config {
+        board_width: board_width,
+        board_height: board_height,
+    };
+
+    for (i, frame) in input.enumerate() {
+        let approx_img = approx::approximate(&mut frame_to_image(frame, &meta_data), &config).unwrap();
+        output.send_frame(&approx_img);
+
+        if (i + 1) % 10 == 0 {
+            println!("Approximated {} frames", i + 1);
+        }
+    }
+}
+
+type RawFrame = Vec<u8>;
+
+// contains important video metadata
+#[derive(Debug, Clone, Copy)]
 struct VideoMetaData {
-    // metadata for export
     width: u32,
     height: u32,
-    fps: i32,
+    fps: Rational,
+    time_base: Rational,
     format: Pixel,
 }
 
+// streams from the input file
 struct VideoInput {
-    // metadata for streaming the input
     source: ffmpeg_next::format::context::Input,
     video_stream_index: usize,
-    codec_context: ffmpeg_next::codec::decoder::video::Video,
+    decoder: ffmpeg_next::codec::decoder::video::Video,
+    scaler: Context,
+}
+
+// streams to the output file
+struct VideoOutput {
+    output: ffmpeg_next::format::context::Output,
+    video_stream_index: usize,
+    encoder: ffmpeg_next::codec::encoder::Video,
     scaler: Context,
 }
 
@@ -35,30 +65,32 @@ impl VideoInput {
         // video metadata
         let video_stream_index = input.index();
         let fps = input.avg_frame_rate();
+        let time_base = input.time_base();
         let format = Pixel::RGB24;
 
         // setup the decoder
-        let codec_context = input.codec().decoder().video().unwrap();
+        let decoder = input.codec().decoder().video().unwrap();
         let scaler = Context::get(
-            codec_context.format(),
-            codec_context.width(),
-            codec_context.height(),
+            decoder.format(),
+            decoder.width(),
+            decoder.height(),
             format,
-            codec_context.width(),
-            codec_context.height(),
+            decoder.width(),
+            decoder.height(),
             Flags::BILINEAR,
         ).unwrap();
 
         (VideoMetaData {
-            width: codec_context.width(),
-            height: codec_context.height(),
-            fps: u32::from(fps) as i32,
+            width: decoder.width(),
+            height: decoder.height(),
+            fps: fps,
+            time_base: time_base,
             format: format,
         },
         VideoInput {
             source: source,
             video_stream_index: video_stream_index,
-            codec_context: codec_context,
+            decoder: decoder,
             scaler: scaler,
         })
     }
@@ -71,11 +103,11 @@ impl Iterator for VideoInput {
         while let Some((stream, packet)) = self.source.packets().next() {
             if stream.index() == self.video_stream_index {
                 // send the video packet to the codec
-                self.codec_context.send_packet(&packet).unwrap();
+                self.decoder.send_packet(&packet).unwrap();
                 
                 // then attempt to decode and collect that packet into a frame
                 let mut frame = Video::empty();
-                if self.codec_context.receive_frame(&mut frame).is_ok() {
+                if self.decoder.receive_frame(&mut frame).is_ok() {
                     // then scale the frame, which is now ready to push
                     let mut rgb_frame = Video::empty();
                     self.scaler.run(&frame, &mut rgb_frame).unwrap();
@@ -87,7 +119,7 @@ impl Iterator for VideoInput {
 
         // Flush the decoder to get frames from remaining packets
         let mut frame = Video::empty();
-        while self.codec_context.receive_frame(&mut frame).is_ok() {
+        while self.decoder.receive_frame(&mut frame).is_ok() {
             let mut rgb_frame = Video::empty();
             self.scaler.run(&frame, &mut rgb_frame).unwrap();
 
@@ -100,149 +132,58 @@ impl Iterator for VideoInput {
     }
 }
 
-pub fn run(source: &PathBuf, output: &PathBuf, board_width: usize, board_height: usize) {
-    const NUM_THREADS: usize = 8;
+impl VideoOutput {
+    fn new(file_name: &PathBuf, video: &VideoMetaData) -> VideoOutput {
+        // open the output file
+        let mut output = format::output(file_name).expect("failed to open output file");
 
-    ffmpeg_next::init().expect("failed to initialize ffmpeg");
-    let (video_data, frames) = extract_rgb_frames(source);
-    let frames = frames_to_images(&video_data, frames);
-    let mut approx_frames = Vec::new();
+        // add a video stream
+        let codec = codec::encoder::find(codec::Id::H264).expect("failed to find H264 codec");
+        let stream = output.add_stream(codec).expect("failed to add stream to output");
 
-    let config = draw::Config {
-        board_width: board_width,
-        board_height: board_height,
-    };
-    
-    // approximate all frames using different frames
-    println!("Starting {} threads to approximate", NUM_THREADS);
-    let mut handles = Vec::new();
-    let chunks = utils::split_into_n_chunks(frames.into_iter(), NUM_THREADS);
-    for (thread_id, frames) in chunks.into_iter().enumerate() {
-        let handle = thread::spawn(move || {
-            run_thread(thread_id, frames, &config).unwrap()
-        });
-        handles.push(handle);
-    }
+        let mut encoder = stream.codec().encoder().video().expect("failed to create encoder");
+        encoder.set_width(video.width);
+        encoder.set_height(video.height);
+        encoder.set_format(Pixel::YUV420P);
+        encoder.set_time_base(video.time_base);
+        encoder.set_frame_rate(Some(video.fps));
 
-    // join the handles
-    for handle in handles {
-        approx_frames.extend(handle.join().expect("failed to join thread"));
-    }
+        // Open the encoder to ensure all parameters are set correctly
+        let encoder = encoder.open_as(codec).expect("failed to open encoder");
 
-    println!("Saving {} frames to {}", approx_frames.len(), output.display());
-}
+        // Get the video stream index
+        let video_stream_index = stream.index();
 
-fn run_thread(thread_id: usize, mut frames: Vec<DynamicImage>, config: &draw::Config) -> Result<Vec<DynamicImage>, Box<dyn std::error::Error>> {
-    let mut approx_frames = Vec::new();
-
-    let mut processed_frames = 0;
-    for frame in frames.iter_mut() {
-        let approx_frame = approx::approximate(frame, config)?;
-        approx_frames.push(approx_frame);
-
-        processed_frames += 1;
-        if processed_frames % 50 == 0 {
-            println!("Thread {}: Processed {} frames", thread_id, processed_frames);
+        let scaler = Context::get(
+            video.format,
+            encoder.width(),
+            encoder.height(),
+            video.format,
+            encoder.width(),
+            encoder.height(),
+            Flags::BILINEAR,
+        )
+        .expect("failed to create scaler");
+        VideoOutput {
+            output: output,
+            video_stream_index: video_stream_index,
+            encoder: encoder,
+            scaler: scaler,
         }
     }
 
-    Ok(approx_frames)
-}
-
-fn extract_rgb_frames(file_name: &PathBuf) -> (VideoMetaData, RawFrames) {
-    println!("Extracting video data from {:?}", file_name);
-
-    let (meta_data, input) = VideoInput::new(file_name);
-    let mut decoded_frames = Vec::new();
-
-    for frame in input {
-        decoded_frames.push(frame);
+    fn send_frame(&mut self, image: &DynamicImage) {
+        let mut rgb_frame = Video::empty();
+        let data = image.to_rgb8().into_vec();
+        rgb_frame.set_format(Pixel::RGB24);
+        rgb_frame.set_width(image.width());
+        rgb_frame.set_height(image.height());
+        rgb_frame.data_mut(0).copy_from_slice(&data);
+        self.encoder.send_frame(&rgb_frame).unwrap();
     }
-    println!("Extracted {} video frames", decoded_frames.len());
-
-    (meta_data, decoded_frames)
 }
 
-fn frames_to_images(video: &VideoMetaData, frames: RawFrames) -> Vec<DynamicImage> {
-    let to_convert = frames.len();
-    let mut new_frames = Vec::new();
-    println!("Converting {} video frames into images", to_convert);
-
-    for rgb_data in frames {
-        // check for correct format
-        assert!(rgb_data.len() == (video.width * video.height * 3) as usize);
-
-        let frame: ImageBuffer<image::Rgb<u8>, _> = image::ImageBuffer::from_raw(video.width, video.height, rgb_data.to_owned()).expect("failed to create image from raw data");
-        new_frames.push(DynamicImage::from(frame));
-
-        if new_frames.len() % 100 == 0 {
-            println!("{} frames converted out of {}", new_frames.len(), to_convert);
-        }
-    }
-
-    new_frames
+fn frame_to_image(frame: RawFrame, video: &VideoMetaData) -> DynamicImage {
+    let buffer: ImageBuffer<image::Rgb<u8>, _> = image::ImageBuffer::from_raw(video.width, video.height, frame.to_owned()).expect("failed to create image from raw data");
+    DynamicImage::from(buffer)
 }
-
-// fn save_from_rgb_frames(video: &VideoData, file_name: &str) -> Result<(), Box<dyn std::error::Error>> {
-//     let mut output = format::output(&file_name)?;
-//     let global_header = output.format().flags().contains(format::flag::Flags::GLOBAL_HEADER);
-//     let mut stream = output.add_stream(codec::Id::H264)?;
-
-//     {
-//         let mut encoder = stream.codec().encoder().video()?;
-//         encoder.set_width(video.width);
-//         encoder.set_height(video.height);
-//         encoder.set_format(video.format);
-//         encoder.set_frame_rate(Some(Rational::new(video.fps, 1)));
-//         encoder.set_time_base(Rational::new(1, video.fps));
-//         if global_header {
-//             encoder.set_flags(codec::flag::Flags::GLOBAL_HEADER);
-//         }
-//     }
-
-//     // open output file
-//     output.write_header()?;
-
-//     // Create a scaler context to convert frames to YUV format
-//     let mut scaler = Context::get(
-//         video.format,
-//         video.width,
-//         video.height,
-//         Pixel::YUV420P,
-//         video.width,
-//         video.height,
-//         Flags::BILINEAR,
-//     )?;
-
-//     let mut pts = 0;
-//     let mut video_encoder = stream.codec().encoder().video()?;
-//     for rgb_data in video.frames.iter() {
-//         let mut rgb_frame = Video::empty();
-//         rgb_frame.set_format(video.format);
-//         rgb_frame.set_width(video.width);
-//         rgb_frame.set_height(video.height);
-//         rgb_frame.data_mut(0).copy_from_slice(&rgb_data);
-
-//         let mut yuv_frame = Video::empty();
-//         yuv_frame.set_format(Pixel::YUV410P);
-//         yuv_frame.set_width(video.width);
-//         yuv_frame.set_height(video.height);
-
-//         scaler.run(&rgb_frame, &mut yuv_frame)?;
-//         yuv_frame.set_pts(Some(pts));
-//         pts += 1;
-
-//         video_encoder.send_frame(&yuv_frame)?;
-
-//         // flush encoder
-//         video_encoder.send_eof()?;
-//         let mut encoded = Packet::empty();
-//         while video_encoder.receive_packet(&mut encoded).is_ok() {
-//             encoded.set_stream(0);
-//             output.write_header(&encoded)?;
-//         }
-//     }
-
-
-//     Ok(())
-// }
