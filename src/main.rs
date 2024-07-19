@@ -4,37 +4,24 @@ mod board;
 mod cli;
 mod draw;
 mod piece;
-mod test_many;
+mod integration_test;
+
+use std::path::PathBuf;
 
 use clap::Parser;
 use imageproc::image;
 
 fn main() {
-    ffmpeg_next::init().unwrap();
-    let frames = approx_video::extract_rgb_frames("test_results/test.mp4");
-    return;
-
     let cli = cli::Cli::parse();
 
-    // run integration tests if possible; source and output are ignored
-    if cli.integration_tests {
-        test_many::run("sources", 100).unwrap();
-        return
+    match cli.command {
+        cli::Commands::Integration => integration_test::run("sources", 100).unwrap(),
+        cli::Commands::ApproxImage { source, output, width, height } => run_approx_image(&source, &output, width, height),
+        cli::Commands::ApproxVideo { source, output, width, height } => run_approx_video(&source, &output, width, height),
     }
+}
 
-    // otherwise approximate an image; these arguments must be set
-    let source_img_path = cli.source_img.expect("source_img must be set");
-    let output_img_path = cli.output_img.expect("output_img must be set");
-
-    let board_width = match cli.width {
-        Some(width) => width,
-        None => 10,
-    };
-    let board_height = match cli.height {
-        Some(height) => height,
-        None => 20,
-    };
-
+fn run_approx_image(source_img_path: &PathBuf, output_img_path: &PathBuf, board_width: usize, board_height: usize) {
     let config = draw::Config {
         board_width: board_width,
         board_height: board_height,
@@ -45,6 +32,13 @@ fn main() {
 
     let result_img = approx::approximate(&mut source_img, &config).unwrap();
     result_img.save(output_img_path).expect("could not save output image");
+}
+
+fn run_approx_video(source_img_path: &PathBuf, output_img_path: &PathBuf, board_width: usize, board_height: usize) {
+    // ffmpeg_next::init().unwrap();
+    // let frames = approx_video::extract_rgb_frames("test_results/test.mp4");
+    // let frames = approx_video::frames_to_images(&frames);
+    todo!()
 }
 
 #[cfg(test)]
