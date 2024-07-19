@@ -18,8 +18,8 @@ fn main() {
     }
 
     // otherwise approximate an image; these arguments must be set
-    let source_img_path = cli.source_img.unwrap();
-    let output_img_path = cli.output_img.unwrap();
+    let source_img_path = cli.source_img.expect("source_img must be set");
+    let output_img_path = cli.output_img.expect("output_img must be set");
 
     let board_width = match cli.width {
         Some(width) => width,
@@ -39,7 +39,7 @@ fn main() {
     println!("Loaded {}x{} image", source_img.width(), source_img.height());
 
     let result_img = approx::approximate(&mut source_img, &config).unwrap();
-    result_img.save(output_img_path).unwrap();
+    result_img.save(output_img_path).expect("could not save output image");
 }
 
 #[cfg(test)]

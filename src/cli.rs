@@ -13,11 +13,11 @@ pub struct Cli {
     pub output_img: Option<PathBuf>,
 
     // board width
-    #[clap(long, short, action)]
+    #[clap(long, action)]
     pub width: Option<usize>,
 
     // board height
-    #[clap(long, short, action)]
+    #[clap(long, action)]
     pub height: Option<usize>,
 
     // run integration tests
