@@ -8,20 +8,21 @@ use ffmpeg_next::software::scaling::{context::Context, flag::Flags};
 use ffmpeg_next::util::format::pixel::Pixel;
 use image::{DynamicImage, ImageBuffer};
 
+type RawFrames = Vec<Vec<u8>>;
+
 pub struct VideoData {
     pub width: u32,
     pub height: u32,
     pub fps: i32,
     pub format: Pixel,
-    pub frames: Vec<Vec<u8>>,
 }
 
 pub fn run(source: &PathBuf, output: &PathBuf, board_width: usize, board_height: usize) {
     const NUM_THREADS: usize = 8;
 
     ffmpeg_next::init().expect("failed to initialize ffmpeg");
-    let frames = extract_rgb_frames(source);
-    let frames = frames_to_images(&frames);
+    let (video_data, frames) = extract_rgb_frames(source);
+    let frames = frames_to_images(&video_data, frames);
     let mut approx_frames = Vec::new();
 
     let config = draw::Config {
@@ -30,6 +31,7 @@ pub fn run(source: &PathBuf, output: &PathBuf, board_width: usize, board_height:
     };
     
     // approximate all frames using different frames
+    println!("Starting {} threads to approximate", NUM_THREADS);
     let mut handles = Vec::new();
     let chunks = utils::split_into_n_chunks(frames.into_iter(), NUM_THREADS);
     for (thread_id, frames) in chunks.into_iter().enumerate() {
@@ -56,15 +58,17 @@ fn run_thread(thread_id: usize, mut frames: Vec<DynamicImage>, config: &draw::Co
         approx_frames.push(approx_frame);
 
         processed_frames += 1;
-        if processed_frames % 100 == 0 {
-            println!("Thread {} Processed {} frames", thread_id, processed_frames);
+        if processed_frames % 50 == 0 {
+            println!("Thread {}: Processed {} frames", thread_id, processed_frames);
         }
     }
 
     Ok(approx_frames)
 }
 
-fn extract_rgb_frames(file_name: &PathBuf) -> VideoData {
+fn extract_rgb_frames(file_name: &PathBuf) -> (VideoData, RawFrames) {
+    println!("Extracting video data from {:?}", file_name);
+
     let mut source = format::input(file_name).unwrap();
     let input = source.streams().best(ffmpeg_next::media::Type::Video).unwrap();
 
@@ -107,7 +111,6 @@ fn extract_rgb_frames(file_name: &PathBuf) -> VideoData {
             }
         }
     }
-    println!("{} frames decoded", decoded_frames.len());
 
     // Flush the decoder to get the remaining frames
     codec_context.send_eof().unwrap();
@@ -126,24 +129,34 @@ fn extract_rgb_frames(file_name: &PathBuf) -> VideoData {
 
     println!("{} frames decoded", decoded_frames.len());
     
-    VideoData {
+    (VideoData {
         width: codec_context.width(),
         height: codec_context.height(),
         fps: u32::from(fps) as i32,
         format: format,
-        frames: decoded_frames,
-    }
+    },
+    decoded_frames
+    )
 }
 
-fn frames_to_images(video: &VideoData) -> Vec<DynamicImage> {
-    let mut frames = Vec::new();
+fn frames_to_images(video: &VideoData, frames: RawFrames) -> Vec<DynamicImage> {
+    let to_convert = frames.len();
+    let mut new_frames = Vec::new();
+    println!("Converting {} video frames into images", to_convert);
 
-    for rgb_data in video.frames.iter() {
-        let frame: ImageBuffer<image::Rgba<u8>, _> = image::ImageBuffer::from_raw(video.width, video.height, rgb_data.to_owned()).expect("failed to create image from raw data");
-        frames.push(DynamicImage::from(frame));
+    for rgb_data in frames {
+        // check for correct format
+        assert!(rgb_data.len() == (video.width * video.height * 3) as usize);
+
+        let frame: ImageBuffer<image::Rgb<u8>, _> = image::ImageBuffer::from_raw(video.width, video.height, rgb_data.to_owned()).expect("failed to create image from raw data");
+        new_frames.push(DynamicImage::from(frame));
+
+        if new_frames.len() % 100 == 0 {
+            println!("{} frames converted out of {}", new_frames.len(), to_convert);
+        }
     }
 
-    frames
+    new_frames
 }
 
 // fn save_from_rgb_frames(video: &VideoData, file_name: &str) -> Result<(), Box<dyn std::error::Error>> {
