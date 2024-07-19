@@ -1,5 +1,4 @@
-use crate::approx::approximate;
-use crate::draw;
+use crate::{approx::approximate, draw, utils};
 
 use std::fs;
 use std::path::PathBuf;
@@ -21,7 +20,7 @@ pub fn run(dir: &str, board_width: u32) -> Result<(), Box<dyn std::error::Error>
     let mut thread_id = 0;
 
     println!("Processing {} files at {} using {} threads", num_files, dir, NUM_THREADS);
-    for chunk in split_into_n_chunks(fs::read_dir(dir)?, NUM_THREADS) {
+    for chunk in utils::split_into_n_chunks(fs::read_dir(dir)?, NUM_THREADS) {
         // assign each chunk to a thread
         let paths = chunk
             .into_iter()
@@ -46,20 +45,6 @@ pub fn run(dir: &str, board_width: u32) -> Result<(), Box<dyn std::error::Error>
     println!("Average Dssim diff={}", total_diff / (num_files as f64));
     println!("Time Elapsed: {:?}", start.elapsed());
     Ok(())
-}
-
-fn split_into_n_chunks<T, I>(iter: I, n: usize) -> Vec<Vec<T>> 
-    where I: Iterator<Item = T>
-{
-    let mut chunks = Vec::new();
-    for _ in 0..n {
-        chunks.push(Vec::new());
-    }
-
-    for (i, item) in iter.enumerate() {
-        chunks[i % n].push(item);
-    }
-    chunks
 }
 
 fn run_thread(thread_id: usize, paths: Vec<PathBuf>, board_width: u32) -> Result<f64, Box<dyn std::error::Error>> {
