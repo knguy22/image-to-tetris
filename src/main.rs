@@ -5,6 +5,7 @@ mod cli;
 mod draw;
 mod piece;
 mod integration_test;
+mod utils;
 
 use std::path::PathBuf;
 
@@ -17,28 +18,21 @@ fn main() {
     match cli.command {
         cli::Commands::Integration => integration_test::run("sources", 100).unwrap(),
         cli::Commands::ApproxImage { source, output, width, height } => run_approx_image(&source, &output, width, height),
-        cli::Commands::ApproxVideo { source, output, width, height } => run_approx_video(&source, &output, width, height),
+        cli::Commands::ApproxVideo { source, output, width, height } => approx_video::run(&source, &output, width, height),
     }
 }
 
-fn run_approx_image(source_img_path: &PathBuf, output_img_path: &PathBuf, board_width: usize, board_height: usize) {
+fn run_approx_image(source: &PathBuf, output: &PathBuf, board_width: usize, board_height: usize) {
     let config = draw::Config {
         board_width: board_width,
         board_height: board_height,
     };
 
-    let mut source_img = image::open(source_img_path).unwrap();
+    let mut source_img = image::open(source).unwrap();
     println!("Loaded {}x{} image", source_img.width(), source_img.height());
 
     let result_img = approx::approximate(&mut source_img, &config).unwrap();
-    result_img.save(output_img_path).expect("could not save output image");
-}
-
-fn run_approx_video(source_img_path: &PathBuf, output_img_path: &PathBuf, board_width: usize, board_height: usize) {
-    // ffmpeg_next::init().unwrap();
-    // let frames = approx_video::extract_rgb_frames("test_results/test.mp4");
-    // let frames = approx_video::frames_to_images(&frames);
-    todo!()
+    result_img.save(output).expect("could not save output image");
 }
 
 #[cfg(test)]
