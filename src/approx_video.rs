@@ -8,13 +8,96 @@ use ffmpeg_next::software::scaling::{context::Context, flag::Flags};
 use ffmpeg_next::util::format::pixel::Pixel;
 use image::{DynamicImage, ImageBuffer};
 
+type RawFrame = Vec<u8>;
 type RawFrames = Vec<Vec<u8>>;
 
-pub struct VideoData {
-    pub width: u32,
-    pub height: u32,
-    pub fps: i32,
-    pub format: Pixel,
+struct VideoMetaData {
+    // metadata for export
+    width: u32,
+    height: u32,
+    fps: i32,
+    format: Pixel,
+}
+
+struct VideoInput {
+    // metadata for streaming the input
+    source: ffmpeg_next::format::context::Input,
+    video_stream_index: usize,
+    codec_context: ffmpeg_next::codec::decoder::video::Video,
+    scaler: Context,
+}
+
+impl VideoInput {
+    fn new(file_name: &PathBuf) -> (VideoMetaData, VideoInput) {
+        let source = format::input(file_name).unwrap();
+        let input = source.streams().best(ffmpeg_next::media::Type::Video).unwrap();
+
+        // video metadata
+        let video_stream_index = input.index();
+        let fps = input.avg_frame_rate();
+        let format = Pixel::RGB24;
+
+        // setup the decoder
+        let codec_context = input.codec().decoder().video().unwrap();
+        let scaler = Context::get(
+            codec_context.format(),
+            codec_context.width(),
+            codec_context.height(),
+            format,
+            codec_context.width(),
+            codec_context.height(),
+            Flags::BILINEAR,
+        ).unwrap();
+
+        (VideoMetaData {
+            width: codec_context.width(),
+            height: codec_context.height(),
+            fps: u32::from(fps) as i32,
+            format: format,
+        },
+        VideoInput {
+            source: source,
+            video_stream_index: video_stream_index,
+            codec_context: codec_context,
+            scaler: scaler,
+        })
+    }
+}
+
+impl Iterator for VideoInput {
+    type Item = RawFrame;
+    fn next(&mut self) -> Option<Self::Item> {
+        // Loop through the packets in the video file
+        while let Some((stream, packet)) = self.source.packets().next() {
+            if stream.index() == self.video_stream_index {
+                // send the video packet to the codec
+                self.codec_context.send_packet(&packet).unwrap();
+                
+                // then attempt to decode and collect that packet into a frame
+                let mut frame = Video::empty();
+                if self.codec_context.receive_frame(&mut frame).is_ok() {
+                    // then scale the frame, which is now ready to push
+                    let mut rgb_frame = Video::empty();
+                    self.scaler.run(&frame, &mut rgb_frame).unwrap();
+                    let data = rgb_frame.data(0).to_vec();
+                    return Some(data)
+                }
+            }
+        }
+
+        // Flush the decoder to get frames from remaining packets
+        let mut frame = Video::empty();
+        while self.codec_context.receive_frame(&mut frame).is_ok() {
+            let mut rgb_frame = Video::empty();
+            self.scaler.run(&frame, &mut rgb_frame).unwrap();
+
+            // Collect the frame data
+            let data = rgb_frame.data(0).to_vec();
+            return Some(data)
+        }
+
+        None
+    }
 }
 
 pub fn run(source: &PathBuf, output: &PathBuf, board_width: usize, board_height: usize) {
@@ -66,80 +149,21 @@ fn run_thread(thread_id: usize, mut frames: Vec<DynamicImage>, config: &draw::Co
     Ok(approx_frames)
 }
 
-fn extract_rgb_frames(file_name: &PathBuf) -> (VideoData, RawFrames) {
+fn extract_rgb_frames(file_name: &PathBuf) -> (VideoMetaData, RawFrames) {
     println!("Extracting video data from {:?}", file_name);
 
-    let mut source = format::input(file_name).unwrap();
-    let input = source.streams().best(ffmpeg_next::media::Type::Video).unwrap();
-
-    // video metadata
-    let video_stream_index = input.index();
-    let fps = input.avg_frame_rate();
-    let format = Pixel::RGB24;
-
-    // setup the decoder
-    let mut codec_context = input.codec().decoder().video().unwrap();
-    let mut scaler = Context::get(
-        codec_context.format(),
-        codec_context.width(),
-        codec_context.height(),
-        format,
-        codec_context.width(),
-        codec_context.height(),
-        Flags::BILINEAR,
-    ).unwrap();
-
-    // Loop through the packets in the video file
+    let (meta_data, input) = VideoInput::new(file_name);
     let mut decoded_frames = Vec::new();
-    for (stream, packet) in source.packets() {
-        // send the video packet to the codec
-        if stream.index() == video_stream_index {
-            codec_context.send_packet(&packet).unwrap();
-            
-            // then decode and collect that packet into a frame
-            let mut frame = Video::empty();
-            while codec_context.receive_frame(&mut frame).is_ok() {
 
-                // then scale the frame, which is now ready to push
-                let mut rgb_frame = Video::empty();
-                scaler.run(&frame, &mut rgb_frame).unwrap();
-                let data = rgb_frame.data(0).to_vec();
-                decoded_frames.push(data);
-
-                // clear the frame for the next iter
-                frame = Video::empty();
-            }
-        }
+    for frame in input {
+        decoded_frames.push(frame);
     }
+    println!("Extracted {} video frames", decoded_frames.len());
 
-    // Flush the decoder to get the remaining frames
-    codec_context.send_eof().unwrap();
-    let mut frame = Video::empty();
-    while codec_context.receive_frame(&mut frame).is_ok() {
-        let mut rgb_frame = Video::empty();
-        scaler.run(&frame, &mut rgb_frame).unwrap();
-
-        // Collect the frame data
-        let data = rgb_frame.data(0).to_vec();
-        decoded_frames.push(data);
-
-        // Clear the frame for the next iteration
-        frame = Video::empty();
-    }
-
-    println!("{} frames decoded", decoded_frames.len());
-    
-    (VideoData {
-        width: codec_context.width(),
-        height: codec_context.height(),
-        fps: u32::from(fps) as i32,
-        format: format,
-    },
-    decoded_frames
-    )
+    (meta_data, decoded_frames)
 }
 
-fn frames_to_images(video: &VideoData, frames: RawFrames) -> Vec<DynamicImage> {
+fn frames_to_images(video: &VideoMetaData, frames: RawFrames) -> Vec<DynamicImage> {
     let to_convert = frames.len();
     let mut new_frames = Vec::new();
     println!("Converting {} video frames into images", to_convert);
