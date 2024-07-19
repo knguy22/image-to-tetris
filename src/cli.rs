@@ -21,7 +21,7 @@ pub struct Cli {
     pub height: Option<usize>,
 
     // run integration tests
-    #[clap(long, short, action)]
+    #[clap(long, action)]
     pub integration_tests: bool,
 }
 
