@@ -2,28 +2,25 @@ use crate::{approx, draw};
 
 use std::path::PathBuf;
 
-use ffmpeg_next::{codec, format, Rational, Packet, Error};
+use ffmpeg_next::{format, Rational};
 use ffmpeg_next::frame::Video;
 use ffmpeg_next::software::scaling::{context::Context, flag::Flags};
 use ffmpeg_next::util::format::pixel::Pixel;
-use ffmpeg_next::util::picture;
-use ffmpeg_next::codec::picture::Picture;
 use image::{DynamicImage, ImageBuffer};
 
 pub fn run(source: &PathBuf, output: &PathBuf, board_width: usize, board_height: usize) {
-    const NUM_THREADS: usize = 8;
-
     ffmpeg_next::init().expect("failed to initialize ffmpeg");
     let (meta_data, input) = VideoInput::new(source);
-    let mut output = VideoOutput::new(output, &meta_data);
     let config = draw::Config {
         board_width: board_width,
         board_height: board_height,
     };
+    println!("Loaded {}x{} resolution video", meta_data.width, meta_data.height);
 
     for (i, frame) in input.enumerate() {
-        let approx_img = approx::approximate(&mut frame_to_image(frame, &meta_data), &config).expect("failed to approximate image");
-        output.send_frame(&approx_img, &meta_data);
+        let mut target_img = frame_to_image(frame, &meta_data);
+        let approx_img = approx::approximate(&mut target_img, &config).expect("failed to approximate image");
+        approx_img.save(format!("tmp_video/{}.png", i)).expect("failed to save image");
 
         if (i + 1) % 10 == 0 {
             println!("Approximated {} frames", i + 1);
@@ -48,14 +45,6 @@ struct VideoInput {
     source: ffmpeg_next::format::context::Input,
     video_stream_index: usize,
     decoder: ffmpeg_next::codec::decoder::video::Video,
-    scaler: Context,
-}
-
-// streams to the output file
-struct VideoOutput {
-    output: ffmpeg_next::format::context::Output,
-    video_stream_index: usize,
-    encoder: ffmpeg_next::codec::encoder::Video,
     scaler: Context,
 }
 
@@ -131,75 +120,6 @@ impl Iterator for VideoInput {
         }
 
         None
-    }
-}
-
-impl VideoOutput {
-    fn new(file_name: &PathBuf, video: &VideoMetaData) -> VideoOutput {
-        // open the output file
-        let mut output = format::output(file_name).expect("failed to open output file");
-
-        // add a video stream
-        let codec = codec::encoder::find(codec::Id::H264).expect("failed to find H264 codec");
-        let stream = output.add_stream(codec).expect("failed to add stream to output");
-
-        let mut encoder = stream.codec().encoder().video().expect("failed to create encoder");
-        encoder.set_width(video.width);
-        encoder.set_height(video.height);
-        encoder.set_format(Pixel::YUV420P);
-        encoder.set_time_base(video.time_base);
-        encoder.set_frame_rate(Some(video.fps));
-
-        // Open the encoder to ensure all parameters are set correctly
-        let encoder = encoder.open_as(codec).expect("failed to open encoder");
-
-        // Get the video stream index
-        let video_stream_index = stream.index();
-
-        let scaler = Context::get(
-            video.format,
-            encoder.width(),
-            encoder.height(),
-            video.format,
-            encoder.width(),
-            encoder.height(),
-            Flags::BILINEAR,
-        )
-        .expect("failed to create scaler");
-        VideoOutput {
-            output: output,
-            video_stream_index: video_stream_index,
-            encoder: encoder,
-            scaler: scaler,
-        }
-    }
-
-    fn send_frame(&mut self, image: &DynamicImage, video: &VideoMetaData) {
-        // Convert image to RGB24 format
-        let rgb_image = image.to_rgb8();
-        let width = rgb_image.width();
-        let height = rgb_image.height();
-        let data = rgb_image.into_raw();
-
-        // Create a frame for the RGB image; make sure to check for buffer bounds and copy
-        let mut rgb_frame = Video::new(Pixel::RGB24, width, height);
-        let buffer = rgb_frame.data_mut(0);
-        let buffer_len = buffer.len();
-        assert!(buffer.len() > data.len(), "RGB frame buffer too small");
-        let copy_len = data.len().min(buffer_len);
-        buffer[..copy_len].copy_from_slice(&data[..copy_len]);
-
-        // Create a frame for the YUV420P output
-        let mut yuv_frame = Video::new(Pixel::YUV420P, video.height, video.width);
-        println!("{}x{}", video.width, video.height);
-        println!("{}x{}", rgb_frame.width(), rgb_frame.height());
-        println!("{}x{}", yuv_frame.width(), yuv_frame.height());
-
-        // Convert RGB24 to YUV420P
-        self.scaler.run(&rgb_frame, &mut yuv_frame).expect("failed to convert RGB24 to YUV420P");
-
-        // Send the YUV420P frame to the encoder
-        self.encoder.send_frame(&yuv_frame).expect("failed to send frame to encoder");
     }
 }
 
