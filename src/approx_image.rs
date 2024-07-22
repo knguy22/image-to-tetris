@@ -36,6 +36,13 @@ pub fn approximate(target_img: &mut DynamicImage, config: &Config) -> Result<Dyn
         }
     }
 
+    process_heap(&mut heap, &mut board, target_img, &avg_pixel_grid)?;
+
+    // draw the board
+    Ok(draw::draw_board(&board))
+}
+
+fn process_heap(heap: &mut BinaryHeap<Cell>, board: &mut SkinnedBoard, target_img: &DynamicImage, avg_pixel_grid: &Vec<Rgba<u8>>) -> Result<(), Box<dyn std::error::Error>> {
     // for each cell at the top of the heap:
     while heap.len() > 0 {
         let cell = heap.pop().expect("heap should not be empty");
@@ -81,8 +88,7 @@ pub fn approximate(target_img: &mut DynamicImage, config: &Config) -> Result<Dyn
         board.place(&best_piece, best_skin_id.expect("there must be a best skin"))?;
     }
 
-    // draw the board
-    Ok(draw::draw_board(&board))
+    Ok(())
 }
 
 fn resize_img_from_board(board: &SkinnedBoard, target_img: &DynamicImage) -> Result<DynamicImage, Box<dyn std::error::Error>> {
