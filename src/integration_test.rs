@@ -1,4 +1,4 @@
-use crate::{approx::approximate, draw, utils};
+use crate::{approx_image::approximate, draw, utils};
 
 use std::fs;
 use std::path::PathBuf;

@@ -1,4 +1,4 @@
-mod approx;
+mod approx_image;
 mod approx_video;
 mod board;
 mod cli;
@@ -31,7 +31,7 @@ fn run_approx_image(source: &PathBuf, output: &PathBuf, board_width: usize, boar
     let mut source_img = image::open(source).unwrap();
     println!("Loaded {}x{} image", source_img.width(), source_img.height());
 
-    let result_img = approx::approximate(&mut source_img, &config).unwrap();
+    let result_img = approx_image::approximate(&mut source_img, &config).unwrap();
     result_img.save(output).expect("could not save output image");
 }
 
