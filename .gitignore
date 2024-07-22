@@ -3,3 +3,6 @@
 /sources
 /test_results
 /tmp_video
+/video_sources
+/video_approx
+*.mp4
