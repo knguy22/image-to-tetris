@@ -4,6 +4,10 @@ use clap::{Parser, Subcommand};
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 pub struct Cli {
+    /// number of threads to use; default is 4
+    #[arg(short, long)]
+    pub threads: Option<usize>,
+
     #[command(subcommand)]
     pub command: Commands
 }

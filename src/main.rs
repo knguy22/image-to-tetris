@@ -5,15 +5,19 @@ mod cli;
 mod draw;
 mod piece;
 mod integration_test;
-mod utils;
 
 use std::path::PathBuf;
 
 use clap::Parser;
 use imageproc::image;
+use rayon;
 
 fn main() {
     let cli = cli::Cli::parse();
+
+    // default thread count is 4
+    let threads = cli.threads.unwrap_or(4);
+    rayon::ThreadPoolBuilder::new().num_threads(threads).build_global().unwrap();
 
     match cli.command {
         cli::Commands::Integration => integration_test::run("sources", 100).unwrap(),
