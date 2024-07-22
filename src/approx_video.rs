@@ -5,11 +5,10 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use ffmpeg_next::format;
-use rayon::{prelude::*, current_num_threads};
+use indicatif::{ProgressBar, ProgressStyle};
+use rayon::prelude::*;
 
 pub fn run(source: &PathBuf, output: &PathBuf, board_width: usize, board_height: usize) {
-    println!("Approximating video on {} threads", current_num_threads());
-
     const SOURCE_IMG_DIR: &str = "video_sources";
     const APPROX_IMG_DIR: &str = "video_approx";
     const AUDIO_PATH: &str = "video_approx/audio.wav";
@@ -44,6 +43,7 @@ pub fn run(source: &PathBuf, output: &PathBuf, board_width: usize, board_height:
     println!("Using {} fps", video_config.fps);
 
     // use ffmpeg to generate a directory full of images
+    println!("Generating source images from {}...", source_path);
     let gen_image_command = Command::new("ffmpeg")
         .arg("-i")
         .arg(source_path)
@@ -60,6 +60,7 @@ pub fn run(source: &PathBuf, output: &PathBuf, board_width: usize, board_height:
     }
 
     // use ffmpeg to generate the audio file
+    println!("Generating audio file from {}...", source_path);
     let gen_audio_command = Command::new("ffmpeg")
         .arg("-i")
         .arg(source_path)
@@ -74,10 +75,11 @@ pub fn run(source: &PathBuf, output: &PathBuf, board_width: usize, board_height:
     let images: Vec<_> = fs::read_dir(SOURCE_IMG_DIR).expect("failed to read source images directory")
         .into_iter()
         .collect();
-
+    let pb = progress_bar(images.len());
+    pb.set_message("Approximating source images...");
     images
         .into_par_iter()
-        .for_each(move|image| {
+        .for_each(|image| {
             let source_path = image.expect("failed to read source image").path();
             let source_path_without_dir = source_path.file_name().expect("failed to get source image path without directory");
             let approx_path = format!("{}/{}", APPROX_IMG_DIR, source_path_without_dir.to_str().expect("failed to convert source image path to string"));
@@ -85,9 +87,14 @@ pub fn run(source: &PathBuf, output: &PathBuf, board_width: usize, board_height:
             let mut source_img = image::open(source_path).expect("failed to load source image");
             let approx_img = approx_image::approximate(&mut source_img, &draw_config).expect("failed to approximate image");
             approx_img.save(approx_path).expect("failed to save approx image");
+
+            // make sure the progress bar is updated
+            pb.inc(1);
         });
+    pb.finish_with_message("Done approximating source images!");
 
     // combine the approximated images and audio for a final video
+    println!("Combining approximated images and audio...");
     let _combine_command = Command::new("ffmpeg")
         .arg("-framerate")
         .arg(format!("{}", video_config.fps))
@@ -107,6 +114,17 @@ pub fn run(source: &PathBuf, output: &PathBuf, board_width: usize, board_height:
     // clean up the directories
     fs::remove_dir_all(SOURCE_IMG_DIR).expect("failed to remove source images directory");
     fs::remove_dir_all(APPROX_IMG_DIR).expect("failed to remove approximated images directory");
+
+    println!("Done!");
+}
+
+fn progress_bar(pb_len: usize) -> ProgressBar {
+    let spinner_style = ProgressStyle::with_template("[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}")
+        .unwrap()
+        .tick_chars("##-");
+    let pb = ProgressBar::new(u64::try_from(pb_len).expect("failed to convert usize to u64"));
+    pb.set_style(spinner_style.clone());
+    pb
 }
 
 // contains important video metadata
