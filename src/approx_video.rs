@@ -1,4 +1,4 @@
-use crate::{approx, draw};
+use crate::{approx_image, draw};
 
 use std::fs;
 use std::path::PathBuf;
@@ -74,7 +74,7 @@ pub fn run(source: &PathBuf, output: &PathBuf, board_width: usize, board_height:
         let approx_path = format!("{}/{}", APPROX_IMG_DIR, source_path_without_dir.to_str().expect("failed to convert source image path to string"));
 
         let mut source_img = image::open(source_path).expect("failed to load source image");
-        let approx_img = approx::approximate(&mut source_img, &draw_config).expect("failed to approximate image");
+        let approx_img = approx_image::approximate(&mut source_img, &draw_config).expect("failed to approximate image");
         approx_img.save(approx_path).expect("failed to save approx image");
     }
 
