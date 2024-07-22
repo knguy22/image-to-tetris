@@ -33,6 +33,11 @@ pub fn run(source: &PathBuf, output: &PathBuf, board_width: usize, board_height:
         panic!("video_approx directory is not empty");
     }
 
+    // make sure the output file is not there
+    if PathBuf::from(output_path).exists() {
+        panic!("output file already exists");
+    }
+
     // load config
     let video_config = VideoConfig::new(source).expect("failed to load video config");
     let draw_config = draw::Config {
@@ -95,7 +100,7 @@ pub fn run(source: &PathBuf, output: &PathBuf, board_width: usize, board_height:
 
     // combine the approximated images and audio for a final video
     println!("Combining approximated images and audio...");
-    let _combine_command = Command::new("ffmpeg")
+    let combine_command = Command::new("ffmpeg")
         .arg("-framerate")
         .arg(format!("{}", video_config.fps))
         .arg("-i")
@@ -110,6 +115,10 @@ pub fn run(source: &PathBuf, output: &PathBuf, board_width: usize, board_height:
         .arg(output_path)
         .output()
         .expect("failed to combine images and audio");
+    if !combine_command.status.success() {
+        println!("ffmpeg error: {:?}", combine_command);
+        panic!("failed to combine images and audio");
+    }
 
     // clean up the directories
     fs::remove_dir_all(SOURCE_IMG_DIR).expect("failed to remove source images directory");
