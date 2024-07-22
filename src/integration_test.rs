@@ -6,17 +6,19 @@ use std::time;
 
 use imageproc::image::DynamicImage;
 use dssim::Dssim;
-use rayon::{prelude::*, current_num_threads};
+use rayon::prelude::*;
 
 // tests all image in the directory
 pub fn run(dir: &str, board_width: u32) -> Result<(), Box<dyn std::error::Error>> {
+    println!("Running integration test on {}", dir);
+
     let start = time::Instant::now();
     let num_files = fs::read_dir(dir)?.count();
     let images: Vec<_> = fs::read_dir(dir)?
         .filter_map(|entry| entry.ok())
         .collect();
 
-    println!("Running {} images in {} threads", num_files, current_num_threads());
+    println!("Approximating {} images", num_files);
 
     let total_diff: f64 = images
         .par_iter()

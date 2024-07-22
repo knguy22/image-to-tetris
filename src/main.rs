@@ -18,6 +18,7 @@ fn main() {
     // default thread count is 4
     let threads = cli.threads.unwrap_or(4);
     rayon::ThreadPoolBuilder::new().num_threads(threads).build_global().unwrap();
+    println!("Using {} threads", threads);
 
     match cli.command {
         cli::Commands::Integration => integration_test::run("sources", 100).unwrap(),
@@ -27,6 +28,7 @@ fn main() {
 }
 
 fn run_approx_image(source: &PathBuf, output: &PathBuf, board_width: usize, board_height: usize) {
+    println!("Approximating an image: {}", source.display());
     let config = draw::Config {
         board_width: board_width,
         board_height: board_height,
