@@ -20,14 +20,20 @@ fn main() {
     rayon::ThreadPoolBuilder::new().num_threads(threads).build_global().unwrap();
     println!("Using {} threads", threads);
 
+    let prioritize_tetrominos = match cli.prioritize_tetrominos {
+        true => approx_image::PrioritizeColor::Yes,
+        false => approx_image::PrioritizeColor::No,
+    };
+    println!("Prioritizing tetrominos: {}", cli.prioritize_tetrominos);
+
     match cli.command {
-        cli::Commands::Integration => integration_test::run("sources", 100).unwrap(),
-        cli::Commands::ApproxImage { source, output, width, height } => run_approx_image(&source, &output, width, height),
-        cli::Commands::ApproxVideo { source, output, width, height } => approx_video::run(&source, &output, width, height),
+        cli::Commands::Integration => integration_test::run("sources", 100, prioritize_tetrominos).unwrap(),
+        cli::Commands::ApproxImage { source, output, width, height } => run_approx_image(&source, &output, width, height, prioritize_tetrominos),
+        cli::Commands::ApproxVideo { source, output, width, height } => approx_video::run(&source, &output, width, height, prioritize_tetrominos),
     }
 }
 
-fn run_approx_image(source: &PathBuf, output: &PathBuf, board_width: usize, board_height: usize) {
+fn run_approx_image(source: &PathBuf, output: &PathBuf, board_width: usize, board_height: usize, prioritize_tetrominos: approx_image::PrioritizeColor) {
     println!("Approximating an image: {}", source.display());
     let config = draw::Config {
         board_width: board_width,
@@ -37,7 +43,7 @@ fn run_approx_image(source: &PathBuf, output: &PathBuf, board_width: usize, boar
     let mut source_img = image::open(source).unwrap();
     println!("Loaded {}x{} image", source_img.width(), source_img.height());
 
-    let result_img = approx_image::approximate(&mut source_img, &config).unwrap();
+    let result_img = approx_image::run(&mut source_img, &config, prioritize_tetrominos).unwrap();
     result_img.save(output).expect("could not save output image");
 }
 

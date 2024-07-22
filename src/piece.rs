@@ -29,7 +29,7 @@ pub enum Piece {
     J(Cell, Orientation),
     S(Cell, Orientation),
     Z(Cell, Orientation),
-    Garbage(Cell),
+    Gray(Cell),
     Black(Cell),
 }
 
@@ -104,7 +104,7 @@ impl Piece {
     }
 
     pub fn all_garbage(cell: Cell) -> Vec<Piece> {
-        vec![Piece::Garbage(cell), Piece::Black(cell)]
+        vec![Piece::Gray(cell), Piece::Black(cell)]
     }
 
     pub fn get_char(&self) -> char {
@@ -116,7 +116,7 @@ impl Piece {
             Piece::J(_, _) => 'J',
             Piece::S(_, _) => 'S',
             Piece::Z(_, _) => 'Z',
-            Piece::Garbage(_) => 'G',
+            Piece::Gray(_) => 'G',
             Piece::Black(_) => 'B'
         }
     }
@@ -143,7 +143,7 @@ impl Piece {
             Piece::J(c, _) => c.clone(),
             Piece::S(c, _) => c.clone(),
             Piece::Z(c, _) => c.clone(),
-            Piece::Garbage(c) => c.clone(),
+            Piece::Gray(c) => c.clone(),
             Piece::Black(c) => c.clone()
         }
     }
@@ -158,7 +158,7 @@ impl Piece {
             Piece::J(_, _) => &J_SHAPE,
             Piece::S(_, _) => &S_SHAPE,
             Piece::Z(_, _) => &Z_SHAPE,
-            Piece::Garbage(c) | Piece::Black(c) => return Ok(vec![*c]),
+            Piece::Gray(c) | Piece::Black(c) => return Ok(vec![*c]),
         };
 
         let orien = self.get_orientation();
