@@ -8,6 +8,10 @@ pub struct Cli {
     #[arg(short, long)]
     pub threads: Option<usize>,
 
+    /// flag for whether to prioritize tetrominos or not; increases image color but reduces accuracy
+    # [arg(short, long, default_value_t = false)]
+    pub prioritize_tetrominos: bool,
+
     #[command(subcommand)]
     pub command: Commands
 }

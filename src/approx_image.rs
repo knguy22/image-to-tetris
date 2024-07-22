@@ -7,8 +7,19 @@ use std::collections::BinaryHeap;
 use image::Rgba;
 use imageproc::image::{DynamicImage, GenericImageView};
 
+#[derive(Copy, Clone)]
+pub enum PrioritizeColor {
+    Yes,
+    No
+}
+
+enum UseGarbage {
+    Yes,
+    No
+}
+
 // the target image will be changed in order to fit the scaling of the board
-pub fn approximate(target_img: &mut DynamicImage, config: &Config) -> Result<DynamicImage, Box<dyn std::error::Error>> {
+pub fn run(target_img: &mut DynamicImage, config: &Config, prioritize_tetromino: PrioritizeColor) -> Result<DynamicImage, Box<dyn std::error::Error>> {
     // initialize the board
     let mut board = SkinnedBoard::new(config.board_width, config.board_height);
 
@@ -36,13 +47,34 @@ pub fn approximate(target_img: &mut DynamicImage, config: &Config) -> Result<Dyn
         }
     }
 
-    process_heap(&mut heap, &mut board, target_img, &avg_pixel_grid)?;
+    // perform the approximation
+    match prioritize_tetromino {
+        PrioritizeColor::Yes => process_heap_prioritize(&mut heap, &mut board, target_img, &avg_pixel_grid)?,
+        PrioritizeColor::No => process_heap(&mut heap, &mut board, target_img, &avg_pixel_grid, UseGarbage::Yes)?
+    }
 
     // draw the board
     Ok(draw::draw_board(&board))
 }
 
-fn process_heap(heap: &mut BinaryHeap<Cell>, board: &mut SkinnedBoard, target_img: &DynamicImage, avg_pixel_grid: &Vec<Rgba<u8>>) -> Result<(), Box<dyn std::error::Error>> {
+fn process_heap_prioritize(heap: &mut BinaryHeap<Cell>, board: &mut SkinnedBoard, target_img: &DynamicImage, avg_pixel_grid: &Vec<Rgba<u8>>) -> Result<(), Box<dyn std::error::Error>> {
+    // first try to not use garbage to avoid gray and black blocks
+    process_heap(heap, board, target_img, &avg_pixel_grid, UseGarbage::No)?;
+
+    // then use garbage with the remaining unfilled cells
+    for y in (0..board.board_height()).rev() {
+        for x in 0..board.board_width() {
+            let cell = Cell { x: x, y: y };
+            if board.empty_at(&cell) {
+                heap.push(cell);
+            }
+        }
+    }
+    process_heap(heap, board, target_img, &avg_pixel_grid, UseGarbage::Yes)?;
+    Ok(())
+}
+
+fn process_heap(heap: &mut BinaryHeap<Cell>, board: &mut SkinnedBoard, target_img: &DynamicImage, avg_pixel_grid: &Vec<Rgba<u8>>, use_garbage: UseGarbage) -> Result<(), Box<dyn std::error::Error>> {
     // for each cell at the top of the heap:
     while heap.len() > 0 {
         let cell = heap.pop().expect("heap should not be empty");
@@ -58,15 +90,20 @@ fn process_heap(heap: &mut BinaryHeap<Cell>, board: &mut SkinnedBoard, target_im
         let mut best_skin_id: Option<usize> = None;
 
         for skin in board.iter_skins() {
-            // try black or gray garbage
-            for piece in Piece::all_garbage(cell) {
-                let diff = avg_piece_pixel_diff(&piece, &board, skin, &target_img, &avg_pixel_grid)?;
-                if diff < best_piece_diff {
-                    best_piece = Some(piece);
-                    best_piece_diff = diff;
-                    best_skin_id = Some(skin.id());
+            match use_garbage {
+                // try black or gray garbage
+                UseGarbage::Yes => {
+                    for piece in Piece::all_garbage(cell) {
+                        let diff = avg_piece_pixel_diff(&piece, &board, skin, &target_img, &avg_pixel_grid)?;
+                        if diff < best_piece_diff {
+                            best_piece = Some(piece);
+                            best_piece_diff = diff;
+                            best_skin_id = Some(skin.id());
+                        }
+                    }
                 }
-            }
+                UseGarbage::No => (),
+            };
 
             // try placing pieces
             for orientation in Orientation::all() {
@@ -83,9 +120,11 @@ fn process_heap(heap: &mut BinaryHeap<Cell>, board: &mut SkinnedBoard, target_im
             }
         }
 
-        // place the best piece; there must be a best piece
-        let best_piece = best_piece.expect("there must be a best piece");
-        board.place(&best_piece, best_skin_id.expect("there must be a best skin"))?;
+        // place the best piece
+        match best_piece {
+            Some(best_piece) => board.place(&best_piece, best_skin_id.expect("there must be a best skin"))?,
+            None => (),
+        }
     }
 
     Ok(())

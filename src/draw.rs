@@ -176,7 +176,7 @@ impl BlockSkin {
             Piece::J(_, _) => &self.j_img,
             Piece::S(_, _) => &self.s_img,
             Piece::Z(_, _) => &self.z_img,
-            Piece::Garbage(_) => &self.gray_img,
+            Piece::Gray(_) => &self.gray_img,
             Piece::Black(_) => &self.black_img,
         }
     }

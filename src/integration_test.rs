@@ -1,4 +1,4 @@
-use crate::{approx_image::approximate, draw};
+use crate::{approx_image, draw};
 
 use std::fs;
 use std::path::PathBuf;
@@ -9,7 +9,7 @@ use dssim::Dssim;
 use rayon::prelude::*;
 
 // tests all image in the directory
-pub fn run(dir: &str, board_width: u32) -> Result<(), Box<dyn std::error::Error>> {
+pub fn run(dir: &str, board_width: u32, prioritize_tetromino: approx_image::PrioritizeColor) -> Result<(), Box<dyn std::error::Error>> {
     println!("Running integration test on {}", dir);
 
     let start = time::Instant::now();
@@ -24,7 +24,7 @@ pub fn run(dir: &str, board_width: u32) -> Result<(), Box<dyn std::error::Error>
         .par_iter()
         .map(|image| {
             let path = image.path();
-            run_thread(path, board_width).unwrap()
+            run_thread(path, board_width, prioritize_tetromino).unwrap()
         })
         .sum();
 
@@ -35,7 +35,7 @@ pub fn run(dir: &str, board_width: u32) -> Result<(), Box<dyn std::error::Error>
     Ok(())
 }
 
-fn run_thread(path: PathBuf, board_width: u32) -> Result<f64, Box<dyn std::error::Error>> {
+fn run_thread(path: PathBuf, board_width: u32, prioritize_tetromino: approx_image::PrioritizeColor) -> Result<f64, Box<dyn std::error::Error>> {
     let mut total_diff = 0.0;
     let mut target_img = image::open(path.clone())?;
     
@@ -46,7 +46,7 @@ fn run_thread(path: PathBuf, board_width: u32) -> Result<f64, Box<dyn std::error
         board_height: board_height as usize,
     };
 
-    let approx_img = approximate(&mut target_img, &config)?;
+    let approx_img = approx_image::run(&mut target_img, &config, prioritize_tetromino)?;
 
     // handle scoring
     let dssim_diff = diff_images_dssim(&approx_img, &target_img)?;
