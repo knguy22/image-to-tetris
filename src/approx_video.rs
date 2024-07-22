@@ -5,8 +5,11 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use ffmpeg_next::format;
+use rayon::{prelude::*, current_num_threads};
 
 pub fn run(source: &PathBuf, output: &PathBuf, board_width: usize, board_height: usize) {
+    println!("Approximating video on {} threads", current_num_threads());
+
     const SOURCE_IMG_DIR: &str = "video_sources";
     const APPROX_IMG_DIR: &str = "video_approx";
     const AUDIO_PATH: &str = "video_approx/audio.wav";
@@ -68,15 +71,21 @@ pub fn run(source: &PathBuf, output: &PathBuf, board_width: usize, board_height:
     }
 
     // approximate the source images
-    for file in fs::read_dir(SOURCE_IMG_DIR).expect("failed to read source images directory") {
-        let source_path = file.expect("failed to read source image").path();
-        let source_path_without_dir = source_path.file_name().expect("failed to get source image path without directory");
-        let approx_path = format!("{}/{}", APPROX_IMG_DIR, source_path_without_dir.to_str().expect("failed to convert source image path to string"));
+    let images: Vec<_> = fs::read_dir(SOURCE_IMG_DIR).expect("failed to read source images directory")
+        .into_iter()
+        .collect();
 
-        let mut source_img = image::open(source_path).expect("failed to load source image");
-        let approx_img = approx_image::approximate(&mut source_img, &draw_config).expect("failed to approximate image");
-        approx_img.save(approx_path).expect("failed to save approx image");
-    }
+    images
+        .into_par_iter()
+        .for_each(move|image| {
+            let source_path = image.expect("failed to read source image").path();
+            let source_path_without_dir = source_path.file_name().expect("failed to get source image path without directory");
+            let approx_path = format!("{}/{}", APPROX_IMG_DIR, source_path_without_dir.to_str().expect("failed to convert source image path to string"));
+
+            let mut source_img = image::open(source_path).expect("failed to load source image");
+            let approx_img = approx_image::approximate(&mut source_img, &draw_config).expect("failed to approximate image");
+            approx_img.save(approx_path).expect("failed to save approx image");
+        });
 
     // combine the approximated images and audio for a final video
     let _combine_command = Command::new("ffmpeg")

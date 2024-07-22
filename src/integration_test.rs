@@ -1,44 +1,30 @@
-use crate::{approx_image::approximate, draw, utils};
+use crate::{approx_image::approximate, draw};
 
 use std::fs;
 use std::path::PathBuf;
 use std::time;
-use std::thread;
 
 use imageproc::image::DynamicImage;
 use dssim::Dssim;
+use rayon::{prelude::*, current_num_threads};
 
 // tests all image in the directory
 pub fn run(dir: &str, board_width: u32) -> Result<(), Box<dyn std::error::Error>> {
-    const NUM_THREADS: usize = 8;
-
     let start = time::Instant::now();
     let num_files = fs::read_dir(dir)?.count();
+    let images: Vec<_> = fs::read_dir(dir)?
+        .filter_map(|entry| entry.ok())
+        .collect();
 
-    let mut handles = Vec::new();
-    let mut total_diff = 0.0;
-    let mut thread_id = 0;
+    println!("Running {} images in {} threads", num_files, current_num_threads());
 
-    println!("Processing {} files at {} using {} threads", num_files, dir, NUM_THREADS);
-    for chunk in utils::split_into_n_chunks(fs::read_dir(dir)?, NUM_THREADS) {
-        // assign each chunk to a thread
-        let paths = chunk
-            .into_iter()
-            .map(|res| res.unwrap().path())
-            .collect::<Vec<PathBuf>>();
-
-        // run the thread
-        let handle = thread::spawn( move || {
-            run_thread(thread_id, paths, board_width).unwrap()
-        });
-        
-        handles.push(handle);
-        thread_id += 1;
-    }
-
-    for handle in handles {
-        total_diff += handle.join().unwrap();
-    }
+    let total_diff: f64 = images
+        .par_iter()
+        .map(|image| {
+            let path = image.path();
+            run_thread(path, board_width).unwrap()
+        })
+        .sum();
 
     println!("Number of images={}", num_files);
     println!("Total Dssim diff={}", total_diff);
@@ -47,25 +33,23 @@ pub fn run(dir: &str, board_width: u32) -> Result<(), Box<dyn std::error::Error>
     Ok(())
 }
 
-fn run_thread(thread_id: usize, paths: Vec<PathBuf>, board_width: u32) -> Result<f64, Box<dyn std::error::Error>> {
+fn run_thread(path: PathBuf, board_width: u32) -> Result<f64, Box<dyn std::error::Error>> {
     let mut total_diff = 0.0;
-    for path in paths {
-        let mut target_img = image::open(path.clone())?;
-        
-        // set the board height to scale to the image
-        let board_height = target_img.width() * board_width / target_img.height();
-        let config = draw::Config {
-            board_width: board_width as usize,
-            board_height: board_height as usize,
-        };
+    let mut target_img = image::open(path.clone())?;
+    
+    // set the board height to scale to the image
+    let board_height = target_img.width() * board_width / target_img.height();
+    let config = draw::Config {
+        board_width: board_width as usize,
+        board_height: board_height as usize,
+    };
 
-        let approx_img = approximate(&mut target_img, &config)?;
+    let approx_img = approximate(&mut target_img, &config)?;
 
-        // handle scoring
-        let dssim_diff = diff_images_dssim(&approx_img, &target_img)?;
-        total_diff += dssim_diff;
-        println!("Thread: {}, Diff: {}, Source: {}", thread_id, dssim_diff, path.display());
-    }
+    // handle scoring
+    let dssim_diff = diff_images_dssim(&approx_img, &target_img)?;
+    total_diff += dssim_diff;
+    println!("Diff: {}, Source: {}", dssim_diff, path.display());
 
     Ok(total_diff)
 }
