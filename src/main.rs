@@ -15,7 +15,6 @@ use rayon;
 fn main() {
     let cli = cli::Cli::parse();
 
-    // default thread count is 4
     let threads = cli.threads.unwrap_or(4);
     rayon::ThreadPoolBuilder::new().num_threads(threads).build_global().unwrap();
     println!("Using {} threads", threads);
@@ -27,21 +26,21 @@ fn main() {
     println!("Prioritizing tetrominos: {}", cli.prioritize_tetrominos);
 
     match cli.command {
-        cli::Commands::Integration => {
+        cli::Commands::Integration {board_width} => {
             let config = approx_image::Config {
-                board_width: 100,
+                board_width: board_width.unwrap_or(100),
                 board_height: 0, // height doesn't matter here since it will be auto-scaled
                 prioritize_tetrominos
             };
             integration_test::run("sources", &config).unwrap()
         },
-        cli::Commands::ApproxImage { source, output, width, height } => {
-            run_approx_image(&source, &output, width, height, prioritize_tetrominos)
+        cli::Commands::ApproxImage { source, output, board_width, board_height } => {
+            run_approx_image(&source, &output, board_width, board_height, prioritize_tetrominos)
         }
-        cli::Commands::ApproxVideo { source, output, width, height } => {
+        cli::Commands::ApproxVideo { source, output, board_width, board_height } => {
             let config = approx_image::Config {
-                board_width: width,
-                board_height: height,
+                board_width,
+                board_height,
                 prioritize_tetrominos
             };
             approx_video::run(&source, &output, &config)
