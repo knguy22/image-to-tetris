@@ -1,5 +1,5 @@
 use crate::board::EMPTY_CELL;
-use crate::draw::{self, BlockSkin, Config, SkinnedBoard};
+use crate::draw::{self, BlockSkin, SkinnedBoard};
 use crate::piece::{Cell, Piece, Orientation};
 
 use std::collections::BinaryHeap;
@@ -18,8 +18,15 @@ enum UseGarbage {
     No
 }
 
+#[derive(Copy, Clone)]
+pub struct Config {
+    pub board_width: usize,
+    pub board_height: usize,
+    pub prioritize_tetrominos: PrioritizeColor,
+}
+
 // the target image will be changed in order to fit the scaling of the board
-pub fn run(target_img: &mut DynamicImage, config: &Config, prioritize_tetromino: PrioritizeColor) -> Result<DynamicImage, Box<dyn std::error::Error>> {
+pub fn run(target_img: &mut DynamicImage, config: &Config) -> Result<DynamicImage, Box<dyn std::error::Error>> {
     // initialize the board
     let mut board = SkinnedBoard::new(config.board_width, config.board_height);
 
@@ -48,7 +55,7 @@ pub fn run(target_img: &mut DynamicImage, config: &Config, prioritize_tetromino:
     }
 
     // perform the approximation
-    match prioritize_tetromino {
+    match config.prioritize_tetrominos {
         PrioritizeColor::Yes => process_heap_prioritize(&mut heap, &mut board, target_img, &avg_pixel_grid)?,
         PrioritizeColor::No => process_heap(&mut heap, &mut board, target_img, &avg_pixel_grid, UseGarbage::Yes)?
     }

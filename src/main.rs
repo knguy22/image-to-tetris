@@ -27,23 +27,40 @@ fn main() {
     println!("Prioritizing tetrominos: {}", cli.prioritize_tetrominos);
 
     match cli.command {
-        cli::Commands::Integration => integration_test::run("sources", 100, prioritize_tetrominos).unwrap(),
-        cli::Commands::ApproxImage { source, output, width, height } => run_approx_image(&source, &output, width, height, prioritize_tetrominos),
-        cli::Commands::ApproxVideo { source, output, width, height } => approx_video::run(&source, &output, width, height, prioritize_tetrominos),
+        cli::Commands::Integration => {
+            let config = approx_image::Config {
+                board_width: 100,
+                board_height: 0, // height doesn't matter here since it will be auto-scaled
+                prioritize_tetrominos
+            };
+            integration_test::run("sources", &config).unwrap()
+        },
+        cli::Commands::ApproxImage { source, output, width, height } => {
+            run_approx_image(&source, &output, width, height, prioritize_tetrominos)
+        }
+        cli::Commands::ApproxVideo { source, output, width, height } => {
+            let config = approx_image::Config {
+                board_width: width,
+                board_height: height,
+                prioritize_tetrominos
+            };
+            approx_video::run(&source, &output, &config)
+        }
     }
 }
 
 fn run_approx_image(source: &PathBuf, output: &PathBuf, board_width: usize, board_height: usize, prioritize_tetrominos: approx_image::PrioritizeColor) {
     println!("Approximating an image: {}", source.display());
-    let config = draw::Config {
+    let config = approx_image::Config {
         board_width: board_width,
         board_height: board_height,
+        prioritize_tetrominos
     };
 
     let mut source_img = image::open(source).unwrap();
     println!("Loaded {}x{} image", source_img.width(), source_img.height());
 
-    let result_img = approx_image::run(&mut source_img, &config, prioritize_tetrominos).unwrap();
+    let result_img = approx_image::run(&mut source_img, &config).unwrap();
     result_img.save(output).expect("could not save output image");
 }
 
