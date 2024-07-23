@@ -52,11 +52,14 @@ mod tests {
     use std::{fs, path};
 
     use draw::SkinnedBoard;
+    use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
     use super::*;
 
     #[test]
     fn test_draw_all_pieces() {
+        rayon::ThreadPoolBuilder::new().num_threads(8).build_global().unwrap();
+
         let width = 10;
         let height = 20;
         let skin_id = 0;
@@ -65,13 +68,19 @@ mod tests {
             fs::create_dir(test_dir).unwrap();
         }
 
-        for orientation in piece::Orientation::all() {
-            for piece in piece::Piece::all_normal(piece::Cell { x: 4, y: 4 }, orientation) {
+        let all_piece_types: Vec<_> = piece::Orientation::all()
+            .into_iter()
+            .flat_map(|o| piece::Piece::all_normal(piece::Cell { x: 4, y: 4 }, o))
+            .collect();
+
+        all_piece_types
+            .into_par_iter()
+            .for_each(|piece| {
                 let mut board = SkinnedBoard::new(width, height);
 
                 // place regular piece
                 board.place(&piece, skin_id).unwrap();
-                
+
                 // fill the rest with black garbage
                 for y in 0..height {
                     for x in 0..width {
@@ -84,7 +93,6 @@ mod tests {
 
                 let img = draw::draw_board(&board);
                 img.save(format!("{}/{:?} {:?}.png", test_dir, piece, piece.get_orientation())).unwrap();
-            }
-        }
+            });
     }
 }
