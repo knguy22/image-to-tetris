@@ -1,6 +1,11 @@
-use crate::board::EMPTY_CELL;
-use crate::draw::{self, BlockSkin, SkinnedBoard, Skins};
-use crate::piece::{Cell, Piece, Orientation};
+pub mod draw;
+pub mod integration_test;
+mod board;
+mod piece;
+
+use board::EMPTY_CELL;
+use draw::{BlockSkin, SkinnedBoard, Skins};
+use piece::{Cell, Piece, Orientation};
 
 use std::collections::BinaryHeap;
 
@@ -325,4 +330,56 @@ fn subtract_pixels(a: &Rgba<u8>, b: &Rgba<u8>) -> [i32; 3] {
         a[1] as i32 - b[1] as i32,
         a[2] as i32 - b[2] as i32,
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{fs, path};
+
+    use draw::SkinnedBoard;
+    use piece;
+    use rayon::iter::{IntoParallelIterator, ParallelIterator};
+
+    use super::*;
+
+    #[test]
+    fn test_draw_all_pieces() {
+        rayon::ThreadPoolBuilder::new().num_threads(8).build_global().expect("failed to build thread pool");
+
+        let width = 10;
+        let height = 20;
+        let skin_id = 0;
+        let test_dir = "test_results";
+        if !path::Path::new(&test_dir).exists() {
+            fs::create_dir(test_dir).expect("failed to create test directory");
+        }
+
+        let skins = draw::create_skins();
+        let all_piece_types: Vec<_> = piece::Orientation::all()
+            .into_iter()
+            .flat_map(|o| piece::Piece::all_normal(piece::Cell { x: 4, y: 4 }, o))
+            .collect();
+
+        all_piece_types
+            .into_par_iter()
+            .for_each(|piece| {
+                let mut board = SkinnedBoard::new(width, height, &skins);
+
+                // place regular piece
+                board.place(&piece, skin_id).expect("failed to place piece");
+
+                // fill the rest with black garbage
+                for y in 0..height {
+                    for x in 0..width {
+                        let cell = piece::Cell { x: x, y: y };
+                        if board.empty_at(&cell) {
+                            board.place(&piece::Piece::Black(cell), skin_id).expect("failed to place garbage");
+                        }
+                    }
+                }
+
+                let img = draw::draw_board(&board);
+                img.save(format!("{}/{:?} {:?}.png", test_dir, piece, piece.get_orientation())).expect("failed to save image");
+            });
+    }
 }
