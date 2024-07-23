@@ -1,4 +1,4 @@
-use crate::{approx_image, draw};
+use crate::approx_image;
 
 use std::fs;
 use std::path::PathBuf;
@@ -8,7 +8,7 @@ use ffmpeg_next::format;
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 
-pub fn run(source: &PathBuf, output: &PathBuf, board_width: usize, board_height: usize, prioritize_tetromino: approx_image::PrioritizeColor) {
+pub fn run(source: &PathBuf, output: &PathBuf, config: &approx_image::Config) {
     const SOURCE_IMG_DIR: &str = "video_sources";
     const APPROX_IMG_DIR: &str = "video_approx";
     const AUDIO_PATH: &str = "video_approx/audio.wav";
@@ -40,11 +40,7 @@ pub fn run(source: &PathBuf, output: &PathBuf, board_width: usize, board_height:
 
     // load config
     let video_config = VideoConfig::new(source).expect("failed to load video config");
-    let draw_config = draw::Config {
-        board_width: board_width,
-        board_height: board_height,
-    };
-    println!("Approximating video with {}x{} dimensions using {}x{} board", video_config.width, video_config.height, board_width, board_height);
+    println!("Approximating video with {}x{} dimensions using {}x{} board", video_config.width, video_config.height, config.board_width, config.board_height);
     println!("Using {} fps", video_config.fps);
 
     // use ffmpeg to generate a directory full of images
@@ -90,7 +86,7 @@ pub fn run(source: &PathBuf, output: &PathBuf, board_width: usize, board_height:
             let approx_path = format!("{}/{}", APPROX_IMG_DIR, source_path_without_dir.to_str().expect("failed to convert source image path to string"));
 
             let mut source_img = image::open(source_path).expect("failed to load source image");
-            let approx_img = approx_image::run(&mut source_img, &draw_config, prioritize_tetromino).expect("failed to approximate image");
+            let approx_img = approx_image::run(&mut source_img, &config).expect("failed to approximate image");
             approx_img.save(approx_path).expect("failed to save approx image");
 
             // make sure the progress bar is updated

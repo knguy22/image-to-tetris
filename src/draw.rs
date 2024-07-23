@@ -6,12 +6,6 @@ use imageproc::{image, image::GenericImageView, image::DynamicImage, image::imag
 
 const INVALID_SKIN_ID: usize = usize::MAX;
 
-#[derive(Copy, Clone)]
-pub struct Config {
-    pub board_width: usize,
-    pub board_height: usize,
-}
-
 pub struct SkinnedBoard {
     board: Board,
     cells_skin: Vec<usize>,
