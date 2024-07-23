@@ -1,5 +1,5 @@
-use crate::board::{Board, EMPTY_CELL, BLOCKED_CELL};
-use crate::piece::{Cell, Piece};
+use super::board::{Board, EMPTY_CELL, BLOCKED_CELL};
+use super::piece::{Cell, Piece};
 
 use image::Rgba;
 use imageproc::{image, image::GenericImageView, image::DynamicImage, image::imageops::resize};

@@ -1,5 +1,5 @@
 use std::error::Error;
-use crate::piece::{Cell, Piece};
+use super::piece::{Cell, Piece};
 
 #[derive(Clone)]
 pub struct Board {
@@ -109,7 +109,7 @@ impl Board {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::piece::Orientation;
+    use crate::approx_image::piece::Orientation;
 
     #[test]
     fn test_place_empty_board() {
