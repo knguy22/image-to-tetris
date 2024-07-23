@@ -24,7 +24,7 @@ pub fn run(dir: &str, config: &approx_image::Config) -> Result<(), Box<dyn std::
         .par_iter()
         .map(|image| {
             let path = image.path();
-            run_thread(path, config).unwrap()
+            score_image(path, config).expect("failed to score image")
         })
         .sum();
 
@@ -39,7 +39,7 @@ pub fn run(dir: &str, config: &approx_image::Config) -> Result<(), Box<dyn std::
     Ok(())
 }
 
-fn run_thread(path: PathBuf, old_config: &approx_image::Config) -> Result<f64, Box<dyn std::error::Error>> {
+fn score_image(path: PathBuf, old_config: &approx_image::Config) -> Result<f64, Box<dyn std::error::Error>> {
     let mut total_diff = 0.0;
     let mut target_img = image::open(path.clone())?;
     
