@@ -28,6 +28,10 @@ pub fn run(dir: &str, board_width: u32, prioritize_tetromino: approx_image::Prio
         })
         .sum();
 
+    if num_files == 0 {
+        panic!("No images found in directory");
+    }
+
     println!("Number of images={}", num_files);
     println!("Total Dssim diff={}", total_diff);
     println!("Average Dssim diff={}", total_diff / (num_files as f64));
