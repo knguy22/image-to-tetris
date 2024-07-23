@@ -84,9 +84,7 @@ fn process_heap_prioritize(heap: &mut BinaryHeap<Cell>, board: &mut SkinnedBoard
 
 fn process_heap(heap: &mut BinaryHeap<Cell>, board: &mut SkinnedBoard, target_img: &DynamicImage, avg_pixel_grid: &Vec<Rgba<u8>>, use_garbage: UseGarbage) -> Result<(), Box<dyn std::error::Error>> {
     // for each cell at the top of the heap:
-    while heap.len() > 0 {
-        let cell = heap.pop().expect("heap should not be empty");
-
+    while let Some(cell) = heap.pop() {
         // 1. check if the cell is unoccupied
         if !board.empty_at(&cell) {
             continue;

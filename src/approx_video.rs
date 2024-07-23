@@ -8,38 +8,38 @@ use ffmpeg_next::format;
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 
-pub fn run(source: &PathBuf, output: &PathBuf, config: &approx_image::Config) {
+pub fn run(source: &PathBuf, output: &PathBuf, config: &approx_image::Config) -> Result<(), Box<dyn std::error::Error>> {
     const SOURCE_IMG_DIR: &str = "video_sources";
     const APPROX_IMG_DIR: &str = "video_approx";
     const AUDIO_PATH: &str = "video_approx/audio.wav";
 
-    ffmpeg_next::init().expect("failed to initialize ffmpeg");
+    ffmpeg_next::init()?;
     let source_path = source.to_str().expect("failed to convert source path to string");
     let output_path = output.to_str().expect("failed to convert output path to string");
 
     // check for the prerequisite directories to exist
     if !PathBuf::from(SOURCE_IMG_DIR).exists() {
-        fs::create_dir(SOURCE_IMG_DIR).expect("failed to create video_sources directory");
+        fs::create_dir(SOURCE_IMG_DIR)?;
     }
     if !PathBuf::from(APPROX_IMG_DIR).exists() {
-        fs::create_dir(APPROX_IMG_DIR).expect("failed to create video_sources directory");
+        fs::create_dir(APPROX_IMG_DIR)?;
     }
 
     // make sure the directories are empty; crash if not
-    if fs::read_dir(SOURCE_IMG_DIR).unwrap().count() > 0 {
-        panic!("video_sources directory is not empty");
+    if fs::read_dir(SOURCE_IMG_DIR)?.count() > 0 {
+        return Err("video_sources directory is not empty".into());
     }
-    if fs::read_dir(APPROX_IMG_DIR).unwrap().count() > 0 {
-        panic!("video_approx directory is not empty");
+    if fs::read_dir(APPROX_IMG_DIR)?.count() > 0 {
+        return Err("video_approx directory is not empty".into());
     }
 
     // make sure the output file is not there
     if PathBuf::from(output_path).exists() {
-        panic!("output file already exists");
+        return Err("output file already exists".into());
     }
 
     // load config
-    let video_config = VideoConfig::new(source).expect("failed to load video config");
+    let video_config = VideoConfig::new(source)?;
     println!("Approximating video with {}x{} dimensions using {}x{} board", video_config.width, video_config.height, config.board_width, config.board_height);
     println!("Using {} fps", video_config.fps);
 
@@ -53,12 +53,8 @@ pub fn run(source: &PathBuf, output: &PathBuf, config: &approx_image::Config) {
         .arg("-start_number")
         .arg("0")
         .arg(format!("{}/%d.png", SOURCE_IMG_DIR))
-        .output()
-        .expect("failed to create source images");
-    if !gen_image_command.status.success() {
-        println!("ffmpeg error: {:?}", gen_image_command);
-        panic!("failed to generate source images");
-    }
+        .output()?;
+    check_command_result(gen_image_command)?;
 
     // use ffmpeg to generate the audio file
     println!("Generating audio file from {}...", source_path);
@@ -66,17 +62,14 @@ pub fn run(source: &PathBuf, output: &PathBuf, config: &approx_image::Config) {
         .arg("-i")
         .arg(source_path)
         .arg(AUDIO_PATH)
-        .output()
-        .expect("failed to create audio file");
-    if !gen_audio_command.status.success() {
-        panic!("failed to generate source images");
-    }
+        .output()?;
+    check_command_result(gen_audio_command)?;
 
     // approximate the source images
-    let images: Vec<_> = fs::read_dir(SOURCE_IMG_DIR).expect("failed to read source images directory")
+    let images: Vec<_> = fs::read_dir(SOURCE_IMG_DIR)?
         .into_iter()
         .collect();
-    let pb = progress_bar(images.len());
+    let pb = progress_bar(images.len())?;
     pb.set_message("Approximating source images...");
     images
         .into_par_iter()
@@ -113,27 +106,31 @@ pub fn run(source: &PathBuf, output: &PathBuf, config: &approx_image::Config) {
         .arg("aac")
         .arg("-shortest")
         .arg(output_path)
-        .output()
-        .expect("failed to combine images and audio");
-    if !combine_command.status.success() {
-        println!("ffmpeg error: {:?}", combine_command);
-        panic!("failed to combine images and audio");
-    }
+        .output()?;
+    check_command_result(combine_command)?;
 
     // clean up the directories
-    fs::remove_dir_all(SOURCE_IMG_DIR).expect("failed to remove source images directory");
-    fs::remove_dir_all(APPROX_IMG_DIR).expect("failed to remove approximated images directory");
+    fs::remove_dir_all(SOURCE_IMG_DIR)?;
+    fs::remove_dir_all(APPROX_IMG_DIR)?;
 
     println!("Done!");
+
+    Ok(())
 }
 
-fn progress_bar(pb_len: usize) -> ProgressBar {
-    let spinner_style = ProgressStyle::with_template("[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}")
-        .unwrap()
+fn progress_bar(pb_len: usize) -> Result<ProgressBar, Box<dyn std::error::Error>> {
+    let spinner_style = ProgressStyle::with_template("[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}")?
         .tick_chars("##-");
-    let pb = ProgressBar::new(u64::try_from(pb_len).expect("failed to convert usize to u64"));
+    let pb = ProgressBar::new(u64::try_from(pb_len)?);
     pb.set_style(spinner_style.clone());
-    pb
+    Ok(pb)
+}
+
+fn check_command_result(result: std::process::Output) -> Result<(), Box<dyn std::error::Error>> {
+    match result.status.code() {
+        Some(0) => Ok(()),
+        _ => Err(format!("failed to execute command, command line: {:?}", result).into()),
+    }
 }
 
 // contains important video metadata
@@ -150,7 +147,7 @@ impl VideoConfig {
         let source = format::input(path)?;
         let input = source.streams().best(ffmpeg_next::media::Type::Video).ok_or("failed to find video stream")?;
         let fps = input.avg_frame_rate();
-        let decoder = input.codec().decoder().video().expect("failed to create decoder");
+        let decoder = input.codec().decoder().video()?;
 
         Ok(VideoConfig {
             width: decoder.width(),
