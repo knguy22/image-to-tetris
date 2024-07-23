@@ -1,5 +1,5 @@
 use crate::board::EMPTY_CELL;
-use crate::draw::{self, BlockSkin, SkinnedBoard};
+use crate::draw::{self, BlockSkin, SkinnedBoard, Skins};
 use crate::piece::{Cell, Piece, Orientation};
 
 use std::collections::BinaryHeap;
@@ -19,16 +19,17 @@ enum UseGarbage {
 }
 
 #[derive(Copy, Clone)]
-pub struct Config {
+pub struct Config<'img> {
     pub board_width: usize,
     pub board_height: usize,
     pub prioritize_tetrominos: PrioritizeColor,
+    pub skins: &'img Skins,
 }
 
 // the target image will be changed in order to fit the scaling of the board
 pub fn run(target_img: &mut DynamicImage, config: &Config) -> Result<DynamicImage, Box<dyn std::error::Error>> {
     // initialize the board
-    let mut board = SkinnedBoard::new(config.board_width, config.board_height);
+    let mut board = SkinnedBoard::new(config.board_width, config.board_height, config.skins);
 
     // resize the skins
     let (pixels_width, pixels_height) = target_img.dimensions();

@@ -6,10 +6,12 @@ use imageproc::{image, image::GenericImageView, image::DynamicImage, image::imag
 
 const INVALID_SKIN_ID: usize = usize::MAX;
 
+pub type Skins = Vec<BlockSkin>;
+
 pub struct SkinnedBoard {
     board: Board,
     cells_skin: Vec<usize>,
-    skins: Vec<BlockSkin>,
+    skins: Skins,
 }
 
 #[derive(Clone)]
@@ -37,20 +39,12 @@ pub struct BlockImage {
 }
 
 impl SkinnedBoard {
-    pub fn new(width: usize, height: usize) -> SkinnedBoard {
-        let mut skins = Vec::new();
-        for file in std::fs::read_dir("assets").expect("assets directory not found") {
-            let path = file.expect("failed to read file").path();
-            if path.is_file() && path.extension().expect("no file extension found") == "png" {
-                skins.push(BlockSkin::new(path.to_str().expect("failed to convert path to string"), skins.len()).expect("failed to load skin"));
-            }
-        }
-
+    pub fn new(width: usize, height: usize, skins: &Skins) -> SkinnedBoard {
         // cells skin must have the same dimensions as board
         SkinnedBoard {
             board: Board::new(width, height),
             cells_skin: vec![INVALID_SKIN_ID; width * height],
-            skins: skins
+            skins: skins.clone()
         }
     }
 
@@ -223,7 +217,9 @@ impl BlockImage {
     }
 
     pub fn resize(&mut self, width: u32, height: u32) {
-        self.img = DynamicImage::from(resize(&self.img, width, height, image::imageops::FilterType::Lanczos3));
+        if self.img.width() != width || self.img.height() != height {
+            self.img = DynamicImage::from(resize(&self.img, width, height, image::imageops::FilterType::Lanczos3));
+        }
     }
 
     #[allow(dead_code)]
@@ -273,6 +269,18 @@ pub fn draw_board(skin_board: &SkinnedBoard) -> DynamicImage {
     DynamicImage::from(img)
 }
 
+pub fn create_skins() -> Skins {
+    let mut skins = Vec::new();
+    for file in std::fs::read_dir("assets").expect("assets directory not found") {
+        let path = file.expect("failed to read file").path();
+        if path.is_file() && path.extension().expect("no file extension found") == "png" {
+            skins.push(BlockSkin::new(path.to_str().expect("failed to convert path to string"), skins.len()).expect("failed to load skin"));
+        }
+    }
+
+    skins
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -317,7 +325,8 @@ mod tests {
 
     #[test]
     fn test_skinned_board_resize() {
-        let mut board = SkinnedBoard::new(36, 36);
+        let skins = create_skins();
+        let mut board = SkinnedBoard::new(36, 36, &skins);
         board.resize_skins(64, 64);
 
         for skin in board.skins.iter() {

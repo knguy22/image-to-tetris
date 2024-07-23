@@ -24,7 +24,7 @@ pub fn run(dir: &str, config: &approx_image::Config) -> Result<(), Box<dyn std::
         .par_iter()
         .map(|image| {
             let path = image.path();
-            run_thread(path, config.board_width as u32, config.prioritize_tetrominos).unwrap()
+            run_thread(path, config).unwrap()
         })
         .sum();
 
@@ -39,16 +39,16 @@ pub fn run(dir: &str, config: &approx_image::Config) -> Result<(), Box<dyn std::
     Ok(())
 }
 
-fn run_thread(path: PathBuf, board_width: u32, prioritize_tetrominos: approx_image::PrioritizeColor) -> Result<f64, Box<dyn std::error::Error>> {
+fn run_thread(path: PathBuf, old_config: &approx_image::Config) -> Result<f64, Box<dyn std::error::Error>> {
     let mut total_diff = 0.0;
     let mut target_img = image::open(path.clone())?;
     
     // set the board height to scale to the image
-    let board_height = target_img.width() * board_width / target_img.height();
+    let board_height = target_img.width() * (old_config.board_width as u32) / target_img.height();
     let config = approx_image::Config {
-        board_width: board_width as usize,
+        board_width: old_config.board_width as usize,
         board_height: board_height as usize,
-        prioritize_tetrominos
+        ..*old_config
     };
 
     let approx_img = approx_image::run(&mut target_img, &config)?;
