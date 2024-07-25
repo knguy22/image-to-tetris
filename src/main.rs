@@ -1,4 +1,5 @@
 mod approx_image;
+mod approx_audio;
 mod approx_video;
 mod cli;
 
@@ -45,6 +46,9 @@ fn main() {
                 skins: &skins,
             };
             run_approx_image(&source, &output, &config)
+        }
+        cli::Commands::ApproxAudio { source, output } => {
+            approx_audio::run(&source, &output).expect("failed to run approximation audio");
         }
         cli::Commands::ApproxVideo { source, output, board_width, board_height } => {
             let config = Config {

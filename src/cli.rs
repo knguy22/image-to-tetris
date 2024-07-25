@@ -24,6 +24,9 @@ pub enum Commands {
     /// approximates a single image using tetris blocks
     ApproxImage{source: PathBuf, output: PathBuf, board_width: usize, board_height: usize},
 
+    /// approximates a single audio file using tetris sound clips
+    ApproxAudio{source: PathBuf, output: PathBuf},
+
     /// approximates a single video using tetris blocks
     ApproxVideo{source: PathBuf, output: PathBuf, board_width: usize, board_height: usize},
 }

@@ -8,6 +8,7 @@ clap = { version = "4.5.9", features = ["derive"] }
 dssim = "3.3.2"
 dssim-core = "3.2.10"
 ffmpeg-next = "7.0.2"
+fundsp = "0.18.2"
 image = "0.25.1"
 image-compare = "0.4.1"
 imageproc = "0.25.0"
