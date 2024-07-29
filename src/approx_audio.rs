@@ -11,8 +11,14 @@ use fundsp::prelude::*;
 // approximate each individual chunk
 // combine the chunks into a single audio file
 
+#[derive(Debug)]
+struct TetrisClips {
+    clips: Vec<AudioClip>
+}
+
 struct AudioClip {
     wave: Wave,
+    file_name: String,
     sample_rate: f64,
     max_amplitude: f32,
     num_channels: usize,
@@ -22,7 +28,23 @@ struct AudioClip {
 pub fn run(source: &PathBuf, output: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     let clip = AudioClip::new(source)?;
     println!("{:?}", clip);
+
+    let tetris_clips = TetrisClips::new(source)?;
+    println!("{:?}", tetris_clips);
     todo!();
+}
+
+impl TetrisClips {
+    pub fn new(source: &PathBuf) -> Result<TetrisClips, Box<dyn std::error::Error>> {
+        let clips_dir = PathBuf::from("assets_sound");
+        let mut clips = Vec::new();
+        for clip in clips_dir.read_dir()? {
+            let clip = clip?;
+            clips.push(AudioClip::new(&clip.path())?);
+        }
+        Ok(TetrisClips { clips })
+    }
+
 }
 
 impl AudioClip {
@@ -34,6 +56,7 @@ impl AudioClip {
         let num_samples: usize = (wave.duration() * wave.sample_rate()) as usize;
         Ok(AudioClip {
             wave,
+            file_name: source.to_str().unwrap().to_string(),
             sample_rate,
             max_amplitude,
             num_channels,
@@ -45,6 +68,7 @@ impl AudioClip {
 impl fmt::Debug for AudioClip {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AudioClip")
+            .field("file_name", &self.file_name)
             .field("sample_rate", &self.sample_rate)
             .field("max_amplitude", &self.max_amplitude)
             .field("num_channels", &self.num_channels)
