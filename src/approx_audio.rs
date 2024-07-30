@@ -35,22 +35,15 @@ struct AudioClip {
 
 type Channel = Vec<Sample>;
 type Sample = f32;
-
-// contains amplitudes for each channel at a certain timestamp
+type FFTChannel = Vec<FFTSample>;
+type FFTSample = Complex<Sample>;
 
 pub fn run(source: &PathBuf, output: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     let clip = AudioClip::new(source)?;
     println!("{:?}", clip);
 
-    let mut planner = FftPlanner::<Sample>::new();
-    let fft = planner.plan_fft_forward(clip.num_samples);
-    let mut buffer = clip.channels[0]
-        .iter()
-        .map(|f| Complex::new(*f, 0.0))
-        .collect_vec();
-    fft.process(&mut buffer);
-
-    println!("{:?}", buffer);
+    let fft = clip.fft();
+    println!("{:?}", fft);
 
     // let tetris_clips = TetrisClips::new(&PathBuf::from("assets_sound"))?;
     // println!("{:?}", tetris_clips);
@@ -135,6 +128,23 @@ impl AudioClip {
             num_samples,
         })
     }
+
+    pub fn fft(&self) -> Vec<FFTChannel> {
+        let mut planner = FftPlanner::<Sample>::new();
+        let fft = planner.plan_fft_forward(self.num_samples);
+        let mut fft_final: Vec<FFTChannel> = Vec::new();
+
+        for channel in self.channels.iter() {
+            let mut buffer = channel
+                .iter()
+                .map(|f| Complex::new(*f, 0.0))
+                .collect_vec();
+            fft.process(&mut buffer);
+            fft_final.push(buffer);
+        }
+
+        fft_final
+    }
 }
 
 impl fmt::Debug for AudioClip {
@@ -151,7 +161,7 @@ impl fmt::Debug for AudioClip {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs, path};
+    use std::path;
 
     use super::*;
 
