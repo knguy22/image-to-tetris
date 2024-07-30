@@ -16,8 +16,13 @@ struct TetrisClips {
     clips: Vec<AudioClip>
 }
 
+#[derive(Debug)]
+struct InputAudioClip {
+    chunks: Vec<AudioClip>,
+}
+
 struct AudioClip {
-    wave: Wave,
+    samples: Vec<Vec<f32>>,
     file_name: String,
     sample_rate: f64,
     max_amplitude: f32,
@@ -47,6 +52,13 @@ impl TetrisClips {
 
 }
 
+impl InputAudioClip {
+    pub fn new(source: &PathBuf) -> Result<InputAudioClip, Box<dyn std::error::Error>> {
+        let clip = AudioClip::new(source)?;
+        todo!()
+    }
+}
+
 impl AudioClip {
     pub fn new(source: &PathBuf) -> Result<AudioClip, Box<dyn std::error::Error>> {
         let wave = Wave::load(source)?;
@@ -54,8 +66,17 @@ impl AudioClip {
         let max_amplitude = wave.amplitude();
         let num_channels = wave.channels();
         let num_samples: usize = (wave.duration() * wave.sample_rate()) as usize;
+        let mut samples: Vec<Vec<f32>> = Vec::new();
+        for channel in 0..num_channels {
+            let mut channel_samples = Vec::new();
+            for index in 0..num_samples {
+                channel_samples.push(wave.at(channel, index));
+            }
+            samples.push(channel_samples);
+        }
+
         Ok(AudioClip {
-            wave,
+            samples,
             file_name: source.to_str().unwrap().to_string(),
             sample_rate,
             max_amplitude,
