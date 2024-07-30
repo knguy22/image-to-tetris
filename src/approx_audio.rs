@@ -39,16 +39,15 @@ pub fn run(source: &PathBuf, output: &PathBuf) -> Result<(), Box<dyn std::error:
     let clip = AudioClip::new(source)?;
     println!("{:?}", clip);
 
-    let tetris_clips = TetrisClips::new(source)?;
+    let tetris_clips = TetrisClips::new(&PathBuf::from("assets_sound"))?;
     println!("{:?}", tetris_clips);
     todo!();
 }
 
 impl TetrisClips {
     pub fn new(source: &PathBuf) -> Result<TetrisClips, Box<dyn std::error::Error>> {
-        let clips_dir = PathBuf::from("assets_sound");
         let mut clips = Vec::new();
-        for clip in clips_dir.read_dir()? {
+        for clip in source.read_dir()? {
             let clip = clip?;
             clips.push(AudioClip::new(&clip.path())?);
         }
@@ -146,5 +145,13 @@ mod tests {
         let clip = InputAudioClip::new(&source, 0.2).expect("failed to create audio clip");
         
         assert_eq!(clip.chunks.len(), 15);
+    }
+
+    #[test]
+    fn test_tetris_clips() {
+        let source = path::PathBuf::from("test_sources");
+        let tetris_clips = TetrisClips::new(&source).expect("failed to create tetris clips");
+        
+        assert_eq!(tetris_clips.clips.len(), 7);
     }
 }
