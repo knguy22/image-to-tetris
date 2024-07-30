@@ -24,7 +24,7 @@ struct InputAudioClip {
 
 // the fundamental structure of an audio clip in this project
 struct AudioClip {
-    samples: Vec<Sample>,
+    channels: Vec<Channel>,
     file_name: String,
     sample_rate: f64,
     duration: f64,
@@ -33,20 +33,21 @@ struct AudioClip {
     num_samples: usize,
 }
 
+type Channel = Vec<Sample>;
+type Sample = f32;
+
 // contains amplitudes for each channel at a certain timestamp
-type Sample = Vec<f32>;
 
 pub fn run(source: &PathBuf, output: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     let clip = AudioClip::new(source)?;
     println!("{:?}", clip);
 
-    let mut planner = FftPlanner::<f32>::new();
+    let mut planner = FftPlanner::<Sample>::new();
     let fft = planner.plan_fft_forward(clip.num_samples);
-    let mut buffer = Vec::new();
-    for sample in clip.samples.iter() {
-        buffer.push(Complex{re: sample[0], im: 0.0});
-    }
-
+    let mut buffer = clip.channels[0]
+        .iter()
+        .map(|f| Complex::new(*f, 0.0))
+        .collect_vec();
     fft.process(&mut buffer);
 
     println!("{:?}", buffer);
@@ -72,13 +73,26 @@ impl InputAudioClip {
     pub fn new(source: &PathBuf, max_clip_duration: f64) -> Result<InputAudioClip, Box<dyn std::error::Error>> {
         let clip = AudioClip::new(source)?;
 
-        // split the original video into parseable chunks
-        let chunk_num_samples = (max_clip_duration * clip.sample_rate) as usize;
+        // split the original video into chunks; this will be useful for approximation later
         let mut chunks = Vec::new();
-        for chunk in clip.samples.chunks(chunk_num_samples) {
+        let sample_indicies = (0..clip.num_samples).into_iter().collect_vec();
+        let chunk_num_samples = (max_clip_duration * clip.sample_rate) as usize;
+        for chunk_indices in sample_indicies.chunks(chunk_num_samples) {
+
+            // grab each channel one by one at the specified chunk indices
+            let mut channels = Vec::new();
+            for channel_idx in 0..clip.num_channels {
+                let mut channel = Vec::new();
+                for sample_idx in chunk_indices {
+                    channel.push(clip.channels[channel_idx][*sample_idx]);
+                }
+                channels.push(channel);
+            }
+
+            // create the audio clip once we have all the channels
             chunks.push(
                 AudioClip {
-                    samples: chunk.to_vec(),
+                    channels,
                     file_name: clip.file_name.clone(),
                     sample_rate: clip.sample_rate,
                     duration: max_clip_duration,
@@ -101,18 +115,18 @@ impl AudioClip {
         let max_amplitude = wave.amplitude();
         let num_channels = wave.channels();
         let num_samples: usize = (duration * sample_rate) as usize;
-        let mut samples: Vec<Sample> = Vec::new();
+        let mut channels: Vec<Channel> = Vec::new();
 
-        for index in 0..num_samples {
-            let mut sample = Sample::new();
-            for channel in 0..num_channels {
-                sample.push(wave.at(channel, index));
+        for channel_idx in 0..num_channels {
+            let mut channel = Channel::new();
+            for sample_idx in 0..num_samples {
+                channel.push(wave.at(channel_idx, sample_idx));
             }
-            samples.push(sample);
+            channels.push(channel);
         }
 
         Ok(AudioClip {
-            samples,
+            channels,
             file_name: source.to_str().unwrap().to_string(),
             duration,
             sample_rate,
@@ -148,10 +162,10 @@ mod tests {
 
         assert_ne!(clip.num_channels, 0);
         assert_ne!(clip.num_samples, 0);
-        assert_ne!(clip.samples.len(), 0);
+        assert_ne!(clip.channels.len(), 0);
 
-        assert_eq!(clip.samples.len(), clip.num_samples);
-        assert_eq!(clip.samples[0].len(), clip.num_channels);
+        assert_eq!(clip.channels.len(), clip.num_channels);
+        assert_eq!(clip.channels[0].len(), clip.num_samples);
     }
 
     #[test]
