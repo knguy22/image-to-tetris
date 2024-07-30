@@ -3,6 +3,7 @@ use std::fmt;
 
 use fundsp::prelude::*;
 use itertools::Itertools;
+use rustfft::{FftPlanner, num_complex::Complex};
 
 // Todo:
 // Be able to extract audio and metadata into a struct (do this for both input and tetris sample clips)
@@ -39,8 +40,19 @@ pub fn run(source: &PathBuf, output: &PathBuf) -> Result<(), Box<dyn std::error:
     let clip = AudioClip::new(source)?;
     println!("{:?}", clip);
 
-    let tetris_clips = TetrisClips::new(&PathBuf::from("assets_sound"))?;
-    println!("{:?}", tetris_clips);
+    let mut planner = FftPlanner::<f32>::new();
+    let fft = planner.plan_fft_forward(clip.num_samples);
+    let mut buffer = Vec::new();
+    for sample in clip.samples.iter() {
+        buffer.push(Complex{re: sample[0], im: 0.0});
+    }
+
+    fft.process(&mut buffer);
+
+    println!("{:?}", buffer);
+
+    // let tetris_clips = TetrisClips::new(&PathBuf::from("assets_sound"))?;
+    // println!("{:?}", tetris_clips);
     todo!();
 }
 
@@ -137,6 +149,9 @@ mod tests {
         assert_ne!(clip.num_channels, 0);
         assert_ne!(clip.num_samples, 0);
         assert_ne!(clip.samples.len(), 0);
+
+        assert_eq!(clip.samples.len(), clip.num_samples);
+        assert_eq!(clip.samples[0].len(), clip.num_channels);
     }
 
     #[test]
