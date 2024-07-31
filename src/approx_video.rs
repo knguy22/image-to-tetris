@@ -1,4 +1,5 @@
 use crate::approx_image;
+use crate::utils::check_command_result;
 
 use std::fs;
 use std::path::PathBuf;
@@ -124,13 +125,6 @@ fn progress_bar(pb_len: usize) -> Result<ProgressBar, Box<dyn std::error::Error>
     let pb = ProgressBar::new(u64::try_from(pb_len)?);
     pb.set_style(spinner_style.clone());
     Ok(pb)
-}
-
-fn check_command_result(result: std::process::Output) -> Result<(), Box<dyn std::error::Error>> {
-    match result.status.code() {
-        Some(0) => Ok(()),
-        _ => Err(format!("failed to execute command, command line: {:?}", result).into()),
-    }
 }
 
 // contains important video metadata

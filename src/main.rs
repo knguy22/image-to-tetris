@@ -2,6 +2,7 @@ mod approx_image;
 mod approx_audio;
 mod approx_video;
 mod cli;
+mod utils;
 
 use approx_image::{Config, PrioritizeColor};
 use approx_image::draw::create_skins;
