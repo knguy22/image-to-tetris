@@ -7,15 +7,16 @@ def main():
     # expected structure: channel, index, normalized value
     channels = df.groupby('channel')
     for channel, group in channels:
-        sample = group['sample']
+        frequency = group['frequency']
         norm = group['norm']
 
         plt.figure(figsize=(10, 6))
-        plt.plot(sample, norm, 'b-', label='Normalized value')
+        plt.plot(frequency, norm, 'b-', label='Normalized value')
 
-        plt.xlabel('Sample')
-        plt.ylabel('Value')
-        plt.title(f'Channel {channel}: Normalized value after FFT')
+        plt.xlabel('Frequency')
+        plt.ylabel('Normalized Value')
+        plt.xlim(0, 2000)
+        plt.title(f'Channel {channel} after FFT')
         plt.legend()
 
         plt.grid(True)

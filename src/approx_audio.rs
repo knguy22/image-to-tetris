@@ -1,4 +1,3 @@
-use std::io;
 use std::path::PathBuf;
 use std::fmt;
 
@@ -34,6 +33,11 @@ struct AudioClip {
     num_samples: usize,
 }
 
+struct FFTResult {
+    channels: Vec<FFTChannel>,
+    frequency_resolution: f64,
+}
+
 type Channel = Vec<Sample>;
 type Sample = f32;
 type FFTChannel = Vec<FFTSample>;
@@ -43,8 +47,9 @@ pub fn run(source: &PathBuf, output: &PathBuf) -> Result<(), Box<dyn std::error:
     let clip = AudioClip::new(source)?;
     println!("{:?}", clip);
 
-    let fft = clip.fft();
-    dump_fft_to_csv(&fft)?;
+    let fft_res = clip.fft();
+    println!("{:?}", fft_res);
+    dump_fft_to_csv(&fft_res)?;
 
     // let tetris_clips = TetrisClips::new(&PathBuf::from("assets_sound"))?;
     // println!("{:?}", tetris_clips);
@@ -130,7 +135,7 @@ impl AudioClip {
         })
     }
 
-    pub fn fft(&self) -> Vec<FFTChannel> {
+    pub fn fft(&self) -> FFTResult {
         let mut planner = FftPlanner::<Sample>::new();
         let fft = planner.plan_fft_forward(self.num_samples);
         let mut fft_final: Vec<FFTChannel> = Vec::new();
@@ -145,7 +150,10 @@ impl AudioClip {
             fft_final.push(buffer);
         }
 
-        fft_final
+        FFTResult {
+            channels: fft_final,
+            frequency_resolution: self.sample_rate / self.num_samples as f64,
+        }
     }
 }
 
@@ -161,14 +169,23 @@ impl fmt::Debug for AudioClip {
     }
 }
 
+impl fmt::Debug for FFTResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("FFTResult")
+            .field("frequency_resolution", &self.frequency_resolution)
+            .finish()
+    }
+}
+
 #[allow(dead_code)]
-fn dump_fft_to_csv(fft: &Vec<FFTChannel>) -> Result<(), Box<dyn std::error::Error>> {
-    let output = PathBuf::from("fft.csv");
+fn dump_fft_to_csv(fft: &FFTResult) -> Result<(), Box<dyn std::error::Error>> {
+    let output = PathBuf::from("python/fft.csv");
     let mut wtr = csv::Writer::from_path(output)?;
-    wtr.write_record(&["channel", "sample", "real", "imaginary"])?;
-    for (channel_idx, channel) in fft.iter().enumerate() {
+    wtr.write_record(&["channel", "frequency", "norm"])?;
+    for (channel_idx, channel) in fft.channels.iter().enumerate() {
         for (i, sample) in channel.iter().enumerate() {
-            wtr.write_record(&[channel_idx.to_string(), i.to_string(), sample.re.to_string(), sample.im.to_string()])?;
+            let frequency = fft.frequency_resolution * i as f64;
+            wtr.write_record(&[channel_idx.to_string(), frequency.to_string(), sample.norm().to_string()])?;
         }
     }
 
