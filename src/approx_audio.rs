@@ -1,9 +1,9 @@
 mod audio_clip;
+mod resample;
 
 use audio_clip::*;
 
 use std::path::PathBuf;
-use std::fmt;
 
 use itertools::Itertools;
 
@@ -25,6 +25,9 @@ struct InputAudioClip {
 }
 
 pub fn run(source: &PathBuf, output: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    let tetris_sounds_orig = PathBuf::from("assets_sound");
+    let tetris_sounds_resampled = PathBuf::from("tmp_assets_sound");
+
     let clip = AudioClip::new(source)?;
     println!("{:?}", clip);
 
@@ -32,8 +35,17 @@ pub fn run(source: &PathBuf, output: &PathBuf) -> Result<(), Box<dyn std::error:
     fft_res.dump()?;
     println!("{:?}", fft_res);
 
-    // let tetris_clips = TetrisClips::new(&PathBuf::from("assets_sound"))?;
-    // println!("{:?}", tetris_clips);
+    let orig_tetris_clips = TetrisClips::new(&tetris_sounds_orig)?;
+    for clip in orig_tetris_clips.clips {
+        println!("{:?}", clip);
+    }
+
+    resample::run_dir(&tetris_sounds_orig, &tetris_sounds_resampled, clip.sample_rate)?;
+    let new_tetris_clips = TetrisClips::new(&tetris_sounds_resampled)?;
+    for clip in new_tetris_clips.clips {
+        println!("{:?}", clip);
+    }
+
     todo!();
 }
 
