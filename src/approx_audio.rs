@@ -1,3 +1,4 @@
+use std::io;
 use std::path::PathBuf;
 use std::fmt;
 
@@ -43,7 +44,7 @@ pub fn run(source: &PathBuf, output: &PathBuf) -> Result<(), Box<dyn std::error:
     println!("{:?}", clip);
 
     let fft = clip.fft();
-    println!("{:?}", fft);
+    dump_fft_to_csv(&fft)?;
 
     // let tetris_clips = TetrisClips::new(&PathBuf::from("assets_sound"))?;
     // println!("{:?}", tetris_clips);
@@ -134,6 +135,7 @@ impl AudioClip {
         let fft = planner.plan_fft_forward(self.num_samples);
         let mut fft_final: Vec<FFTChannel> = Vec::new();
 
+        // perform the FFT on each channel
         for channel in self.channels.iter() {
             let mut buffer = channel
                 .iter()
@@ -157,6 +159,20 @@ impl fmt::Debug for AudioClip {
             .field("num_samples", &self.num_samples)
             .finish()
     }
+}
+
+#[allow(dead_code)]
+fn dump_fft_to_csv(fft: &Vec<FFTChannel>) -> Result<(), Box<dyn std::error::Error>> {
+    let output = PathBuf::from("fft.csv");
+    let mut wtr = csv::Writer::from_path(output)?;
+    wtr.write_record(&["channel", "sample", "real", "imaginary"])?;
+    for (channel_idx, channel) in fft.iter().enumerate() {
+        for (i, sample) in channel.iter().enumerate() {
+            wtr.write_record(&[channel_idx.to_string(), i.to_string(), sample.re.to_string(), sample.im.to_string()])?;
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
