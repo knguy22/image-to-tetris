@@ -6,6 +6,11 @@ use std::process::Command;
 
 // resamples the audio to the specified sample rate using ffmpeg
 pub fn run(source: &PathBuf, output: &PathBuf, sample_rate: f64) -> Result<(), Box<dyn std::error::Error>> {
+    // replace the file
+    if output.exists() {
+        fs::remove_file(output)?;
+    }
+
     let gen_audio_command = Command::new("ffmpeg")
         .arg("-i")
         .arg(source)
@@ -28,7 +33,6 @@ pub fn run_dir(source: &PathBuf, output: &PathBuf, sample_rate: f64) -> Result<(
         let source_path = path.expect("failed to read source image").path();
         let file_name = source_path.file_name().expect("failed to get source image path without directory");
         let output_path = output.join(file_name);
-        println!("Resampling {} to {}...", source_path.display(), output_path.display());
         run(&source_path, &output_path, sample_rate)?;
     }
     Ok(())

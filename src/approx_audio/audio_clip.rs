@@ -78,6 +78,7 @@ impl AudioClip {
         let mut wav_writer = WavWriter::new(writer, spec)?;
 
         // write each channel with interleaved samples
+        assert!(self.channels.iter().all(|channel| channel.len() == self.num_samples));
         for i in 0..self.num_samples {
             for channel in self.channels.iter() {
                 wav_writer.write_sample(channel[i])?;
