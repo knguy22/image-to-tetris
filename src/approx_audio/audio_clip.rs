@@ -1,4 +1,5 @@
 use std::fmt;
+use std::ops;
 use std::path::PathBuf;
 
 use fundsp::prelude::*;
@@ -11,6 +12,7 @@ pub type FFTChannel = Vec<FFTSample>;
 pub type FFTSample = Complex<Sample>;
 
 // the fundamental structure of an audio clip in this project
+#[derive(Clone)]
 pub struct AudioClip {
     pub channels: Vec<Channel>,
     pub file_name: String,
@@ -26,7 +28,7 @@ pub struct FFTResult {
 }
 
 impl AudioClip {
-    pub fn new(source: &PathBuf) -> Result<AudioClip, Box<dyn std::error::Error>> {
+    pub fn new(source: &PathBuf) -> Result<Self, Box<dyn std::error::Error>> {
         let wave = Wave::load(source)?;
         let sample_rate = wave.sample_rate();
         let duration = wave.duration();
@@ -73,6 +75,19 @@ impl AudioClip {
             frequency_resolution: self.sample_rate / self.num_samples as f64,
         }
     }
+
+    // zero pads the audio clip; this is useful for comparison of two audio clips
+    pub fn zero_pad(&self, num_samples: usize) -> Result<Self, Box<dyn std::error::Error>> {
+        assert!(num_samples >= self.num_samples);
+
+        let mut clip = self.clone();
+        for channel in clip.channels.iter_mut() {
+            channel.resize(num_samples, 0.0);
+        }
+        clip.num_samples = num_samples;
+        Ok(clip)
+    }
+
 }
 
 impl FFTResult {
