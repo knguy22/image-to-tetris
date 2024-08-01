@@ -738,6 +738,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d231dfb89cfffdbc30e7fc41579ed6066ad03abda9e567ccafae602b97ec5024"
 
 [[package]]
+name = "hound"
+version = "3.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "62adaabb884c94955b19907d60019f4e145d091c75345379e70d1ee696f7854f"
+
+[[package]]
 name = "image"
 version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -782,6 +788,7 @@ dependencies = [
  "dssim-core",
  "ffmpeg-next",
  "fundsp",
+ "hound",
  "image",
  "image-compare",
  "imageproc",
@@ -791,6 +798,7 @@ dependencies = [
  "rayon",
  "rgb",
  "rustfft",
+ "symphonia",
 ]
 
 [[package]]
