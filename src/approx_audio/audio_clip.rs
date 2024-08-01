@@ -18,6 +18,7 @@ pub type FFTSample = Complex<Sample>;
 pub struct AudioClip {
     pub channels: Vec<Channel>,
     pub file_name: String,
+    pub duration: f64,
     pub sample_rate: f64,
     pub max_amplitude: f32,
     pub num_channels: usize,
@@ -50,6 +51,7 @@ impl AudioClip {
         Ok(AudioClip {
             channels,
             file_name: source.to_str().unwrap().to_string(),
+            duration,
             sample_rate,
             max_amplitude,
             num_channels,

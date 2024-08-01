@@ -3,6 +3,7 @@ mod resample;
 
 use audio_clip::*;
 
+use std::fs;
 use std::path::PathBuf;
 
 use itertools::Itertools;
@@ -29,24 +30,35 @@ pub fn run(source: &PathBuf, output: &PathBuf) -> Result<(), Box<dyn std::error:
     let tetris_sounds_resampled = PathBuf::from("tmp_assets_sound");
 
     let clip = AudioClip::new(source)?;
-    clip.write(output)?;
 
-    let fft_res = clip.fft();
-    fft_res.dump()?;
-    println!("{:?}", fft_res);
-
+    // find important metadata
     let orig_tetris_clips = TetrisClips::new(&tetris_sounds_orig)?;
+    let mut max_duration = clip.duration;
+    let mut max_sample_rate = clip.sample_rate;
     for clip in orig_tetris_clips.clips {
-        println!("{:?}", clip);
+        // f64 doesn't support ord, only partial-ord
+        if clip.duration > max_duration {
+            max_duration = clip.duration;
+        }
+        if clip.sample_rate > max_sample_rate {
+            max_sample_rate = clip.sample_rate;
+        }
     }
 
-    resample::run_dir(&tetris_sounds_orig, &tetris_sounds_resampled, clip.sample_rate)?;
+    // standardize tetris clips; this makes later comparisons of clips easier
+    resample::run_dir(&tetris_sounds_orig, &tetris_sounds_resampled, max_sample_rate)?;
     let new_tetris_clips = TetrisClips::new(&tetris_sounds_resampled)?;
     for clip in new_tetris_clips.clips {
         println!("{:?}", clip);
     }
 
-    todo!();
+    // now split the input
+    let clip = InputAudioClip::new(source, max_duration)?;
+
+    // cleanup
+    fs::remove_dir_all(tetris_sounds_resampled)?;
+
+    Ok(())
 }
 
 impl TetrisClips {
@@ -74,17 +86,18 @@ impl InputAudioClip {
             // grab each channel one by one at the specified chunk indices
             let mut channels = Vec::new();
             for channel_idx in 0..clip.num_channels {
-                let mut channel = Vec::new();
+                channels.push(Vec::new());
                 for sample_idx in chunk_indices {
-                    channel.push(clip.channels[channel_idx][*sample_idx]);
+                    channels.last_mut().unwrap().push(clip.channels[channel_idx][*sample_idx]);
                 }
-                channels.push(channel);
             }
+            let duration = chunk_indices.len() as f64 / clip.sample_rate;
 
             // create the audio clip once we have all the channels
             chunks.push(
                 AudioClip {
                     channels,
+                    duration,
                     file_name: clip.file_name.clone(),
                     sample_rate: clip.sample_rate,
                     max_amplitude: clip.max_amplitude,
@@ -106,10 +119,17 @@ mod tests {
 
     #[test]
     fn test_split_input_audio_clip() {
+        let duration = 0.2;
         let source = path::PathBuf::from("test_sources/a6.mp3");
-        let clip = InputAudioClip::new(&source, 0.2).expect("failed to create audio clip");
-        
+        let clip = InputAudioClip::new(&source, duration).expect("failed to create audio clip");
+
         assert_eq!(clip.chunks.len(), 15);
+
+        // exclude last since rounding errors
+        for chunk in clip.chunks.iter().take(clip.chunks.len() - 1) {
+            assert_eq!(chunk.duration, duration);
+        }
+        assert_ne!(clip.chunks.last().unwrap().duration, duration);
     }
 
     #[test]
