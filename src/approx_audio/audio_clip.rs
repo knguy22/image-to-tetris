@@ -1,10 +1,12 @@
 use std::fmt;
-use std::ops;
+use std::fs;
+use std::io;
 use std::path::PathBuf;
 
 use fundsp::prelude::*;
 use itertools::Itertools;
 use rustfft::{FftPlanner, num_complex::Complex};
+use hound::{WavWriter, WavSpec, SampleFormat};
 
 pub type Channel = Vec<Sample>;
 pub type Sample = f32;
@@ -55,6 +57,35 @@ impl AudioClip {
         })
     }
 
+    pub fn write(&self, path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+        // output file must be wav
+        if path.extension().unwrap() != "wav" {
+            return Err("output file must be wav".into());
+        }
+
+        // create the output file and initialize the writer
+        let spec = WavSpec {
+            channels: self.channels.len() as u16,
+            sample_rate: self.sample_rate as u32,
+            bits_per_sample: 32,
+            sample_format: SampleFormat::Float,
+        };
+
+        let output_file = fs::File::create(path)?;
+        let writer = io::BufWriter::new(output_file);
+        let mut wav_writer = WavWriter::new(writer, spec)?;
+
+        // write each channel with interleaved samples
+        for i in 0..self.num_samples {
+            for channel in self.channels.iter() {
+                wav_writer.write_sample(channel[i])?;
+            }
+        }
+
+        wav_writer.finalize()?;
+        Ok(())
+    }
+
     pub fn fft(&self) -> FFTResult {
         let mut planner = FftPlanner::<Sample>::new();
         let fft = planner.plan_fft_forward(self.num_samples);
@@ -88,6 +119,17 @@ impl AudioClip {
         Ok(clip)
     }
 
+    pub fn append(&self, other: &Self) -> Result<Self, Box<dyn std::error::Error>> {
+        assert!(self.sample_rate == other.sample_rate);
+        assert!(self.num_channels == other.num_channels);
+
+        let mut clip = self.clone();
+        for channel_idx in 0..self.num_channels {
+            clip.channels[channel_idx].extend(&other.channels[channel_idx]);
+        }
+        clip.num_samples = self.num_samples + other.num_samples;
+        Ok(clip)
+    }
 }
 
 impl FFTResult {
@@ -145,5 +187,19 @@ mod tests {
 
         assert_eq!(clip.channels.len(), clip.num_channels);
         assert_eq!(clip.channels[0].len(), clip.num_samples);
+    }
+
+    #[test]
+    fn test_write_audio_clip() {
+        let source = path::PathBuf::from("test_sources/a6.mp3");
+        let output = path::PathBuf::from("test_results/test.wav");
+
+        let clip = AudioClip::new(&source).expect("failed to create audio clip");
+        clip.write(&output).expect("failed to write audio clip");
+
+        assert!(output.exists());
+
+        // cleanup
+        fs::remove_file(output).expect("failed to remove test file");
     }
 }

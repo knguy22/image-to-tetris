@@ -29,7 +29,7 @@ pub fn run(source: &PathBuf, output: &PathBuf) -> Result<(), Box<dyn std::error:
     let tetris_sounds_resampled = PathBuf::from("tmp_assets_sound");
 
     let clip = AudioClip::new(source)?;
-    println!("{:?}", clip);
+    clip.write(output)?;
 
     let fft_res = clip.fft();
     fft_res.dump()?;
