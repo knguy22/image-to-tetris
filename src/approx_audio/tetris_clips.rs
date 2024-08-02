@@ -54,7 +54,7 @@ mod tests {
 
     #[test]
     fn test_tetris_clips() {
-        let source = path::PathBuf::from("test_sources");
+        let source = path::PathBuf::from("test_audio_clips");
         let tetris_clips = TetrisClips::new(&source).expect("failed to create tetris clips");
 
         for clip in tetris_clips.clips.iter() {
@@ -69,7 +69,7 @@ mod tests {
 
     #[test]
     fn test_combotones() {
-        let source = path::PathBuf::from("test_sources/comboTones.mp3");
+        let source = path::PathBuf::from("test_audio_clips/comboTones.mp3");
         let combotones = AudioClip::new(&source).expect("failed to create audio clip");
         let split_combotones = TetrisClips::split_combotones(&combotones);
 

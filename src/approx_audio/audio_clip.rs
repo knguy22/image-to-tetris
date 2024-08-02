@@ -286,7 +286,7 @@ mod tests {
 
     #[test]
     fn test_create_audio_clip() {
-        let source = path::PathBuf::from("test_sources/a6.mp3");
+        let source = path::PathBuf::from("test_audio_clips/a6.mp3");
         let clip = AudioClip::new(&source).expect("failed to create audio clip");
 
         assert_ne!(clip.num_channels, 0);
@@ -299,7 +299,7 @@ mod tests {
 
     #[test]
     fn test_write_audio_clip() {
-        let source = path::PathBuf::from("test_sources/a6.mp3");
+        let source = path::PathBuf::from("test_audio_clips/a6.mp3");
         let output = path::PathBuf::from("test_results/test.wav");
 
         let clip = AudioClip::new(&source).expect("failed to create audio clip");
@@ -314,7 +314,7 @@ mod tests {
     #[test]
     fn test_split_clip() {
         let duration = 0.2;
-        let source = path::PathBuf::from("test_sources/a6.mp3");
+        let source = path::PathBuf::from("test_audio_clips/a6.mp3");
         let clip = AudioClip::new(&source).expect("failed to create audio clip").split_by_duration(duration);
 
         assert_eq!(clip.len(), 15);
@@ -338,7 +338,7 @@ mod tests {
     #[test]
     fn test_zero_padding() {
         let num_samples = 1000000;
-        let source = path::PathBuf::from("test_sources/a6.mp3");
+        let source = path::PathBuf::from("test_audio_clips/a6.mp3");
         let clip = AudioClip::new(&source).expect("failed to create audio clip");
         let output = clip.zero_pad(num_samples).expect("failed to zero pad audio clip");
 
@@ -350,7 +350,7 @@ mod tests {
     fn test_dot_product() {
         // the same file should have the highest dot product with itself
         let mut clips = Vec::new();
-        for source in path::PathBuf::from("test_sources").read_dir().unwrap() {
+        for source in path::PathBuf::from("test_audio_clips").read_dir().unwrap() {
             clips.push(AudioClip::new(&source.unwrap().path()).expect("failed to create audio clip"));
         }
 

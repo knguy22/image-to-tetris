@@ -164,7 +164,7 @@ mod tests {
 
     #[test]
     fn test_split_input_to_audio_clip() {
-        let source = path::PathBuf::from("test_sources/a6.mp3");
+        let source = path::PathBuf::from("test_audio_clips/a6.mp3");
         let clip = AudioClip::new(&source).expect("failed to create audio clip");
         let input_clip = InputAudioClip::new(&source, 0.1, clip.num_channels).expect("failed to create audio clip").to_audio_clip();
 
