@@ -228,6 +228,8 @@ impl fmt::Debug for AudioClip {
 mod tests {
     use std::path;
 
+    use crate::approx_audio::resample;
+
     use super::*;
 
     #[test]
@@ -294,13 +296,22 @@ mod tests {
 
     #[test]
     fn test_dot_product() {
+        // first resample the audio clips to 44100 Hz
+        let sample_rate = 44100.0;
+        let source_dir = path::PathBuf::from("test_audio_clips");
+        let resample_source_dir = path::PathBuf::from("test_resampled_audio_clips");
+        resample::run_dir(&source_dir, &resample_source_dir, sample_rate).expect("failed to resample audio clips");
+
         // the same file should have the highest dot product with itself
         let mut clips = Vec::new();
-        for source in path::PathBuf::from("test_audio_clips").read_dir().unwrap() {
+        for source in resample_source_dir.read_dir().unwrap() {
             clips.push(AudioClip::new(&source.unwrap().path()).expect("failed to create audio clip"));
         }
 
         let self_dot_product = clips[0].dot_product(&clips[0]);
         assert!(clips.iter().skip(1).all(|clip| clip.dot_product(&clips[0]) < self_dot_product));
+
+        // cleanup
+        fs::remove_dir_all(resample_source_dir).expect("failed to remove resampled audio clips");
     }
 }
