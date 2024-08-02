@@ -29,18 +29,22 @@ struct InputAudioClip {
 struct MetaData {
     max_duration: f64,
     max_sample_rate: f64,
+    max_channels: usize,
 }
 
 pub fn run(source: &PathBuf, output: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     let tetris_sounds_orig = PathBuf::from("assets_sound");
     let tetris_sounds_resampled = PathBuf::from("tmp_assets_sound");
 
-    let MetaData{max_duration, max_sample_rate} = init(source, &tetris_sounds_orig)?;
+    let MetaData{max_duration, max_sample_rate, max_channels} = init(source, &tetris_sounds_orig)?;
     println!("Approximating audio with sample rate {} and duration {}", max_sample_rate, max_duration);
 
     // standardize tetris clips; this makes later comparisons of clips easier
     resample::run_dir(&tetris_sounds_orig, &tetris_sounds_resampled, max_sample_rate)?;
-    let new_tetris_clips = TetrisClips::new(&tetris_sounds_resampled)?;
+    let mut new_tetris_clips = TetrisClips::new(&tetris_sounds_resampled)?;
+    for clip in &mut new_tetris_clips.clips {
+        clip.add_new_channels(max_channels);
+    }
     new_tetris_clips.dump(&PathBuf::from("results"))?;
 
     // now split the input
@@ -64,6 +68,7 @@ fn init(source: &PathBuf, tetris_sounds: &PathBuf) -> Result<MetaData, Box<dyn s
     let orig_tetris_clips = TetrisClips::new(&tetris_sounds)?;
     let mut max_duration = 0.0;
     let mut max_sample_rate = clip.sample_rate;
+    let mut max_channels = clip.num_channels;
     for clip in orig_tetris_clips.clips {
         // f64 doesn't support ord, only partial-ord which is why max is not used
         if clip.duration > max_duration {
@@ -72,11 +77,13 @@ fn init(source: &PathBuf, tetris_sounds: &PathBuf) -> Result<MetaData, Box<dyn s
         if clip.sample_rate > max_sample_rate {
             max_sample_rate = clip.sample_rate;
         }
+        max_channels = cmp::max(max_channels, clip.num_channels);
     }
 
     Ok(MetaData {
         max_duration,
         max_sample_rate,
+        max_channels,
     })
 }
 
@@ -136,9 +143,14 @@ impl InputAudioClip {
 
         for (chunk_idx, chunk) in self.chunks.iter().enumerate() {
             // choose a best tetris clip for the specific chunk
-            let best_clip: &AudioClip = &tetris_clips.clips[0];
+            let mut best_clip: &AudioClip = &tetris_clips.clips[0];
+            let mut best_dot_product = chunk.dot_product(best_clip);
             for clip in tetris_clips.clips.iter().skip(1) {
-                continue;
+                let dot_product = chunk.dot_product(clip);
+                if dot_product > best_dot_product {
+                    best_dot_product = dot_product;
+                    best_clip = clip;
+                }
             }
 
             assert!(chunk.num_channels == best_clip.num_channels);
