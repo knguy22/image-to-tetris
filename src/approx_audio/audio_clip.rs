@@ -127,6 +127,7 @@ impl AudioClip {
 
     pub fn dot_product(&self, other: &Self) -> f64 {
         assert!(self.num_channels == other.num_channels);
+        assert!(self.sample_rate == other.sample_rate);
 
         let zero_pad_curr = self.num_samples < other.num_samples;
         let curr = if zero_pad_curr {

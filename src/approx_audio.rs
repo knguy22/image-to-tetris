@@ -23,8 +23,8 @@ struct MetaData {
 
 pub fn run(source: &PathBuf, output: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     let tetris_sounds_orig = PathBuf::from("assets_sound");
-    let tetris_sounds_resampled = PathBuf::from("tmp_assets_sound");
-    let source_resampled = PathBuf::from("tmp_assets_sound").join(source.file_name().unwrap()).with_extension("wav");
+    let tetris_sounds_resampled = PathBuf::from("tmp_tetris_sounds_assets");
+    let source_resampled = PathBuf::from("tmp_source.wav");
 
     let MetaData{max_duration, max_sample_rate, max_channels} = init(source, &tetris_sounds_orig)?;
     println!("Approximating audio with sample rate {} and duration {}", max_sample_rate, max_duration);
@@ -43,9 +43,9 @@ pub fn run(source: &PathBuf, output: &PathBuf) -> Result<(), Box<dyn std::error:
     let approx_clip = clip.approx(&tetris_clips);
     match approx_clip {
         Ok(approx_clip) => {
-            let orig_clip = AudioClip::new(source)?;
+            let source_clip = AudioClip::new(&source_resampled)?;
             let final_clip = approx_clip.to_audio_clip();
-            let final_approx_score = final_clip.dot_product(&orig_clip);
+            let final_approx_score = final_clip.dot_product(&source_clip);
 
             println!("Approximation score: {}", final_approx_score);
             final_clip.write(&output)?;
@@ -54,7 +54,7 @@ pub fn run(source: &PathBuf, output: &PathBuf) -> Result<(), Box<dyn std::error:
     }
 
     // cleanup
-    cleanup(&tetris_sounds_resampled)?;
+    cleanup(&tetris_sounds_resampled, &source_resampled)?;
 
     Ok(())
 }
@@ -85,8 +85,9 @@ fn init(source: &PathBuf, tetris_sounds: &PathBuf) -> Result<MetaData, Box<dyn s
     })
 }
 
-fn cleanup(tetris_sounds_resampled: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+fn cleanup(tetris_sounds_resampled: &PathBuf, input_resampled: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     fs::remove_dir_all(tetris_sounds_resampled)?;
+    fs::remove_file(input_resampled)?;
     Ok(())
 }
 
