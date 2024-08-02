@@ -6,9 +6,6 @@ use std::process::Command;
 
 // resamples the audio to the specified sample rate using ffmpeg
 pub fn run(source: &PathBuf, output: &PathBuf, sample_rate: f64) -> Result<(), Box<dyn std::error::Error>> {
-    // use .wav for output
-    let output = output.with_extension("wav");
-
     // replace the file
     if output.exists() {
         fs::remove_file(output.clone())?;
@@ -26,6 +23,7 @@ pub fn run(source: &PathBuf, output: &PathBuf, sample_rate: f64) -> Result<(), B
 }
 
 // the same as run but for an entire directory
+// note: all output files will have their extension changed to .wav
 pub fn run_dir(source: &PathBuf, output: &PathBuf, sample_rate: f64) -> Result<(), Box<dyn std::error::Error>> {
     // makes sure the output directory exists
     if !output.exists() {
@@ -35,7 +33,7 @@ pub fn run_dir(source: &PathBuf, output: &PathBuf, sample_rate: f64) -> Result<(
     for path in source.read_dir()? {
         let source_path = path.expect("failed to read source image").path();
         let file_name = source_path.file_name().expect("failed to get source image path without directory");
-        let output_path = output.join(file_name);
+        let output_path = output.join(file_name).with_extension("wav");
         run(&source_path, &output_path, sample_rate)?;
     }
     Ok(())

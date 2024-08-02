@@ -153,7 +153,9 @@ impl AudioClip {
         let mut dot_product = 0.0;
         for channel_idx in 0..curr.num_channels {
             for sample_idx in 0..curr.num_samples {
-                dot_product += curr.channels[channel_idx][sample_idx] * other.channels[channel_idx][sample_idx];
+                let normalized_curr = curr.channels[channel_idx][sample_idx] / curr.max_amplitude;
+                let normalized_other = other.channels[channel_idx][sample_idx] / other.max_amplitude;
+                dot_product += normalized_curr * normalized_other;
             }
         }
 
@@ -164,6 +166,9 @@ impl AudioClip {
     // uses the average of existing channels for new values
     pub fn add_new_channels(&mut self, num_channels: usize) {
         assert!(num_channels >= self.num_channels);
+        if self.num_channels == num_channels {
+            return
+        }
 
         let new_channels = num_channels - self.num_channels;
 
@@ -313,6 +318,7 @@ mod tests {
         let clip = AudioClip::new(&source).expect("failed to create audio clip").split_by_duration(duration);
 
         assert_eq!(clip.len(), 15);
+        assert!(clip.iter().all(|c| c.sample_rate == clip[0].sample_rate));
 
         // exclude last due to rounding errors
         for chunk in clip.iter().take(clip.len() - 1) {

@@ -35,24 +35,26 @@ struct MetaData {
 pub fn run(source: &PathBuf, output: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     let tetris_sounds_orig = PathBuf::from("assets_sound");
     let tetris_sounds_resampled = PathBuf::from("tmp_assets_sound");
+    let source_resampled = PathBuf::from("tmp_assets_sound").join(source.file_name().unwrap()).with_extension("wav");
 
     let MetaData{max_duration, max_sample_rate, max_channels} = init(source, &tetris_sounds_orig)?;
     println!("Approximating audio with sample rate {} and duration {}", max_sample_rate, max_duration);
 
-    // standardize tetris clips; this makes later comparisons of clips easier
+    // standardize tetris clips + input clip; this makes later comparisons of clips easier
     resample::run_dir(&tetris_sounds_orig, &tetris_sounds_resampled, max_sample_rate)?;
-    let mut new_tetris_clips = TetrisClips::new(&tetris_sounds_resampled)?;
-    for clip in &mut new_tetris_clips.clips {
+    resample::run(&source, &source_resampled, max_sample_rate)?;
+    let mut tetris_clips = TetrisClips::new(&tetris_sounds_resampled)?;
+    for clip in &mut tetris_clips.clips {
         clip.add_new_channels(max_channels);
     }
-    new_tetris_clips.dump(&PathBuf::from("results"))?;
+    tetris_clips.dump(&PathBuf::from("results"))?;
 
     // now split the input
-    let clip = InputAudioClip::new(source, max_duration)?;
-    let approx_clip = clip.approx(&new_tetris_clips);
+    let clip = InputAudioClip::new(&source_resampled, max_duration, max_channels)?;
+    let approx_clip = clip.approx(&tetris_clips);
     match approx_clip {
         Ok(approx_clip) => approx_clip.to_audio_clip().write(&output)?,
-        _ => (),
+        Err(e) => println!("Error: {}", e),
     }
 
     // cleanup
@@ -132,8 +134,9 @@ impl TetrisClips {
 }
 
 impl InputAudioClip {
-    pub fn new(source: &PathBuf, max_clip_duration: f64) -> Result<InputAudioClip, Box<dyn std::error::Error>> {
-        let clip = AudioClip::new(source)?;
+    pub fn new(source: &PathBuf, max_clip_duration: f64, num_channels: usize) -> Result<InputAudioClip, Box<dyn std::error::Error>> {
+        let mut clip = AudioClip::new(source)?;
+        clip.add_new_channels(num_channels);
         let chunks = clip.split_by_duration(max_clip_duration);
         Ok(InputAudioClip{chunks})
     }
@@ -154,6 +157,7 @@ impl InputAudioClip {
             }
 
             assert!(chunk.num_channels == best_clip.num_channels);
+            assert!(chunk.sample_rate == best_clip.sample_rate);
 
             // prevent index overflow since the last chunk can be smaller than the others
             let num_samples_to_write = cmp::min(chunk.num_samples, best_clip.num_samples);
@@ -213,7 +217,7 @@ mod tests {
     fn test_split_input_to_audio_clip() {
         let source = path::PathBuf::from("test_sources/a6.mp3");
         let clip = AudioClip::new(&source).expect("failed to create audio clip");
-        let input_clip = InputAudioClip::new(&source, 0.1).expect("failed to create audio clip").to_audio_clip();
+        let input_clip = InputAudioClip::new(&source, 0.1, clip.num_channels).expect("failed to create audio clip").to_audio_clip();
 
         assert_eq!(input_clip.num_channels, clip.num_channels);
         assert_eq!(input_clip.sample_rate, clip.sample_rate);
