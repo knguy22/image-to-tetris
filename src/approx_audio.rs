@@ -42,7 +42,14 @@ pub fn run(source: &PathBuf, output: &PathBuf) -> Result<(), Box<dyn std::error:
     let clip = InputAudioClip::new(&source_resampled, max_duration, max_channels)?;
     let approx_clip = clip.approx(&tetris_clips);
     match approx_clip {
-        Ok(approx_clip) => approx_clip.to_audio_clip().write(&output)?,
+        Ok(approx_clip) => {
+            let orig_clip = AudioClip::new(source)?;
+            let final_clip = approx_clip.to_audio_clip();
+            let final_approx_score = final_clip.dot_product(&orig_clip);
+
+            println!("Approximation score: {}", final_approx_score);
+            final_clip.write(&output)?;
+        },
         Err(e) => println!("Error: {}", e),
     }
 

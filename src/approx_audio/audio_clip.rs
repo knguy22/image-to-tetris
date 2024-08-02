@@ -125,7 +125,7 @@ impl AudioClip {
         chunks
     }
 
-    pub fn dot_product(&self, other: &Self) -> f32 {
+    pub fn dot_product(&self, other: &Self) -> f64 {
         assert!(self.num_channels == other.num_channels);
 
         let zero_pad_curr = self.num_samples < other.num_samples;
@@ -141,16 +141,17 @@ impl AudioClip {
             other.zero_pad(self.num_samples).unwrap()
         };
 
-        let mut dot_product = 0.0;
+        let mut dot_product: f64 = 0.0;
         for channel_idx in 0..curr.num_channels {
             for sample_idx in 0..curr.num_samples {
-                let normalized_curr = curr.channels[channel_idx][sample_idx] / curr.max_amplitude;
-                let normalized_other = other.channels[channel_idx][sample_idx] / other.max_amplitude;
-                dot_product += normalized_curr * normalized_other;
+                let curr_sample = curr.channels[channel_idx][sample_idx];
+                let other_sample = other.channels[channel_idx][sample_idx];
+                dot_product += f64::from(curr_sample) * f64::from(other_sample);
             }
         }
 
-        dot_product
+        assert!(!dot_product.is_nan());
+        dot_product / ((curr.num_samples * curr.num_channels) as f64)
     }
 
     // add new channels to the audio clip
