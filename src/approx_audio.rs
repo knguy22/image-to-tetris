@@ -94,50 +94,21 @@ impl TetrisClips {
         Ok(TetrisClips { clips })
     }
 
+    fn split_combotones(clips: &AudioClip) -> Vec<AudioClip> {
+        const NUM_COMBOS: usize = 15;
+        let combo_duration = clips.duration / NUM_COMBOS as f64;
+
+        // there may be an extra combo due to rounding errors; drop it 
+        let combos = clips.split_by_duration(combo_duration);
+        combos.into_iter().take(NUM_COMBOS).collect()
+    }
+
 }
 
 impl InputAudioClip {
     pub fn new(source: &PathBuf, max_clip_duration: f64) -> Result<InputAudioClip, Box<dyn std::error::Error>> {
         let clip = AudioClip::new(source)?;
-
-        // split the original video into chunks; this will be useful for approximation later
-        let mut chunks = Vec::new();
-        let sample_indicies = (0..clip.num_samples).into_iter().collect_vec();
-        let chunk_num_samples = (max_clip_duration * clip.sample_rate) as usize;
-        for chunk_indices in sample_indicies.chunks(chunk_num_samples) {
-
-            // grab each channel one by one at the specified chunk indices
-            // also keep track of metadata along the way
-            let mut channels = Vec::new();
-            let mut max_amplitude = 0.0;
-            for channel_idx in 0..clip.num_channels {
-                channels.push(Vec::new());
-                for sample_idx in chunk_indices {
-                    channels.last_mut().unwrap().push(clip.channels[channel_idx][*sample_idx]);
-
-                    if clip.channels[channel_idx][*sample_idx] > max_amplitude {
-                        max_amplitude = clip.channels[channel_idx][*sample_idx];
-                    }
-                }
-            }
-
-            let num_samples = chunk_indices.len();
-            let duration = num_samples as f64 / clip.sample_rate;
-
-            // create the audio clip once we have all the channels
-            chunks.push(
-                AudioClip {
-                    channels,
-                    duration,
-                    file_name: clip.file_name.clone(),
-                    sample_rate: clip.sample_rate,
-                    max_amplitude,
-                    num_channels: clip.num_channels,
-                    num_samples,
-                }
-            )
-        }
-
+        let chunks = clip.split_by_duration(max_clip_duration);
         Ok(InputAudioClip{chunks})
     }
 
@@ -208,29 +179,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_split_input_clip() {
-        let duration = 0.2;
-        let source = path::PathBuf::from("test_sources/a6.mp3");
-        let clip = InputAudioClip::new(&source, duration).expect("failed to create audio clip");
-
-        assert_eq!(clip.chunks.len(), 15);
-
-        // exclude last due to rounding errors
-        for chunk in clip.chunks.iter().take(clip.chunks.len() - 1) {
-            assert_eq!(chunk.duration, duration);
-            assert_eq!(chunk.num_samples, chunk.channels[0].len());
-
-            for channel in chunk.channels.iter() {
-                assert_eq!(channel.len(), chunk.num_samples);
-            }
-        }
-
-        let last = clip.chunks.last().unwrap();
-        assert_ne!(last.duration, duration);
-        assert_eq!(last.num_samples, last.channels[0].len());
-    }
-
-    #[test]
     fn test_split_input_to_audio_clip() {
         let source = path::PathBuf::from("test_sources/a6.mp3");
         let clip = AudioClip::new(&source).expect("failed to create audio clip");
@@ -254,6 +202,17 @@ mod tests {
             }
         }
         
-        assert_eq!(tetris_clips.clips.len(), 7);
+        assert_eq!(tetris_clips.clips.len(), 22);
+    }
+
+    #[test]
+    fn test_combotones() {
+        let source = path::PathBuf::from("test_sources/comboTones.mp3");
+        let combotones = AudioClip::new(&source).expect("failed to create audio clip");
+        let split_combotones = TetrisClips::split_combotones(&combotones);
+
+        assert_eq!(split_combotones.len(), 15);
+        assert!(split_combotones.iter().all(|clip| clip.num_channels == clip.channels.len()));
+        assert!(split_combotones.iter().all(|clip| clip.num_samples == clip.channels[0].len()));
     }
 }

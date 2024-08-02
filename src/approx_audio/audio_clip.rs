@@ -89,6 +89,50 @@ impl AudioClip {
         Ok(())
     }
 
+    // splits the audio clip into chunks the length of max_duration; if the last chunk is shorter than 
+    // max_duration, it will still be included but will be smaller than max_duration
+    pub fn split_by_duration(&self, max_duration: f64) -> Vec<Self> {
+        // split the original video into chunks; this will be useful for approximation later
+        let mut chunks = Vec::new();
+        let sample_indicies = (0..self.num_samples).into_iter().collect_vec();
+        let chunk_num_samples = (max_duration * self.sample_rate) as usize;
+        for chunk_indices in sample_indicies.chunks(chunk_num_samples) {
+
+            // grab each channel one by one at the specified chunk indices
+            // also keep track of metadata along the way
+            let mut channels = Vec::new();
+            let mut max_amplitude = 0.0;
+            for channel_idx in 0..self.num_channels {
+                channels.push(Vec::new());
+                for sample_idx in chunk_indices {
+                    channels.last_mut().unwrap().push(self.channels[channel_idx][*sample_idx]);
+
+                    if self.channels[channel_idx][*sample_idx] > max_amplitude {
+                        max_amplitude = self.channels[channel_idx][*sample_idx];
+                    }
+                }
+            }
+
+            let num_samples = chunk_indices.len();
+            let duration = num_samples as f64 / self.sample_rate;
+
+            // create the audio clip once we have all the channels
+            chunks.push(
+                AudioClip {
+                    channels,
+                    duration,
+                    file_name: self.file_name.clone(),
+                    sample_rate: self.sample_rate,
+                    max_amplitude,
+                    num_channels: self.num_channels,
+                    num_samples,
+                }
+            )
+        }
+
+        chunks
+    }
+
     pub fn fft(&self) -> FFTResult {
         let mut planner = FftPlanner::<Sample>::new();
         let fft = planner.plan_fft_forward(self.num_samples);
@@ -204,5 +248,28 @@ mod tests {
 
         // cleanup
         fs::remove_file(output).expect("failed to remove test file");
+    }
+
+    #[test]
+    fn test_split_clip() {
+        let duration = 0.2;
+        let source = path::PathBuf::from("test_sources/a6.mp3");
+        let clip = AudioClip::new(&source).expect("failed to create audio clip").split_by_duration(duration);
+
+        assert_eq!(clip.len(), 15);
+
+        // exclude last due to rounding errors
+        for chunk in clip.iter().take(clip.len() - 1) {
+            assert_eq!(chunk.duration, duration);
+            assert_eq!(chunk.num_samples, chunk.channels[0].len());
+
+            for channel in chunk.channels.iter() {
+                assert_eq!(channel.len(), chunk.num_samples);
+            }
+        }
+
+        let last = clip.last().unwrap();
+        assert_ne!(last.duration, duration);
+        assert_eq!(last.num_samples, last.channels[0].len());
     }
 }
