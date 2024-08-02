@@ -87,9 +87,18 @@ fn cleanup(tetris_sounds_resampled: &PathBuf) -> Result<(), Box<dyn std::error::
 impl TetrisClips {
     pub fn new(source: &PathBuf) -> Result<TetrisClips, Box<dyn std::error::Error>> {
         let mut clips = Vec::new();
-        for clip in source.read_dir()? {
-            let clip = clip?;
-            clips.push(AudioClip::new(&clip.path())?);
+        for path in source.read_dir()? {
+            let path = path?;
+            let clip = AudioClip::new(&path.path())?;
+
+            match path.file_name() {
+                // combotones are made of multiple clips, not just one
+                name if name == "comboTones.mp3" => {
+                    let combos = TetrisClips::split_combotones(&clip);
+                    clips.extend(combos)
+                },
+                _ => clips.push(clip),
+            }
         }
         Ok(TetrisClips { clips })
     }
