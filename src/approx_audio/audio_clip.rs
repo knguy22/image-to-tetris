@@ -329,6 +329,7 @@ mod tests {
         assert_eq!(last.num_samples, last.channels[0].len());
     }
 
+    #[test]
     fn test_zero_padding() {
         let num_samples = 1000000;
         let source = path::PathBuf::from("test_sources/a6.mp3");
@@ -337,5 +338,17 @@ mod tests {
 
         assert_eq!(output.num_samples, num_samples);
         assert!(output.channels.iter().all(|channel| channel.len() == num_samples));
+    }
+
+    #[test]
+    fn test_dot_product() {
+        // the same file should have the highest dot product with itself
+        let mut clips = Vec::new();
+        for source in path::PathBuf::from("test_sources").read_dir().unwrap() {
+            clips.push(AudioClip::new(&source.unwrap().path()).expect("failed to create audio clip"));
+        }
+
+        let self_dot_product = clips[0].dot_product(&clips[0]);
+        assert!(clips.iter().skip(1).all(|clip| clip.dot_product(&clips[0]) < self_dot_product));
     }
 }
