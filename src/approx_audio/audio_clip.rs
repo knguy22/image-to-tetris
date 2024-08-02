@@ -134,6 +134,61 @@ impl AudioClip {
         chunks
     }
 
+    pub fn dot_product(&self, other: &Self) -> f32 {
+        assert!(self.num_channels == other.num_channels);
+
+        let zero_pad_curr = self.num_samples < other.num_samples;
+        let curr = if zero_pad_curr {
+            self.zero_pad(other.num_samples).unwrap()
+        } else {
+            self.clone()
+        };
+
+        let other = if zero_pad_curr {
+            other.clone()
+        } else {
+            other.zero_pad(self.num_samples).unwrap()
+        };
+
+        let mut dot_product = 0.0;
+        for channel_idx in 0..curr.num_channels {
+            for sample_idx in 0..curr.num_samples {
+                dot_product += curr.channels[channel_idx][sample_idx] * other.channels[channel_idx][sample_idx];
+            }
+        }
+
+        dot_product
+    }
+
+    // add new channels to the audio clip
+    // uses the average of existing channels for new values
+    pub fn add_new_channels(&mut self, num_channels: usize) {
+        assert!(num_channels >= self.num_channels);
+
+        let new_channels = num_channels - self.num_channels;
+
+        // add the new channels
+        let mut channels = self.channels.clone();
+        for _ in 0..new_channels {
+            channels.push(vec![0.0; self.num_samples]);
+        }
+
+        // populate the existing channels with values
+        for sample_idx in 0..self.num_samples {
+            let mut sample_sum = 0.0;
+            for channel_idx in 0..self.num_channels {
+                sample_sum += self.channels[channel_idx][sample_idx];
+            }
+
+            for new_channel_idx in self.num_channels..num_channels {
+                channels[new_channel_idx][sample_idx] = sample_sum / (self.num_channels as f32);
+            }
+        }
+
+        self.channels = channels;
+        self.num_channels = num_channels;
+    }
+
     pub fn fft(&self) -> FFTResult {
         let mut planner = FftPlanner::<Sample>::new();
         let fft = planner.plan_fft_forward(self.num_samples);
@@ -272,5 +327,15 @@ mod tests {
         let last = clip.last().unwrap();
         assert_ne!(last.duration, duration);
         assert_eq!(last.num_samples, last.channels[0].len());
+    }
+
+    fn test_zero_padding() {
+        let num_samples = 1000000;
+        let source = path::PathBuf::from("test_sources/a6.mp3");
+        let clip = AudioClip::new(&source).expect("failed to create audio clip");
+        let output = clip.zero_pad(num_samples).expect("failed to zero pad audio clip");
+
+        assert_eq!(output.num_samples, num_samples);
+        assert!(output.channels.iter().all(|channel| channel.len() == num_samples));
     }
 }
