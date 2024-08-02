@@ -287,7 +287,7 @@ mod tests {
 
     #[test]
     fn test_init() {
-        let skin = BlockSkin::new("assets/HqGYC5G - Imgur.png", 0).expect("could not load skin");
+        let skin = BlockSkin::new("test_images/HqGYC5G - Imgur.png", 0).expect("could not load skin");
         assert_eq!(skin.width, 36);
         assert_eq!(skin.height, 36);
 
@@ -299,7 +299,7 @@ mod tests {
 
     #[test]
     fn test_resize_larger() {
-        let mut skin = BlockSkin::new("assets/HqGYC5G - Imgur.png", 0).expect("could not load skin");
+        let mut skin = BlockSkin::new("test_images/HqGYC5G - Imgur.png", 0).expect("could not load skin");
         skin.resize(64, 64);
         assert_eq!(skin.width, 64);
         assert_eq!(skin.height, 64);
@@ -312,7 +312,7 @@ mod tests {
 
     #[test]
     fn test_resize_smaller() {
-        let mut skin = BlockSkin::new("assets/HqGYC5G - Imgur.png", 0).expect("could not load skin");
+        let mut skin = BlockSkin::new("test_images/HqGYC5G - Imgur.png", 0).expect("could not load skin");
         skin.resize(16, 16);
         assert_eq!(skin.width, 16);
         assert_eq!(skin.height, 16);
