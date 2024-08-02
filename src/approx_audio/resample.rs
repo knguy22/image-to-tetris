@@ -6,9 +6,12 @@ use std::process::Command;
 
 // resamples the audio to the specified sample rate using ffmpeg
 pub fn run(source: &PathBuf, output: &PathBuf, sample_rate: f64) -> Result<(), Box<dyn std::error::Error>> {
+    // use .wav for output
+    let output = output.with_extension("wav");
+
     // replace the file
     if output.exists() {
-        fs::remove_file(output)?;
+        fs::remove_file(output.clone())?;
     }
 
     let gen_audio_command = Command::new("ffmpeg")

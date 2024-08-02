@@ -41,6 +41,7 @@ pub fn run(source: &PathBuf, output: &PathBuf) -> Result<(), Box<dyn std::error:
     // standardize tetris clips; this makes later comparisons of clips easier
     resample::run_dir(&tetris_sounds_orig, &tetris_sounds_resampled, max_sample_rate)?;
     let new_tetris_clips = TetrisClips::new(&tetris_sounds_resampled)?;
+    new_tetris_clips.dump(&PathBuf::from("results"))?;
 
     // now split the input
     let clip = InputAudioClip::new(source, max_duration)?;
@@ -93,7 +94,7 @@ impl TetrisClips {
 
             match path.file_name() {
                 // combotones are made of multiple clips, not just one
-                name if name == "comboTones.mp3" => {
+                name if name == "comboTones.mp3" || name == "comboTones.wav" => {
                     let combos = TetrisClips::split_combotones(&clip);
                     clips.extend(combos)
                 },
@@ -112,6 +113,15 @@ impl TetrisClips {
         combos.into_iter().take(NUM_COMBOS).collect()
     }
 
+    #[allow(dead_code)]
+    fn dump(&self, output_dir: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+        for clip in self.clips.iter() {
+            let clip_path = PathBuf::from(clip.file_name.clone());
+            let clip_file_name = clip_path.file_name().unwrap();
+            clip.write(&output_dir.join(&clip_file_name))?;
+        }
+        Ok(())
+    }
 }
 
 impl InputAudioClip {

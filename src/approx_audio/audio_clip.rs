@@ -96,7 +96,7 @@ impl AudioClip {
         let mut chunks = Vec::new();
         let sample_indicies = (0..self.num_samples).into_iter().collect_vec();
         let chunk_num_samples = (max_duration * self.sample_rate) as usize;
-        for chunk_indices in sample_indicies.chunks(chunk_num_samples) {
+        for (chunk_idx, chunk_indices) in sample_indicies.chunks(chunk_num_samples).enumerate() {
 
             // grab each channel one by one at the specified chunk indices
             // also keep track of metadata along the way
@@ -115,13 +115,14 @@ impl AudioClip {
 
             let num_samples = chunk_indices.len();
             let duration = num_samples as f64 / self.sample_rate;
+            let file_name = format!("{}_{}.wav", self.file_name, chunk_idx);
 
             // create the audio clip once we have all the channels
             chunks.push(
                 AudioClip {
                     channels,
                     duration,
-                    file_name: self.file_name.clone(),
+                    file_name,
                     sample_rate: self.sample_rate,
                     max_amplitude,
                     num_channels: self.num_channels,
