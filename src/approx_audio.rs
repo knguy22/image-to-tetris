@@ -1,8 +1,9 @@
 mod audio_clip;
+mod fft;
 mod tetris_clips;
 mod resample;
 
-use audio_clip::*;
+use audio_clip::AudioClip;
 use tetris_clips::TetrisClips;
 
 use std::fs;
