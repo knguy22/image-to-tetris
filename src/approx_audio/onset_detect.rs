@@ -3,10 +3,16 @@ use itertools::Itertools;
 use super::audio_clip::{AudioClip, Sample};
 use super::fft::FFTResult;
 
+pub type  Onsets = Vec<Onset>;
+pub struct Onset {
+    pub index: usize,
+    pub is_onset: bool,
+}
+
 impl AudioClip {
     // gives a vector of sample indices that are onsets
     // this currently uses spectrum onset detection
-    pub fn detect_onsets(&self) -> Vec<bool> {
+    pub fn detect_onsets(&self) -> Onsets {
         // perform short time fourier transform
         let window_size = 2048;
         let hop_size = 2048 / 4;
@@ -20,19 +26,19 @@ impl AudioClip {
 
         // perform onset detection using the derivative
         // onsets will typically have higher derivative values
+        let mut onsets = Vec::new();
+        let index_iter = (0..self.num_samples).step_by(hop_size);
         let avg_diff = diffs
             .iter()
             .sum::<f32>()
             / diffs.len() as f32;
-        let mut onsets = Vec::new();
-        for diff in diffs.iter() {
-            if *diff > avg_diff {
-                onsets.push(true);
-            }
-            else {
-                onsets.push(false);
-            }
+        for (diff, index) in diffs.iter().zip(index_iter) {
+            onsets.push(Onset {
+                index,
+                is_onset: *diff > avg_diff
+            })
         }
+
         onsets
     }
 
@@ -83,7 +89,7 @@ mod tests {
         let onsets = clip.detect_onsets();
         let onset_count = onsets
             .iter()
-            .filter(|&&b| b)
+            .filter(|&b| b.is_onset)
             .count();
 
         assert!(onset_count > 0);

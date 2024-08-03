@@ -4,7 +4,6 @@ use std::io;
 use std::path::PathBuf;
 
 use fundsp::prelude::*;
-use itertools::Itertools;
 use hound::{WavWriter, WavSpec, SampleFormat};
 
 pub type Channel = Vec<Sample>;
