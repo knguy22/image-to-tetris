@@ -1,57 +1,25 @@
 use itertools::Itertools;
 
 use super::audio_clip::{AudioClip, Sample};
+use super::fft::FFTResult;
 
 impl AudioClip {
     // gives a vector of sample indices that are onsets
     // this currently uses spectrum onset detection
     pub fn detect_onsets(&self) -> Vec<bool> {
         // perform short time fourier transform
-        let stft = self.stft(None, None);
-        
+        let window_size = 2048;
+        let hop_size = 2048 / 4;
+        let stft = self.stft(Some(window_size), Some(hop_size));
+
         // do feature processing
-        // we only want the absolute values, not complex
-        // we also take the gamma function to enhance the lower frequencies
-        let gamma: f32 = 100.0;
-        let stft = stft
-            .iter()
-            .map(|fft_result| {
-                fft_result
-                    .samples
-                    .iter()
-                    .map(|sample| (1.0 + gamma * sample.norm()).ln())
-                    .collect_vec()
-            })
-            .collect_vec();
+        let stft = self.apply_gamma_log(&stft, 100.0);
 
-        // find the diffs (f32) between each adjacent fft result
-        // also don't keep any negative values
-        // and prepend a zero vector to keep the length consistent with the stft
-        let mut diffs = stft
-            .iter()
-            .tuple_windows()
-            .map(|(a, b)| {
-                b
-                    .iter()
-                    .zip(a.iter())
-                    .map(|(b, a)| if b - a >= 0.0 { b - a } else { 0.0 })
-                    .reduce(|a, b| a + b)
-                    .unwrap()
-            })
-            .collect_vec();
-        diffs.insert(0, 0.0);
+        // take the derivative
+        let diffs = self.find_diffs(&stft);
 
-        // normalize the diffs
-        let max_diff = diffs
-            .iter()
-            .max_by(|a, b| a.partial_cmp(b).unwrap())
-            .unwrap();
-        diffs = diffs
-            .iter()
-            .map(|diff| diff / max_diff)
-            .collect_vec();
-
-        // perform onset detection
+        // perform onset detection using the derivative
+        // onsets will typically have higher derivative values
         let avg_diff = diffs
             .iter()
             .sum::<f32>()
@@ -66,6 +34,40 @@ impl AudioClip {
             }
         }
         onsets
+    }
+
+    // effects: increases prominence of higher frequencies
+    fn apply_gamma_log(&self, stft: &Vec<FFTResult>, gamma: Sample) -> Vec<Vec<Sample>> {
+        stft
+            .iter()
+            .map(|fft_result| {
+                fft_result
+                    .samples
+                    .iter()
+                    .map(|sample| (1.0 + gamma * sample.norm()).ln())
+                    .collect_vec()
+            })
+            .collect_vec()
+    }
+
+    // finds the diffs of an stft
+    // this is equivalent to finding the derivative of the stft
+    // negative derivatives are ignored since we don't care about offsets
+    fn find_diffs(&self, stft: &Vec<Vec<Sample>>) -> Vec<Sample> {
+        let mut diffs = stft
+            .iter()
+            .tuple_windows()
+            .map(|(a, b)| {
+                b
+                    .iter()
+                    .zip(a.iter())
+                    .map(|(b, a)| if b - a >= 0.0 { b - a } else { 0.0 })
+                    .reduce(|a, b| a + b)
+                    .unwrap()
+            })
+            .collect_vec();
+        diffs.insert(0, 0.0);
+        diffs
     }
 }
 
