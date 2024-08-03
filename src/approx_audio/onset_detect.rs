@@ -11,39 +11,8 @@ pub struct Onset {
 }
 
 impl AudioClip {
-    // gives a vector of sample indices that are onsets
-    // this currently uses spectrum onset detection
-    pub fn detect_onsets(&self) -> Onsets {
-        // perform short time fourier transform
-        let window_size = 2048;
-        let hop_size = 2048 / 4;
-        let stft = self.stft(Some(window_size), Some(hop_size));
-
-        // do feature processing
-        let stft = self.apply_gamma_log(&stft, 100.0);
-
-        // take the derivative
-        let diffs = self.find_diffs(&stft);
-
-        // perform onset detection using the derivative
-        // onsets will typically have higher derivative values
-        let mut onsets = Vec::new();
-        let index_iter = (0..self.num_samples).step_by(hop_size);
-        let avg_diff = diffs
-            .iter()
-            .sum::<f32>()
-            / diffs.len() as f32;
-        for (diff, index) in diffs.iter().zip(index_iter) {
-            onsets.push(Onset {
-                index,
-                is_onset: *diff > avg_diff
-            })
-        }
-
-        onsets
-    }
-
-    pub fn split_by_onsets(&self, onsets: &Onsets) -> Vec<AudioClip> {
+    pub fn split_by_onsets(&self) -> Vec<AudioClip> {
+        let onsets = self.detect_onsets();
         let mut true_onsets = onsets.iter().filter(|o| o.is_onset).collect_vec();
 
         // we need to include 0 and the end in the true onsets
@@ -71,6 +40,38 @@ impl AudioClip {
                 self.window(start, end)
             })
             .collect_vec()
+    }
+
+    // gives a vector of sample indices that are onsets
+    // this currently uses spectrum onset detection
+    fn detect_onsets(&self) -> Onsets {
+        // perform short time fourier transform
+        let window_size = 8192;
+        let hop_size = window_size / 4;
+        let stft = self.stft(window_size, hop_size);
+
+        // do feature processing
+        let stft = self.apply_gamma_log(&stft, 100.0);
+
+        // take the derivative
+        let diffs = self.find_diffs(&stft);
+
+        // perform onset detection using the derivative
+        // onsets will typically have higher derivative values
+        let mut onsets = Vec::new();
+        let index_iter = (0..self.num_samples).step_by(hop_size);
+        let avg_diff = diffs
+            .iter()
+            .sum::<f32>()
+            / diffs.len() as f32;
+        for (diff, index) in diffs.iter().zip(index_iter) {
+            onsets.push(Onset {
+                index,
+                is_onset: *diff > avg_diff
+            })
+        }
+
+        onsets
     }
 
     // effects: increases prominence of higher frequencies
@@ -132,7 +133,7 @@ mod tests {
         let clip = AudioClip::new(&path::PathBuf::from("test_audio_clips/comboTones.mp3")).unwrap();
         let onsets = clip.detect_onsets();
         let true_onsets = onsets.iter().filter(|o| o.is_onset).collect_vec();
-        let clips = clip.split_by_onsets(&onsets);
+        let clips = clip.split_by_onsets();
 
         // should be 1 more than the number of onsets because clips are split by onsets
         assert_eq!(clips.len() - 1, true_onsets.len());

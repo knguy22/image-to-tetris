@@ -40,7 +40,7 @@ impl TetrisClips {
         for clip in self.clips.iter() {
             let clip_path = PathBuf::from(clip.file_name.clone());
             let clip_file_name = clip_path.file_name().unwrap();
-            clip.write(&output_dir.join(&clip_file_name))?;
+            clip.write(Some(&output_dir.join(&clip_file_name)))?;
         }
         Ok(())
     }

@@ -16,10 +16,7 @@ impl AudioClip {
     /// performs a short time fourier transform on the audio clip
     /// window_size is the number of samples in the window; defaults to 2048
     /// hop_size is the number of samples between each window; defaults to window_size // 4
-    pub fn stft(&self, window_size: Option<usize>, hop_size: Option<usize>) -> Vec<FFTResult> {
-        let window_size = window_size.unwrap_or(2048);
-        let hop_size = hop_size.unwrap_or(window_size / 4);
-
+    pub fn stft(&self, window_size: usize, hop_size: usize) -> Vec<FFTResult> {
         let mut stft_res = Vec::new();
 
         let mut curr_index = 0;
@@ -124,7 +121,7 @@ mod tests {
         let window = 1024;
         let hop = window / 4;
         let clip = AudioClip::new_monotone(sample_rate, duration, amplitude);
-        let stft = clip.stft(Some(window), Some(hop));
+        let stft = clip.stft(window, hop);
 
         // we expect the number of ffts done to be windows + hop that can fit in the clip
         assert_eq!(stft.len(), clip.num_samples / (hop + window) + 1);
@@ -139,7 +136,7 @@ mod tests {
         let window = 2048;
         let hop = window / 4;
         let clip = AudioClip::new_monotone(sample_rate, duration, amplitude);
-        let stft = clip.stft(Some(window), Some(hop));
+        let stft = clip.stft(window, hop);
 
         // we expect the number of ffts done to be windows + hop that can fit in the clip
         assert_eq!(stft.len(), clip.num_samples / (hop + window) + 1);

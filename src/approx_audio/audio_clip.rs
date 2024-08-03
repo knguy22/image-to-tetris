@@ -73,7 +73,10 @@ impl AudioClip {
         }
     }
 
-    pub fn write(&self, path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn write(&self, path: Option<&PathBuf>) -> Result<(), Box<dyn std::error::Error>> {
+        let self_path = PathBuf::from(&self.file_name);
+        let path = path.unwrap_or(&self_path);
+
         // output file must be wav
         if path.extension().unwrap() != "wav" {
             return Err("output file must be wav".into());
@@ -267,7 +270,7 @@ mod tests {
         let output = path::PathBuf::from("test_results/test.wav");
 
         let clip = AudioClip::new(&source).expect("failed to create audio clip");
-        clip.write(&output).expect("failed to write audio clip");
+        clip.write(Some(&output)).expect("failed to write audio clip");
 
         assert!(output.exists());
 
