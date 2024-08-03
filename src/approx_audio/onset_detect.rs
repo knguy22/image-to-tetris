@@ -46,7 +46,7 @@ impl AudioClip {
     // this currently uses spectrum onset detection
     fn detect_onsets(&self) -> Onsets {
         // perform short time fourier transform
-        let window_size = 8192;
+        let window_size = 2048;
         let hop_size = window_size / 4;
         let stft = self.stft(window_size, hop_size);
 
@@ -59,7 +59,7 @@ impl AudioClip {
         // perform onset detection using the derivative
         // onsets will typically have higher derivative values
         let mut onsets = Vec::new();
-        let index_iter = (0..self.num_samples).step_by(hop_size);
+        let index_iter = (0..self.num_samples).step_by(window_size + hop_size);
         let avg_diff = diffs
             .iter()
             .sum::<f32>()
