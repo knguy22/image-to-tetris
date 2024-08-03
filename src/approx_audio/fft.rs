@@ -69,6 +69,11 @@ impl AudioClip {
 }
 
 impl FFTResult {
+    pub fn norm(&self) -> f64 {
+        let norm_sum: f64 = self.samples.iter().map(|s| f64::from(s.norm())).sum();
+        norm_sum / self.samples.len() as f64
+    }
+
     #[allow(dead_code)]
     pub fn dump(&self, output: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
         let mut wtr = csv::Writer::from_path(output)?;
@@ -143,6 +148,17 @@ mod tests {
 
         // we expect the number of ffts done to be windows + hop that can fit in the clip
         assert_eq!(stft.len(), clip.num_samples / (hop + window) + 1);
+    }
+
+    #[test]
+    fn test_fft_norm() {
+        let sample_rate = 44100.0;
+        let duration = 1.0;
+        let amplitude = 0.5;
+
+        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude);
+        let fft = clip.fft();
+        assert!(fft.norm() > 0.0);
     }
 
     #[test]
