@@ -50,9 +50,6 @@ pub fn run(source: &PathBuf, output: &PathBuf) -> Result<(), Box<dyn std::error:
 
             println!("Approximation score: {}", final_approx_score);
             final_clip.write(&output)?;
-
-            let stft = source_clip.stft(None, None);
-            println!("STFT: {}", stft.len());
         },
         Err(e) => println!("Error: {}", e),
     }
@@ -99,7 +96,8 @@ impl InputAudioClip {
     pub fn new(source: &PathBuf, max_clip_duration: f64, num_channels: usize) -> Result<InputAudioClip, Box<dyn std::error::Error>> {
         let mut clip = AudioClip::new(source)?;
         clip.add_new_channels(num_channels);
-        let chunks = clip.split_by_duration(max_clip_duration);
+        let onsets = clip.detect_onsets();
+        let chunks = clip.split_by_onsets(&onsets);
         Ok(InputAudioClip{chunks})
     }
 
