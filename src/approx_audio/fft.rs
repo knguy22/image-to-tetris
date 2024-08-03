@@ -12,6 +12,10 @@ pub struct FFTResult {
 }
 
 impl AudioClip {
+    pub fn stft(&self) -> Vec<FFTResult> {
+        todo!()
+    }
+
     pub fn fft(&self) -> FFTResult {
         let mut planner = FftPlanner::<Sample>::new();
         let fft = planner.plan_fft_forward(self.num_samples);

@@ -3,7 +3,7 @@ mod fft;
 mod tetris_clips;
 mod resample;
 
-use audio_clip::AudioClip;
+use audio_clip::{AudioClip, Sample};
 use tetris_clips::TetrisClips;
 
 use std::fs;
@@ -141,7 +141,7 @@ impl InputAudioClip {
 
     // joins all the contained chunks into a single audio clip
     pub fn to_audio_clip(&self) -> AudioClip {
-        let mut channels: Vec<Vec<f32>> = vec![Vec::new(); self.chunks[0].num_channels];
+        let mut channels: Vec<Vec<Sample>> = vec![Vec::new(); self.chunks[0].num_channels];
         for chunk in &self.chunks {
             for channel_idx in 0..chunk.num_channels {
                 channels[channel_idx].extend(&chunk.channels[channel_idx]);

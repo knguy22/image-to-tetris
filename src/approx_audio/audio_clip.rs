@@ -50,6 +50,30 @@ impl AudioClip {
         })
     }
 
+    #[allow(dead_code)]
+    pub fn new_monotone(sample_rate: f64, duration: f64, amplitude: Sample) -> Self {
+        let num_channels = 1;
+        let num_samples = (duration * sample_rate) as usize;
+        let mut channels: Vec<Channel> = Vec::new();
+        for _ in 0..num_channels {
+            let mut channel = Channel::new();
+            for sample_idx in 0..num_samples {
+                channel.push(amplitude);
+            }
+            channels.push(channel);
+        }
+
+        AudioClip {
+            channels,
+            file_name: String::new(),
+            duration,
+            sample_rate,
+            max_amplitude: amplitude,
+            num_channels,
+            num_samples,
+        }
+    }
+
     pub fn write(&self, path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
         // output file must be wav
         if path.extension().unwrap() != "wav" {
@@ -179,7 +203,7 @@ impl AudioClip {
             }
 
             for new_channel_idx in self.num_channels..num_channels {
-                channels[new_channel_idx][sample_idx] = sample_sum / (self.num_channels as f32);
+                channels[new_channel_idx][sample_idx] = sample_sum / (self.num_channels as Sample);
             }
         }
 
@@ -243,6 +267,20 @@ mod tests {
 
         assert_eq!(clip.channels.len(), clip.num_channels);
         assert_eq!(clip.channels[0].len(), clip.num_samples);
+    }
+
+    #[test]
+    fn test_monotone() {
+        let sample_rate = 44100.0;
+        let duration = 1.0;
+        let amplitude = 0.5;
+
+        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude);
+
+        assert!(clip.num_channels > 0);
+        assert_eq!(clip.num_samples, sample_rate as usize * duration as usize);
+        assert_eq!(clip.channels[0].len(), clip.num_samples);
+        assert!(clip.channels[0].iter().all(|v| *v == amplitude));
     }
 
     #[test]
