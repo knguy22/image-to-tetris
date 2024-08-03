@@ -77,6 +77,18 @@ mod tests {
         let clip = AudioClip::new(&source).expect("failed to create audio clip");
         let fft = clip.fft();
         assert_ne!(fft.samples.len(), 0);
+        assert_eq!(fft.samples.len(), clip.num_samples);
+    }
+
+    #[test]
+    fn test_fft_monotone() {
+        let sample_rate = 44100.0;
+        let duration = 1.0;
+        let amplitude = 0.5;
+
+        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude);
+        let fft = clip.fft();
+        assert_eq!(fft.samples.len(), clip.num_samples);
     }
 
     #[test]
