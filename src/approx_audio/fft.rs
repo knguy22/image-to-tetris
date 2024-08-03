@@ -70,8 +70,7 @@ impl AudioClip {
 
 impl FFTResult {
     #[allow(dead_code)]
-    pub fn dump(&self) -> Result<(), Box<dyn std::error::Error>> {
-        let output = PathBuf::from("python/fft.csv");
+    pub fn dump(&self, output: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
         let mut wtr = csv::Writer::from_path(output)?;
         wtr.write_record(&["frequency", "norm"])?;
         for (i, sample) in self.samples.iter().enumerate() {
@@ -149,8 +148,12 @@ mod tests {
     #[test]
     fn test_dump() {
         let source = path::PathBuf::from("test_audio_clips/a6.mp3");
+        let output = path::PathBuf::from("test_fft.csv");
         let clip = AudioClip::new(&source).expect("failed to create audio clip");
         let fft = clip.fft();
-        fft.dump().unwrap();
+        fft.dump(&output).unwrap();
+
+        // cleanup
+        std::fs::remove_file(&output).unwrap();
     }
 }
