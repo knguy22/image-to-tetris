@@ -10,6 +10,9 @@ pub struct Onset {
     pub is_onset: bool,
 }
 
+type StftNorms = Vec<Vec<Sample>>;
+type StftDiffs = Vec<Sample>;
+
 impl AudioClip {
     pub fn split_by_onsets(&self) -> Vec<AudioClip> {
         let onsets = self.detect_onsets();
@@ -50,11 +53,15 @@ impl AudioClip {
         let hop_size = window_size / 4;
         let stft = self.stft(window_size, hop_size);
 
+        // transform the stft from complex into norms
+        let stft = get_norms(&stft);
+
         // do feature processing
-        let stft = self.apply_gamma_log(&stft, 100.0);
+        let stft = apply_gamma_log(&stft, 100.0);
 
         // take the derivative
-        let diffs = self.find_diffs(&stft);
+        let diffs = find_diffs(&stft);
+        let diffs = normalize_diffs(&diffs);
 
         // perform onset detection using the derivative
         // onsets will typically have higher derivative values
@@ -73,40 +80,67 @@ impl AudioClip {
 
         onsets
     }
+}
 
-    // effects: increases prominence of higher frequencies
-    fn apply_gamma_log(&self, stft: &Vec<FFTResult>, gamma: Sample) -> Vec<Vec<Sample>> {
-        stft
-            .iter()
-            .map(|fft_result| {
-                fft_result
-                    .samples
-                    .iter()
-                    .map(|sample| (1.0 + gamma * sample.norm()).ln())
-                    .collect_vec()
-            })
-            .collect_vec()
-    }
+fn get_norms(stft: &Vec<FFTResult>) -> StftNorms {
+    stft
+        .iter()
+        .map(|fft_result| {
+            fft_result
+                .samples
+                .iter()
+                .map(|sample| sample.norm())
+                .collect_vec()
+        })
+        .collect_vec()
+}
 
-    // finds the diffs of an stft
-    // this is equivalent to finding the derivative of the stft
-    // negative derivatives are ignored since we don't care about offsets
-    fn find_diffs(&self, stft: &Vec<Vec<Sample>>) -> Vec<Sample> {
-        let mut diffs = stft
-            .iter()
-            .tuple_windows()
-            .map(|(a, b)| {
-                b
-                    .iter()
-                    .zip(a.iter())
-                    .map(|(b, a)| if b - a >= 0.0 { b - a } else { 0.0 })
-                    .reduce(|a, b| a + b)
-                    .unwrap()
-            })
-            .collect_vec();
-        diffs.insert(0, 0.0);
-        diffs
-    }
+// effects: increases prominence of higher frequencies
+fn apply_gamma_log(stft: &StftNorms, gamma: Sample) -> StftNorms {
+    stft
+        .iter()
+        .map(|fft_result| {
+            fft_result
+                .iter()
+                .map(|sample| (1.0 + gamma * sample).ln())
+                .collect_vec()
+        })
+        .collect_vec()
+}
+
+// finds the diffs of an stft
+// this is equivalent to finding the derivative of the stft
+// negative derivatives are ignored since we don't care about offsets
+fn find_diffs(stft: &StftNorms) -> StftDiffs {
+    let mut diffs = stft
+        .iter()
+        .tuple_windows()
+        .map(|(a, b)| {
+            b
+                .iter()
+                .zip(a.iter())
+                .map(|(b, a)| if b - a >= 0.0 { b - a } else { 0.0 })
+                .reduce(|a, b| a + b)
+                .unwrap()
+        })
+        .collect_vec();
+    diffs.insert(0, 0.0);
+    diffs
+}
+
+// reduce the scale so diffs are at most 1.0
+fn normalize_diffs(diffs: &StftDiffs) -> StftDiffs {
+    let max = diffs
+        .iter()
+        .reduce(|a, b| if a > b { a } else { b })
+        .unwrap();
+    assert!(!max.is_nan());
+    assert!(*max > 0.0);
+
+    diffs
+        .iter()
+        .map(|diff| diff / max)
+        .collect_vec()
 }
 
 
