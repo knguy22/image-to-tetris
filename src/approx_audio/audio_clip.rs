@@ -104,6 +104,27 @@ impl AudioClip {
         Ok(())
     }
 
+    // takes a window of the audio clip
+    // pads the window with 0s if the window extends out of bounds
+    pub fn window(&self, start: usize, end: usize) -> Self {
+        let mut channels = Vec::new();
+        for channel in self.channels.iter() {
+            let end_in_range = std::cmp::min(end, channel.len());
+            let mut to_push = channel[start..end_in_range].to_vec();
+            to_push.resize(end - start, 0.0);
+            channels.push(to_push);
+        }
+        Self {
+            channels,
+            file_name: String::new(),
+            duration: (end - start) as f64 / self.sample_rate,
+            sample_rate: self.sample_rate,
+            max_amplitude: self.max_amplitude,
+            num_channels: self.num_channels,
+            num_samples: (end - start) as usize,
+        }
+    }
+
     // splits the audio clip into chunks the length of max_duration; if the last chunk is shorter than 
     // max_duration, it will still be included but will be smaller than max_duration
     pub fn split_by_duration(&self, max_duration: f64) -> Vec<Self> {
@@ -319,6 +340,50 @@ mod tests {
         let last = clip.last().unwrap();
         assert_ne!(last.duration, duration);
         assert_eq!(last.num_samples, last.channels[0].len());
+    }
+
+    #[test]
+    fn test_window() {
+        let sample_rate = 44100.0;
+        let duration = 1.0;
+        let amplitude = 0.5;
+
+        let start: usize = 1000;
+        let end: usize = 8000;
+        let window_len = end - start;
+
+        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude);
+        let window_clip = clip.window(start, end);
+
+        assert!(window_clip.num_channels > 0);
+        assert_eq!(window_clip.num_samples, window_len);
+        assert_eq!(window_clip.channels[0].len(), window_len);
+        assert!(window_clip.channels[0].iter().all(|v| *v == amplitude));
+    }
+
+    #[test]
+    fn test_window_overflow() {
+        let sample_rate = 44100.0;
+        let duration = 1.0;
+        let amplitude = 0.5;
+        let num_samples = sample_rate as usize * duration as usize;
+
+        let start: usize = 44000;
+        let end: usize = 46000;
+        let window_len = end - start;
+
+        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude);
+        let window_clip = clip.window(start, end);
+
+        assert!(window_clip.num_channels > 0);
+        assert_eq!(window_clip.num_samples, window_len);
+        assert_eq!(window_clip.channels[0].len(), window_len);
+
+        // these samples should still be in range
+        assert!(window_clip.channels[0].iter().take(num_samples - start).all(|v| *v == amplitude));
+
+        // these samples should be out of range
+        assert!(window_clip.channels[0].iter().skip(num_samples - start).all(|v| *v == 0.0));
     }
 
     #[test]

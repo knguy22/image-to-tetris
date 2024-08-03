@@ -12,8 +12,33 @@ pub struct FFTResult {
 }
 
 impl AudioClip {
-    pub fn stft(&self) -> Vec<FFTResult> {
-        todo!()
+
+    /// performs a short time fourier transform on the audio clip
+    /// window_size is the number of samples in the window; defaults to 2048
+    /// hop_size is the number of samples between each window; defaults to window_size // 4
+    pub fn stft(&self, window_size: Option<usize>, hop_size: Option<usize>) -> Vec<FFTResult> {
+        let window_size = window_size.unwrap_or(2048);
+        let hop_size = hop_size.unwrap_or(window_size / 4);
+
+        let mut stft_res = Vec::new();
+
+        let mut curr_index = 0;
+        let mut in_window: bool = true;
+        while curr_index < self.num_samples {
+            if in_window {
+                let window = self.window(curr_index, curr_index + window_size);
+                stft_res.push(window.fft());
+                curr_index += window_size;
+                in_window = false;
+            }
+            // perform a hop
+            else {
+                curr_index += hop_size;
+                in_window = true;
+            }
+        }
+
+        stft_res
     }
 
     pub fn fft(&self) -> FFTResult {
@@ -89,6 +114,36 @@ mod tests {
         let clip = AudioClip::new_monotone(sample_rate, duration, amplitude);
         let fft = clip.fft();
         assert_eq!(fft.samples.len(), clip.num_samples);
+    }
+
+    #[test]
+    fn test_stft() {
+        let sample_rate = 44100.0;
+        let duration = 1.0;
+        let amplitude = 0.5;
+
+        let window = 1024;
+        let hop = window / 4;
+        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude);
+        let stft = clip.stft(Some(window), Some(hop));
+
+        // we expect the number of ffts done to be windows + hop that can fit in the clip
+        assert_eq!(stft.len(), clip.num_samples / (hop + window) + 1);
+    }
+
+    #[test]
+    fn test_stft_2() {
+        let sample_rate = 24100.0;
+        let duration = 5.6;
+        let amplitude = 0.6;
+
+        let window = 2048;
+        let hop = window / 4;
+        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude);
+        let stft = clip.stft(Some(window), Some(hop));
+
+        // we expect the number of ffts done to be windows + hop that can fit in the clip
+        assert_eq!(stft.len(), clip.num_samples / (hop + window) + 1);
     }
 
     #[test]
