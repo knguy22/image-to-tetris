@@ -114,9 +114,10 @@ impl AudioClip {
             to_push.resize(end - start, 0.0);
             channels.push(to_push);
         }
+        let file_name = format!("{}_{}_{}.wav", self.file_name, start, end);
         Self {
             channels,
-            file_name: String::new(),
+            file_name,
             duration: (end - start) as f64 / self.sample_rate,
             sample_rate: self.sample_rate,
             max_amplitude: self.max_amplitude,
@@ -130,43 +131,12 @@ impl AudioClip {
     pub fn split_by_duration(&self, max_duration: f64) -> Vec<Self> {
         // split the original video into chunks; this will be useful for approximation later
         let mut chunks = Vec::new();
-        let sample_indicies = (0..self.num_samples).into_iter().collect_vec();
         let chunk_num_samples = (max_duration * self.sample_rate) as usize;
-        for (chunk_idx, chunk_indices) in sample_indicies.chunks(chunk_num_samples).enumerate() {
-
-            // grab each channel one by one at the specified chunk indices
-            // also keep track of metadata along the way
-            let mut channels = Vec::new();
-            let mut max_amplitude = 0.0;
-            for channel_idx in 0..self.num_channels {
-                channels.push(Vec::new());
-                for sample_idx in chunk_indices {
-                    channels.last_mut().unwrap().push(self.channels[channel_idx][*sample_idx]);
-
-                    if self.channels[channel_idx][*sample_idx] > max_amplitude {
-                        max_amplitude = self.channels[channel_idx][*sample_idx];
-                    }
-                }
-            }
-
-            let num_samples = chunk_indices.len();
-            let duration = num_samples as f64 / self.sample_rate;
-            let file_name = format!("{}_{}.wav", self.file_name, chunk_idx);
-
-            // create the audio clip once we have all the channels
-            chunks.push(
-                AudioClip {
-                    channels,
-                    duration,
-                    file_name,
-                    sample_rate: self.sample_rate,
-                    max_amplitude,
-                    num_channels: self.num_channels,
-                    num_samples,
-                }
-            )
+        for begin in (0..self.num_samples).step_by(chunk_num_samples) {
+            let end = std::cmp::min(begin + chunk_num_samples, self.num_samples);
+            let chunk = self.window(begin, end);
+            chunks.push(chunk);
         }
-
         chunks
     }
 
