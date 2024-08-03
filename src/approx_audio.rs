@@ -1,5 +1,6 @@
 mod audio_clip;
 mod fft;
+mod onset_detect;
 mod tetris_clips;
 mod resample;
 
@@ -49,6 +50,9 @@ pub fn run(source: &PathBuf, output: &PathBuf) -> Result<(), Box<dyn std::error:
 
             println!("Approximation score: {}", final_approx_score);
             final_clip.write(&output)?;
+
+            let stft = source_clip.stft(None, None);
+            println!("STFT: {}", stft.len());
         },
         Err(e) => println!("Error: {}", e),
     }
