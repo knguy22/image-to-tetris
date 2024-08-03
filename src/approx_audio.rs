@@ -17,7 +17,6 @@ struct InputAudioClip {
 }
 
 struct MetaData {
-    max_duration: f64,
     max_sample_rate: f64,
     max_channels: usize,
 }
@@ -27,8 +26,8 @@ pub fn run(source: &PathBuf, output: &PathBuf) -> Result<(), Box<dyn std::error:
     let tetris_sounds_resampled = PathBuf::from("tmp_tetris_sounds_assets");
     let source_resampled = PathBuf::from("tmp_source.wav");
 
-    let MetaData{max_duration, max_sample_rate, max_channels} = init(source, &tetris_sounds_orig)?;
-    println!("Approximating audio with sample rate {} and duration {}", max_sample_rate, max_duration);
+    let MetaData{max_sample_rate, max_channels} = init(source, &tetris_sounds_orig)?;
+    println!("Approximating audio with sample rate {}", max_sample_rate);
 
     // standardize tetris clips + input clip; this makes later comparisons of clips easier
     resample::run_dir(&tetris_sounds_orig, &tetris_sounds_resampled, max_sample_rate)?;
@@ -40,7 +39,7 @@ pub fn run(source: &PathBuf, output: &PathBuf) -> Result<(), Box<dyn std::error:
     tetris_clips.dump(&PathBuf::from("results"))?;
 
     // now split the input
-    let clip = InputAudioClip::new(&source_resampled, max_duration, max_channels)?;
+    let clip = InputAudioClip::new(&source_resampled, max_channels)?;
     let approx_clip = clip.approx(&tetris_clips);
     match approx_clip {
         Ok(approx_clip) => {
@@ -65,14 +64,10 @@ fn init(source: &PathBuf, tetris_sounds: &PathBuf) -> Result<MetaData, Box<dyn s
 
     // find important metadata
     let orig_tetris_clips = TetrisClips::new(&tetris_sounds)?;
-    let mut max_duration = 0.0;
     let mut max_sample_rate = clip.sample_rate;
     let mut max_channels = clip.num_channels;
     for clip in orig_tetris_clips.clips {
         // f64 doesn't support ord, only partial-ord which is why max is not used
-        if clip.duration > max_duration {
-            max_duration = clip.duration;
-        }
         if clip.sample_rate > max_sample_rate {
             max_sample_rate = clip.sample_rate;
         }
@@ -80,7 +75,6 @@ fn init(source: &PathBuf, tetris_sounds: &PathBuf) -> Result<MetaData, Box<dyn s
     }
 
     Ok(MetaData {
-        max_duration,
         max_sample_rate,
         max_channels,
     })
@@ -93,7 +87,7 @@ fn cleanup(tetris_sounds_resampled: &PathBuf, input_resampled: &PathBuf) -> Resu
 }
 
 impl InputAudioClip {
-    pub fn new(source: &PathBuf, max_clip_duration: f64, num_channels: usize) -> Result<InputAudioClip, Box<dyn std::error::Error>> {
+    pub fn new(source: &PathBuf, num_channels: usize) -> Result<InputAudioClip, Box<dyn std::error::Error>> {
         let mut clip = AudioClip::new(source)?;
         clip.add_new_channels(num_channels);
         let onsets = clip.detect_onsets();
@@ -177,7 +171,7 @@ mod tests {
     fn test_split_input_to_audio_clip() {
         let source = path::PathBuf::from("test_audio_clips/a6.mp3");
         let clip = AudioClip::new(&source).expect("failed to create audio clip");
-        let input_clip = InputAudioClip::new(&source, 0.1, clip.num_channels).expect("failed to create audio clip").to_audio_clip();
+        let input_clip = InputAudioClip::new(&source, clip.num_channels).expect("failed to create audio clip").to_audio_clip();
 
         assert_eq!(input_clip.num_channels, clip.num_channels);
         assert_eq!(input_clip.sample_rate, clip.sample_rate);

@@ -56,7 +56,7 @@ impl AudioClip {
         let mut channels: Vec<Channel> = Vec::new();
         for _ in 0..num_channels {
             let mut channel = Channel::new();
-            for sample_idx in 0..num_samples {
+            for _ in 0..num_samples {
                 channel.push(amplitude);
             }
             channels.push(channel);
@@ -210,18 +210,6 @@ impl AudioClip {
             channel.resize(num_samples, 0.0);
         }
         clip.num_samples = num_samples;
-        Ok(clip)
-    }
-
-    pub fn append(&self, other: &Self) -> Result<Self, Box<dyn std::error::Error>> {
-        assert!(self.sample_rate == other.sample_rate);
-        assert!(self.num_channels == other.num_channels);
-
-        let mut clip = self.clone();
-        for channel_idx in 0..self.num_channels {
-            clip.channels[channel_idx].extend(&other.channels[channel_idx]);
-        }
-        clip.num_samples = self.num_samples + other.num_samples;
         Ok(clip)
     }
 }
