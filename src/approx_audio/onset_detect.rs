@@ -4,6 +4,7 @@ use super::audio_clip::{AudioClip, Sample};
 use super::fft::FFTResult;
 
 pub type  Onsets = Vec<Onset>;
+#[derive(Debug)]
 pub struct Onset {
     pub index: usize,
     pub is_onset: bool,
@@ -40,6 +41,36 @@ impl AudioClip {
         }
 
         onsets
+    }
+
+    pub fn split_by_onsets(&self, onsets: &Onsets) -> Vec<AudioClip> {
+        let mut true_onsets = onsets.iter().filter(|o| o.is_onset).collect_vec();
+
+        // we need to include 0 and the end in the true onsets
+        if true_onsets[0].index != 0 {
+            true_onsets.insert(0, &Onset {
+                index: 0,
+                is_onset: true
+            });
+        }
+
+        let end = Onset {
+            index: self.num_samples,
+            is_onset: true
+        };
+        if true_onsets[true_onsets.len() - 1].index != self.num_samples {
+            true_onsets.push(&end);
+        }
+
+        true_onsets
+            .iter()
+            .tuple_windows()
+            .map(|(a, b)| {
+                let start = a.index;
+                let end = b.index;
+                self.window(start, end)
+            })
+            .collect_vec()
     }
 
     // effects: increases prominence of higher frequencies
@@ -94,5 +125,16 @@ mod tests {
 
         assert!(onset_count > 0);
         assert!(onset_count < clip.num_samples);
+    }
+
+    #[test]
+    fn test_split_by_onsets() {
+        let clip = AudioClip::new(&path::PathBuf::from("test_audio_clips/comboTones.mp3")).unwrap();
+        let onsets = clip.detect_onsets();
+        let true_onsets = onsets.iter().filter(|o| o.is_onset).collect_vec();
+        let clips = clip.split_by_onsets(&onsets);
+
+        // should be 1 more than the number of onsets because clips are split by onsets
+        assert_eq!(clips.len() - 1, true_onsets.len());
     }
 }
