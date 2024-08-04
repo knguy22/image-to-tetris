@@ -30,6 +30,7 @@ pub fn run(source: &PathBuf, output: &PathBuf) -> Result<(), Box<dyn std::error:
     println!("Approximating audio with sample rate {}", max_sample_rate);
 
     // standardize tetris clips + input clip; this makes later comparisons of clips easier
+    println!("Resampling clips...");
     resample::run_dir(&tetris_sounds_orig, &tetris_sounds_resampled, max_sample_rate)?;
     resample::run(&source, &source_resampled, max_sample_rate)?;
     let mut tetris_clips = TetrisClips::new(&tetris_sounds_resampled)?;
@@ -39,6 +40,7 @@ pub fn run(source: &PathBuf, output: &PathBuf) -> Result<(), Box<dyn std::error:
     tetris_clips.dump(&PathBuf::from("results"))?;
 
     // now split the input
+    println!("Approximating audio...");
     let clip = InputAudioClip::new(&source_resampled, max_channels)?;
     let approx_clip = clip.approx(&tetris_clips);
     match approx_clip {
@@ -54,6 +56,7 @@ pub fn run(source: &PathBuf, output: &PathBuf) -> Result<(), Box<dyn std::error:
     }
 
     // cleanup
+    println!("Cleaning up...");
     cleanup(&tetris_sounds_resampled, &source_resampled)?;
 
     Ok(())
