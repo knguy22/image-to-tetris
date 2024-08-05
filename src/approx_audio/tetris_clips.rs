@@ -23,6 +23,15 @@ impl TetrisClips {
                 _ => clips.push(clip),
             }
         }
+
+        // songs to split by onsets
+        let songs_to_split = PathBuf::from("assets_sound_onset_split");
+        for path in songs_to_split.read_dir()? {
+            let path = path?;
+            let clip = AudioClip::new(&path.path())?.split_by_onsets();
+            clips.extend(clip);
+        }
+
         Ok(TetrisClips { clips })
     }
 

@@ -7,7 +7,7 @@
 /tmp*
 /video_sources
 /video_approx
-*.mp4
+*.mp*
 *.mov
 *.avi
 *.csv
