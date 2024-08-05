@@ -3,8 +3,9 @@ pub mod integration_test;
 mod board;
 mod piece;
 
+use crate::cli::Config;
 use board::EMPTY_CELL;
-use draw::{BlockSkin, SkinnedBoard, Skins};
+use draw::{BlockSkin, SkinnedBoard};
 use piece::{Cell, Piece, Orientation};
 
 use std::collections::BinaryHeap;
@@ -21,14 +22,6 @@ pub enum PrioritizeColor {
 enum UseGarbage {
     Yes,
     No
-}
-
-#[derive(Copy, Clone)]
-pub struct Config<'img> {
-    pub board_width: usize,
-    pub board_height: usize,
-    pub prioritize_tetrominos: PrioritizeColor,
-    pub skins: &'img Skins,
 }
 
 // the target image will be changed in order to fit the scaling of the board
