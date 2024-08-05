@@ -1,4 +1,6 @@
 use crate::approx_image;
+use crate::approx_audio;
+use crate::cli::Config;
 use crate::utils::check_command_result;
 
 use std::fs;
@@ -9,7 +11,7 @@ use ffmpeg_next::format;
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 
-pub fn run(source: &PathBuf, output: &PathBuf, config: &approx_image::Config) -> Result<(), Box<dyn std::error::Error>> {
+pub fn run(source: &PathBuf, output: &PathBuf, config: &Config) -> Result<(), Box<dyn std::error::Error>> {
     const SOURCE_IMG_DIR: &str = "video_sources";
     const APPROX_IMG_DIR: &str = "video_approx";
     const AUDIO_PATH: &str = "video_approx/audio.wav";
@@ -65,6 +67,14 @@ pub fn run(source: &PathBuf, output: &PathBuf, config: &approx_image::Config) ->
         .arg(AUDIO_PATH)
         .output()?;
     check_command_result(gen_audio_command)?;
+
+    // approximate the audio file if wanted
+    if config.approx_audio {
+        approx_audio::run(&PathBuf::from(AUDIO_PATH), &PathBuf::from(AUDIO_PATH))?;
+    } 
+    else {
+        println!("Skipping audio approximation");
+    }
 
     // approximate the source images
     let images: Vec<_> = fs::read_dir(SOURCE_IMG_DIR)?

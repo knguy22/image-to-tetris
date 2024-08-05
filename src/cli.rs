@@ -1,7 +1,19 @@
+use crate::approx_image::PrioritizeColor;
+use crate::approx_image::draw::Skins;
+
 use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 
-#[derive(Parser)]
+#[derive(Copy, Clone)]
+pub struct Config<'img> {
+    pub board_width: usize,
+    pub board_height: usize,
+    pub prioritize_tetrominos: PrioritizeColor,
+    pub approx_audio: bool,
+    pub skins: &'img Skins,
+}
+
+#[derive(Debug, Parser)]
 #[command(version, about, long_about = None)]
 pub struct Cli {
     /// number of threads to use; default is 4
@@ -12,11 +24,15 @@ pub struct Cli {
     # [arg(short, long, default_value_t = false)]
     pub prioritize_tetrominos: bool,
 
+    /// flag for whether to approximate audio or not, only used with video
+    #[arg(short, long, default_value_t = false)]
+    pub approx_audio: bool,
+
     #[command(subcommand)]
     pub command: Commands
 }
 
-#[derive(Subcommand)]
+#[derive(Debug, Subcommand)]
 pub enum Commands {
     /// runs approximation tests using images located in the `sources` directory; board_width is set to 100 if unspecified
     Integration{board_width: Option<usize>},

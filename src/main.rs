@@ -4,9 +4,10 @@ mod approx_video;
 mod cli;
 mod utils;
 
-use approx_image::{Config, PrioritizeColor};
+use approx_image::PrioritizeColor;
 use approx_image::draw::create_skins;
 use approx_image::integration_test;
+use cli::Config;
 use std::path::PathBuf;
 
 use clap::Parser;
@@ -35,6 +36,7 @@ fn main() {
                 board_width: board_width.unwrap_or(100),
                 board_height: 0, // height doesn't matter here since it will be auto-scaled
                 prioritize_tetrominos,
+                approx_audio: false,
                 skins: &skins,
             };
             integration_test::run("sources", &config).expect("failed to run integration test");
@@ -44,6 +46,7 @@ fn main() {
                 board_width,
                 board_height,
                 prioritize_tetrominos,
+                approx_audio: false,
                 skins: &skins,
             };
             run_approx_image(&source, &output, &config)
@@ -51,11 +54,12 @@ fn main() {
         cli::Commands::ApproxAudio { source, output } => {
             approx_audio::run(&source, &output).expect("failed to run approximation audio");
         }
-        cli::Commands::ApproxVideo { source, output, board_width, board_height } => {
+        cli::Commands::ApproxVideo { source, output, board_width, board_height} => {
             let config = Config {
                 board_width,
                 board_height,
                 prioritize_tetrominos,
+                approx_audio: cli.approx_audio,
                 skins: &skins,
             };
             approx_video::run(&source, &output, &config).expect("failed to run approximation video");
