@@ -1,11 +1,14 @@
 /target
 /assets
+/*assets_sound*
 /results
 /sources
 /test_results
-/tmp_video
+/tmp*
 /video_sources
 /video_approx
 *.mp4
 *.mov
 *.avi
+*.csv
+tmp*
