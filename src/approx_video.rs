@@ -11,38 +11,15 @@ use ffmpeg_next::format;
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 
-pub fn run(source: &PathBuf, output: &PathBuf, config: &Config) -> Result<(), Box<dyn std::error::Error>> {
-    const SOURCE_IMG_DIR: &str = "video_sources";
-    const APPROX_IMG_DIR: &str = "video_approx";
-    const AUDIO_PATH: &str = "video_approx/audio.wav";
+const SOURCE_IMG_DIR: &str = "video_sources";
+const APPROX_IMG_DIR: &str = "video_approx";
+const AUDIO_PATH: &str = "video_approx/audio.wav";
 
-    ffmpeg_next::init()?;
+pub fn run(source: &PathBuf, output: &PathBuf, config: &Config) -> Result<(), Box<dyn std::error::Error>> {
     let source_path = source.to_str().expect("failed to convert source path to string");
     let output_path = output.to_str().expect("failed to convert output path to string");
 
-    // check for the prerequisite directories to exist
-    if !PathBuf::from(SOURCE_IMG_DIR).exists() {
-        fs::create_dir(SOURCE_IMG_DIR)?;
-    }
-    if !PathBuf::from(APPROX_IMG_DIR).exists() {
-        fs::create_dir(APPROX_IMG_DIR)?;
-    }
-
-    // make sure the directories are empty; crash if not
-    if fs::read_dir(SOURCE_IMG_DIR)?.count() > 0 {
-        return Err("video_sources directory is not empty".into());
-    }
-    if fs::read_dir(APPROX_IMG_DIR)?.count() > 0 {
-        return Err("video_approx directory is not empty".into());
-    }
-
-    // make sure the output file is not there
-    if PathBuf::from(output_path).exists() {
-        return Err("output file already exists".into());
-    }
-
-    // load config
-    let video_config = VideoConfig::new(source)?;
+    let video_config = init(source, output)?;
     println!("Approximating video with {}x{} dimensions using {}x{} board", video_config.width, video_config.height, config.board_width, config.board_height);
     println!("Using {} fps", video_config.fps);
 
@@ -129,6 +106,34 @@ pub fn run(source: &PathBuf, output: &PathBuf, config: &Config) -> Result<(), Bo
     Ok(())
 }
 
+pub fn init(source: &PathBuf, output: &PathBuf) -> Result<VideoConfig, Box<dyn std::error::Error>> {
+    ffmpeg_next::init()?;
+
+    // check for the prerequisite directories to exist
+    if !PathBuf::from(SOURCE_IMG_DIR).exists() {
+        fs::create_dir(SOURCE_IMG_DIR)?;
+    }
+    if !PathBuf::from(APPROX_IMG_DIR).exists() {
+        fs::create_dir(APPROX_IMG_DIR)?;
+    }
+
+    // make sure the directories are empty; crash if not
+    if fs::read_dir(SOURCE_IMG_DIR)?.count() > 0 {
+        return Err("video_sources directory is not empty".into());
+    }
+    if fs::read_dir(APPROX_IMG_DIR)?.count() > 0 {
+        return Err("video_approx directory is not empty".into());
+    }
+
+    // make sure the output file is not there
+    if output.exists() {
+        return Err("output file already exists".into());
+    }
+
+    // load config
+    Ok(VideoConfig::new(source)?)
+}
+
 fn progress_bar(pb_len: usize) -> Result<ProgressBar, Box<dyn std::error::Error>> {
     let spinner_style = ProgressStyle::with_template("[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}")?
         .tick_chars("##-");
@@ -139,7 +144,7 @@ fn progress_bar(pb_len: usize) -> Result<ProgressBar, Box<dyn std::error::Error>
 
 // contains important video metadata
 #[derive(Debug, Clone, Copy)]
-struct VideoConfig {
+pub struct VideoConfig {
     width: u32,
     height: u32,
     fps: i32,

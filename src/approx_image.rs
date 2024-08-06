@@ -26,20 +26,7 @@ enum UseGarbage {
 
 // the target image will be changed in order to fit the scaling of the board
 pub fn run(target_img: &mut DynamicImage, config: &Config) -> Result<DynamicImage, Box<dyn std::error::Error>> {
-    // initialize the board
-    let mut board = SkinnedBoard::new(config.board_width, config.board_height, config.skins);
-
-    // resize the skins
-    let (pixels_width, pixels_height) = target_img.dimensions();
-    let skin_width = pixels_width / u32::try_from(board.board_width())?;
-    let skin_height = pixels_height / u32::try_from(board.board_height())?;
-    if skin_width == 0 || skin_height == 0 {
-        return Err("Skin dimensions must be greater than 0".into());
-    }
-    board.resize_skins(skin_width, skin_height);
-
-    // resize the target image to account for rounding errors
-    *target_img = resize_img_from_board(&board, target_img)?;
+    let mut board = init(target_img, config)?;
 
     // initialize average pixels for context reasons during approximation
     let avg_pixel_grid = average_pixel_grid(&target_img, board.skins_width(), board.skins_height())?;
@@ -132,6 +119,25 @@ fn process_heap(heap: &mut BinaryHeap<Cell>, board: &mut SkinnedBoard, target_im
     }
 
     Ok(())
+}
+
+pub fn init(target_img: &mut DynamicImage, config: &Config) -> Result<SkinnedBoard, Box<dyn std::error::Error>> {
+    // initialize the board
+    let mut board = SkinnedBoard::new(config.board_width, config.board_height, config.skins);
+
+    // resize the skins
+    let (pixels_width, pixels_height) = target_img.dimensions();
+    let skin_width = pixels_width / u32::try_from(board.board_width())?;
+    let skin_height = pixels_height / u32::try_from(board.board_height())?;
+    if skin_width == 0 || skin_height == 0 {
+        return Err("Skin dimensions must be greater than 0".into());
+    }
+    board.resize_skins(skin_width, skin_height);
+
+    // resize the target image to account for rounding errors
+    *target_img = resize_img_from_board(&board, target_img)?;
+
+    Ok(board)
 }
 
 fn resize_img_from_board(board: &SkinnedBoard, target_img: &DynamicImage) -> Result<DynamicImage, Box<dyn std::error::Error>> {
