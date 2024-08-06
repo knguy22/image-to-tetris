@@ -36,7 +36,7 @@ pub fn run(target_img: &mut DynamicImage, config: &Config) -> Result<DynamicImag
     if skin_width == 0 || skin_height == 0 {
         return Err("Skin dimensions must be greater than 0".into());
     }
-    board.resize_skins(skin_height, skin_width);
+    board.resize_skins(skin_width, skin_height);
 
     // resize the target image to account for rounding errors
     *target_img = resize_img_from_board(&board, target_img)?;
