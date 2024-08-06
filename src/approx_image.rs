@@ -5,7 +5,7 @@ mod piece;
 
 use crate::cli::{Config, GlobalData};
 use board::EMPTY_CELL;
-use draw::{BlockSkin, SkinnedBoard};
+use draw::{BlockSkin, SkinnedBoard, resize_skins};
 use piece::{Cell, Piece, Orientation};
 
 use std::collections::BinaryHeap;
@@ -126,13 +126,8 @@ pub fn init(target_img: &mut DynamicImage, config: &Config, glob: &GlobalData) -
     let mut board = SkinnedBoard::new(config.board_width, config.board_height, &glob.skins);
 
     // resize the skins
-    let (pixels_width, pixels_height) = target_img.dimensions();
-    let skin_width = pixels_width / u32::try_from(board.board_width())?;
-    let skin_height = pixels_height / u32::try_from(board.board_height())?;
-    if skin_width == 0 || skin_height == 0 {
-        return Err("Skin dimensions must be greater than 0".into());
-    }
-    board.resize_skins(skin_width, skin_height);
+    let (image_width, image_height) = target_img.dimensions();
+    resize_skins(&mut board.skins, image_width, image_height, config.board_width, config.board_height)?;
 
     // resize the target image to account for rounding errors
     *target_img = resize_img_from_board(&board, target_img)?;

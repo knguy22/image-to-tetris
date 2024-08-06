@@ -11,7 +11,7 @@ pub type Skins = Vec<BlockSkin>;
 pub struct SkinnedBoard {
     board: Board,
     cells_skin: Vec<usize>,
-    skins: Skins,
+    pub skins: Skins,
 }
 
 #[derive(Clone)]
@@ -76,13 +76,6 @@ impl SkinnedBoard {
         self.board.height
     }
 
-    pub fn resize_skins(&mut self, width: u32, height: u32) {
-        assert!(width != 0 && height != 0);
-        for skin in self.skins.iter_mut() {
-            skin.resize(width, height);
-        }
-    }
-
     pub fn empty_at(&self, cell: &Cell) -> bool {
         *self.board.get(cell).unwrap_or(&BLOCKED_CELL) == EMPTY_CELL
     }
@@ -104,6 +97,17 @@ impl SkinnedBoard {
     }
 }
 
+pub fn resize_skins(skins: &mut Skins, image_width: u32, image_height: u32, board_width: usize, board_height: usize) -> Result<(), Box<dyn std::error::Error>> {
+    let skin_width = image_width / u32::try_from(board_width)?;
+    let skin_height = image_height / u32::try_from(board_height)?;
+    if skin_width == 0 || skin_height == 0 {
+        return Err("Skin dimensions must be greater than 0".into());
+    }
+    for skin in skins.iter_mut() {
+        skin.resize(skin_width, skin_height);
+    }
+    Ok(())
+}
 
 impl BlockSkin {
     pub fn new(skin_path: &str, id: usize) -> Result<BlockSkin, Box<dyn std::error::Error>> {
@@ -322,17 +326,4 @@ mod tests {
             assert_eq!(i.height(), skin.height);
         }
     }
-
-    #[test]
-    fn test_skinned_board_resize() {
-        let skins = create_skins();
-        let mut board = SkinnedBoard::new(36, 36, &skins);
-        board.resize_skins(64, 64);
-
-        for skin in board.skins.iter() {
-            assert_eq!(skin.width, 64);
-            assert_eq!(skin.height, 64);
-        }
-    }
-
 }

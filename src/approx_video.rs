@@ -131,7 +131,8 @@ pub fn init(source: &PathBuf, output: &PathBuf) -> Result<VideoConfig, Box<dyn s
     }
 
     // load config
-    Ok(VideoConfig::new(source)?)
+    let config = VideoConfig::new(source)?;
+    Ok(config)
 }
 
 fn progress_bar(pb_len: usize) -> Result<ProgressBar, Box<dyn std::error::Error>> {
