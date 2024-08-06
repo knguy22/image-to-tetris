@@ -4,13 +4,16 @@ use crate::approx_image::draw::Skins;
 use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 
+pub struct GlobalData {
+    pub skins: Skins,
+}
+
 #[derive(Copy, Clone)]
-pub struct Config<'img> {
+pub struct Config {
     pub board_width: usize,
     pub board_height: usize,
     pub prioritize_tetrominos: PrioritizeColor,
     pub approx_audio: bool,
-    pub skins: &'img Skins,
 }
 
 #[derive(Debug, Parser)]

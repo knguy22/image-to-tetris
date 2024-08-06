@@ -3,7 +3,7 @@ pub mod integration_test;
 mod board;
 mod piece;
 
-use crate::cli::Config;
+use crate::cli::{Config, GlobalData};
 use board::EMPTY_CELL;
 use draw::{BlockSkin, SkinnedBoard};
 use piece::{Cell, Piece, Orientation};
@@ -25,8 +25,8 @@ enum UseGarbage {
 }
 
 // the target image will be changed in order to fit the scaling of the board
-pub fn run(target_img: &mut DynamicImage, config: &Config) -> Result<DynamicImage, Box<dyn std::error::Error>> {
-    let mut board = init(target_img, config)?;
+pub fn run(target_img: &mut DynamicImage, config: &Config, glob: &GlobalData) -> Result<DynamicImage, Box<dyn std::error::Error>> {
+    let mut board = init(target_img, config, glob)?;
 
     // initialize average pixels for context reasons during approximation
     let avg_pixel_grid = average_pixel_grid(&target_img, board.skins_width(), board.skins_height())?;
@@ -121,9 +121,9 @@ fn process_heap(heap: &mut BinaryHeap<Cell>, board: &mut SkinnedBoard, target_im
     Ok(())
 }
 
-pub fn init(target_img: &mut DynamicImage, config: &Config) -> Result<SkinnedBoard, Box<dyn std::error::Error>> {
+pub fn init(target_img: &mut DynamicImage, config: &Config, glob: &GlobalData) -> Result<SkinnedBoard, Box<dyn std::error::Error>> {
     // initialize the board
-    let mut board = SkinnedBoard::new(config.board_width, config.board_height, config.skins);
+    let mut board = SkinnedBoard::new(config.board_width, config.board_height, &glob.skins);
 
     // resize the skins
     let (pixels_width, pixels_height) = target_img.dimensions();

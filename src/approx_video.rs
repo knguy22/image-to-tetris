@@ -1,6 +1,6 @@
 use crate::approx_image;
 use crate::approx_audio;
-use crate::cli::Config;
+use crate::cli::{Config, GlobalData};
 use crate::utils::check_command_result;
 
 use std::fs;
@@ -15,7 +15,7 @@ const SOURCE_IMG_DIR: &str = "video_sources";
 const APPROX_IMG_DIR: &str = "video_approx";
 const AUDIO_PATH: &str = "video_approx/audio.wav";
 
-pub fn run(source: &PathBuf, output: &PathBuf, config: &Config) -> Result<(), Box<dyn std::error::Error>> {
+pub fn run(source: &PathBuf, output: &PathBuf, config: &Config, glob: &GlobalData) -> Result<(), Box<dyn std::error::Error>> {
     let source_path = source.to_str().expect("failed to convert source path to string");
     let output_path = output.to_str().expect("failed to convert output path to string");
 
@@ -67,7 +67,7 @@ pub fn run(source: &PathBuf, output: &PathBuf, config: &Config) -> Result<(), Bo
             let approx_path = format!("{}/{}", APPROX_IMG_DIR, source_path_without_dir.to_str().expect("failed to convert source image path to string"));
 
             let mut source_img = image::open(source_path).expect("failed to load source image");
-            let approx_img = approx_image::run(&mut source_img, &config).expect("failed to approximate image");
+            let approx_img = approx_image::run(&mut source_img, config, glob).expect("failed to approximate image");
             approx_img.save(approx_path).expect("failed to save approx image");
 
             // make sure the progress bar is updated

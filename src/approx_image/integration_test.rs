@@ -1,4 +1,4 @@
-use super::Config;
+use super::{Config, GlobalData};
 
 use std::fs;
 use std::path::PathBuf;
@@ -9,7 +9,7 @@ use dssim::Dssim;
 use rayon::prelude::*;
 
 // tests all image in the directory
-pub fn run(dir: &str, config: &Config) -> Result<(), Box<dyn std::error::Error>> {
+pub fn run(dir: &str, config: &Config, glob: &GlobalData) -> Result<(), Box<dyn std::error::Error>> {
     println!("Running integration test on {}", dir);
 
     let start = time::Instant::now();
@@ -24,7 +24,7 @@ pub fn run(dir: &str, config: &Config) -> Result<(), Box<dyn std::error::Error>>
         .par_iter()
         .map(|image| {
             let path = image.path();
-            score_image(path, config).expect("failed to score image")
+            score_image(path, config, glob).expect("failed to score image")
         })
         .sum();
 
@@ -39,7 +39,7 @@ pub fn run(dir: &str, config: &Config) -> Result<(), Box<dyn std::error::Error>>
     Ok(())
 }
 
-fn score_image(path: PathBuf, old_config: &Config) -> Result<f64, Box<dyn std::error::Error>> {
+fn score_image(path: PathBuf, old_config: &Config, glob: &GlobalData) -> Result<f64, Box<dyn std::error::Error>> {
     let mut total_diff = 0.0;
     let mut target_img = image::open(path.clone())?;
     
@@ -51,7 +51,7 @@ fn score_image(path: PathBuf, old_config: &Config) -> Result<f64, Box<dyn std::e
         ..*old_config
     };
 
-    let approx_img = super::run(&mut target_img, &config)?;
+    let approx_img = super::run(&mut target_img, &config, glob)?;
 
     // handle scoring
     let dssim_diff = diff_images_dssim(&approx_img, &target_img)?;
