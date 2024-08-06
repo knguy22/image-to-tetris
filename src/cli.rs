@@ -4,6 +4,7 @@ use crate::approx_image::draw::Skins;
 use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 
+#[derive(Clone)]
 pub struct GlobalData {
     pub skins: Skins,
 }

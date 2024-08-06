@@ -8,10 +8,10 @@ const INVALID_SKIN_ID: usize = usize::MAX;
 
 pub type Skins = Vec<BlockSkin>;
 
-pub struct SkinnedBoard {
+pub struct SkinnedBoard<'a> {
     board: Board,
     cells_skin: Vec<usize>,
-    pub skins: Skins,
+    skins: &'a Skins,
 }
 
 #[derive(Clone)]
@@ -38,13 +38,13 @@ pub struct BlockImage {
     avg_pixel: Rgba<u8>,
 }
 
-impl SkinnedBoard {
-    pub fn new(width: usize, height: usize, skins: &Skins) -> SkinnedBoard {
+impl<'a> SkinnedBoard<'a> {
+    pub fn new(width: usize, height: usize, skins: &'a Skins) -> SkinnedBoard {
         // cells skin must have the same dimensions as board
         SkinnedBoard {
             board: Board::new(width, height),
             cells_skin: vec![INVALID_SKIN_ID; width * height],
-            skins: skins.clone()
+            skins
         }
     }
 
@@ -247,7 +247,7 @@ impl BlockImage {
 
 pub fn draw_board(skin_board: &SkinnedBoard) -> DynamicImage {
     let board = &skin_board.board;
-    let skins = &skin_board.skins;
+    let skins = skin_board.skins;
     let cells_skin = &skin_board.cells_skin;
 
     let mut img = image::RgbaImage::new(board.width as u32 * skins[0].width, board.height as u32 * skins[0].height);
@@ -325,5 +325,31 @@ mod tests {
             assert_eq!(i.width(), skin.width);
             assert_eq!(i.height(), skin.height);
         }
+    }
+
+    #[test]
+    fn test_save_skinned_board() {
+        let mut skin = BlockSkin::new("test_images/HqGYC5G - Imgur.png", 0).expect("could not load skin");
+        skin.resize(16, 16);
+        let skins = vec![skin];
+
+        // board should have all cells be set to INVALID by default
+        let board_width = 4;
+        let board_height = 4;
+        let mut board = SkinnedBoard::new(4, 4, &skins);
+        for cell in board.cells_skin.iter() {
+            assert_eq!(*cell, INVALID_SKIN_ID);
+        }
+
+        // replace the invalid
+        for y in 0..board_height {
+            for x in 0..board_width {
+                board.place(&Piece::Black(Cell { x, y }), 0).expect("failed to place piece");
+            }
+        }
+
+        let image = draw_board(&board);
+
+        image.save("test_results/test_save_skinned_board.png").expect("failed to save image");
     }
 }

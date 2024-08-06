@@ -1,9 +1,10 @@
-use super::{Config, GlobalData};
+use super::{Config, GlobalData, draw::resize_skins};
 
 use std::fs;
 use std::path::PathBuf;
 use std::time;
 
+use image::GenericImageView;
 use imageproc::image::DynamicImage;
 use dssim::Dssim;
 use rayon::prelude::*;
@@ -23,8 +24,7 @@ pub fn run(dir: &str, config: &Config, glob: &GlobalData) -> Result<(), Box<dyn 
     let total_diff: f64 = images
         .par_iter()
         .map(|image| {
-            let path = image.path();
-            score_image(path, config, glob).expect("failed to score image")
+            score_image(image.path(), config, glob).expect("failed to score image")
         })
         .sum();
 
@@ -51,9 +51,14 @@ fn score_image(path: PathBuf, old_config: &Config, glob: &GlobalData) -> Result<
         ..*old_config
     };
 
-    let approx_img = super::run(&mut target_img, &config, glob)?;
+    // create a new glob for the local approximation since each image can contain different sizes
+    // this means the block skin sizes should be tailored to the image
+    let mut local_glob = glob.clone();
+    let (image_width, image_height) = target_img.dimensions();
+    resize_skins(&mut local_glob.skins, image_width, image_height, config.board_width, config.board_height)?;
 
     // handle scoring
+    let approx_img = super::run(&mut target_img, &config, &local_glob)?;
     let dssim_diff = diff_images_dssim(&approx_img, &target_img)?;
     total_diff += dssim_diff;
     println!("Diff: {}, Source: {}", dssim_diff, path.display());

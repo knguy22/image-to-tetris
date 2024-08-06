@@ -5,7 +5,7 @@ mod piece;
 
 use crate::cli::{Config, GlobalData};
 use board::EMPTY_CELL;
-use draw::{BlockSkin, SkinnedBoard, resize_skins};
+use draw::{BlockSkin, SkinnedBoard};
 use piece::{Cell, Piece, Orientation};
 
 use std::collections::BinaryHeap;
@@ -27,6 +27,8 @@ enum UseGarbage {
 // the target image will be changed in order to fit the scaling of the board
 pub fn run(target_img: &mut DynamicImage, config: &Config, glob: &GlobalData) -> Result<DynamicImage, Box<dyn std::error::Error>> {
     let mut board = init(target_img, config, glob)?;
+    assert_eq!(board.board_width() as u32 * board.skins_width(), target_img.width());
+    assert_eq!(board.board_height() as u32 * board.skins_height(), target_img.height());
 
     // initialize average pixels for context reasons during approximation
     let avg_pixel_grid = average_pixel_grid(&target_img, board.skins_width(), board.skins_height())?;
@@ -121,13 +123,9 @@ fn process_heap(heap: &mut BinaryHeap<Cell>, board: &mut SkinnedBoard, target_im
     Ok(())
 }
 
-pub fn init(target_img: &mut DynamicImage, config: &Config, glob: &GlobalData) -> Result<SkinnedBoard, Box<dyn std::error::Error>> {
+pub fn init<'a>(target_img: &mut DynamicImage, config: &Config, glob: &'a GlobalData) -> Result<SkinnedBoard<'a>, Box<dyn std::error::Error>> {
     // initialize the board
-    let mut board = SkinnedBoard::new(config.board_width, config.board_height, &glob.skins);
-
-    // resize the skins
-    let (image_width, image_height) = target_img.dimensions();
-    resize_skins(&mut board.skins, image_width, image_height, config.board_width, config.board_height)?;
+    let board = SkinnedBoard::new(config.board_width, config.board_height, &glob.skins);
 
     // resize the target image to account for rounding errors
     *target_img = resize_img_from_board(&board, target_img)?;
@@ -328,12 +326,12 @@ fn subtract_pixels(a: &Rgba<u8>, b: &Rgba<u8>) -> [i32; 3] {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs, path};
+    use std::{fs, path::PathBuf};
 
-    use draw::SkinnedBoard;
-    use piece;
+    use crate::cli::Config;
+    use crate::approx_image::draw::{self, resize_skins, SkinnedBoard};
+    use crate::approx_image::piece;
     use rayon::iter::{IntoParallelIterator, ParallelIterator};
-
     use super::*;
 
     #[test]
@@ -344,7 +342,7 @@ mod tests {
         let height = 20;
         let skin_id = 0;
         let test_dir = "test_results";
-        if !path::Path::new(&test_dir).exists() {
+        if !PathBuf::from(&test_dir).exists() {
             fs::create_dir(test_dir).expect("failed to create test directory");
         }
 
@@ -375,5 +373,29 @@ mod tests {
                 let img = draw::draw_board(&board);
                 img.save(format!("{}/{:?} {:?}.png", test_dir, piece, piece.get_orientation())).expect("failed to save image");
             });
+    }
+
+    #[test]
+    fn test_run() {
+        let target = PathBuf::from("test_images/blank.jpeg");
+        let output = PathBuf::from("test_results/blank.png");
+
+        let mut target_img = image::open(target).expect("could not load source image");
+        let (image_width, image_height) = target_img.dimensions();
+        let board_width = 19;
+        let board_height = 17;
+
+        let mut glob = GlobalData {skins: draw::create_skins()};
+        resize_skins(&mut glob.skins, image_width, image_height, board_width, board_height).unwrap();
+
+        let config = Config {
+            board_width: board_width,
+            board_height: board_height,
+            prioritize_tetrominos: PrioritizeColor::Yes,
+            approx_audio: false,
+        };
+
+        let approx_image = run(&mut target_img, &config, &glob).unwrap();
+        approx_image.save(output).expect("could not save output image");
     }
 }

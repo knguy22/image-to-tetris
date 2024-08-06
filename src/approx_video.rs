@@ -15,11 +15,10 @@ const SOURCE_IMG_DIR: &str = "video_sources";
 const APPROX_IMG_DIR: &str = "video_approx";
 const AUDIO_PATH: &str = "video_approx/audio.wav";
 
-pub fn run(source: &PathBuf, output: &PathBuf, config: &Config, glob: &GlobalData) -> Result<(), Box<dyn std::error::Error>> {
+pub fn run(source: &PathBuf, output: &PathBuf, config: &Config, glob: &GlobalData, video_config: &VideoConfig) -> Result<(), Box<dyn std::error::Error>> {
     let source_path = source.to_str().expect("failed to convert source path to string");
     let output_path = output.to_str().expect("failed to convert output path to string");
 
-    let video_config = init(source, output, config)?;
     println!("Approximating video with {}x{} dimensions using {}x{} board", video_config.width, video_config.height, config.board_width, config.board_height);
     println!("Using {} fps", video_config.fps);
 
