@@ -19,7 +19,7 @@ pub fn run(source: &PathBuf, output: &PathBuf, config: &Config, glob: &GlobalDat
     let source_path = source.to_str().expect("failed to convert source path to string");
     let output_path = output.to_str().expect("failed to convert output path to string");
 
-    let video_config = init(source, output)?;
+    let video_config = init(source, output, config)?;
     println!("Approximating video with {}x{} dimensions using {}x{} board", video_config.width, video_config.height, config.board_width, config.board_height);
     println!("Using {} fps", video_config.fps);
 
@@ -46,7 +46,7 @@ pub fn run(source: &PathBuf, output: &PathBuf, config: &Config, glob: &GlobalDat
     check_command_result(gen_audio_command)?;
 
     // approximate the audio file if wanted
-    if config.approx_audio {
+    if video_config.approx_audio {
         approx_audio::run(&PathBuf::from(AUDIO_PATH), &PathBuf::from(AUDIO_PATH))?;
     } 
     else {
@@ -106,7 +106,7 @@ pub fn run(source: &PathBuf, output: &PathBuf, config: &Config, glob: &GlobalDat
     Ok(())
 }
 
-pub fn init(source: &PathBuf, output: &PathBuf) -> Result<VideoConfig, Box<dyn std::error::Error>> {
+pub fn init(source: &PathBuf, output: &PathBuf, config: &Config) -> Result<VideoConfig, Box<dyn std::error::Error>> {
     ffmpeg_next::init()?;
 
     // check for the prerequisite directories to exist
@@ -131,7 +131,7 @@ pub fn init(source: &PathBuf, output: &PathBuf) -> Result<VideoConfig, Box<dyn s
     }
 
     // load config
-    let config = VideoConfig::new(source)?;
+    let config = VideoConfig::new(source, config)?;
     Ok(config)
 }
 
@@ -149,11 +149,12 @@ pub struct VideoConfig {
     width: u32,
     height: u32,
     fps: i32,
+    approx_audio: bool,
 }
 
 impl VideoConfig {
     // loads video metadata
-    fn new(path: &PathBuf) -> Result<VideoConfig, Box<dyn std::error::Error>> {
+    fn new(path: &PathBuf, config: &Config) -> Result<VideoConfig, Box<dyn std::error::Error>> {
         let source = format::input(path)?;
         let input = source.streams().best(ffmpeg_next::media::Type::Video).ok_or("failed to find video stream")?;
         let fps = input.avg_frame_rate();
@@ -163,6 +164,7 @@ impl VideoConfig {
             width: decoder.width(),
             height: decoder.height(),
             fps: fps.numerator() / fps.denominator(),
+            approx_audio: config.approx_audio,
         })
     }
 }
