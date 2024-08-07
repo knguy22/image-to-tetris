@@ -41,10 +41,10 @@ pub fn run(dir: &str, config: &Config, glob: &GlobalData) -> Result<(), Box<dyn 
 
 fn score_image(path: PathBuf, old_config: &Config, glob: &GlobalData) -> Result<f64, Box<dyn std::error::Error>> {
     let mut total_diff = 0.0;
-    let mut target_img = image::open(path.clone())?;
+    let mut source_img = image::open(path.clone())?;
     
     // set the board height to scale to the image
-    let board_height = target_img.width() * (old_config.board_width as u32) / target_img.height();
+    let board_height = source_img.width() * (old_config.board_width as u32) / source_img.height();
     let config = Config {
         board_width: old_config.board_width as usize,
         board_height: board_height as usize,
@@ -54,12 +54,12 @@ fn score_image(path: PathBuf, old_config: &Config, glob: &GlobalData) -> Result<
     // create a new glob for the local approximation since each image can contain different sizes
     // this means the block skin sizes should be tailored to the image
     let mut local_glob = glob.clone();
-    let (image_width, image_height) = target_img.dimensions();
+    let (image_width, image_height) = source_img.dimensions();
     resize_skins(&mut local_glob.skins, image_width, image_height, config.board_width, config.board_height)?;
 
     // handle scoring
-    let approx_img = super::approx(&mut target_img, &config, &local_glob)?;
-    let dssim_diff = diff_images_dssim(&approx_img, &target_img)?;
+    let approx_img = super::approx(&mut source_img, &config, &local_glob)?;
+    let dssim_diff = diff_images_dssim(&approx_img, &source_img)?;
     total_diff += dssim_diff;
     println!("Diff: {}, Source: {}", dssim_diff, path.display());
 
