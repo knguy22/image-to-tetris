@@ -67,7 +67,7 @@ pub fn run(source: &PathBuf, output: &PathBuf, config: &Config, glob: &GlobalDat
             let approx_path = format!("{}/{}", APPROX_IMG_DIR, source_path_without_dir.to_str().expect("failed to convert source image path to string"));
 
             let mut source_img = image::open(source_path).expect("failed to load source image");
-            let approx_img = approx_image::run(&mut source_img, config, glob).expect("failed to approximate image");
+            let approx_img = approx_image::approx(&mut source_img, config, glob).expect("failed to approximate image");
             approx_img.save(approx_path).expect("failed to save approx image");
 
             // make sure the progress bar is updated

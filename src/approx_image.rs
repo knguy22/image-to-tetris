@@ -5,10 +5,11 @@ mod piece;
 
 use crate::cli::{Config, GlobalData};
 use board::EMPTY_CELL;
-use draw::{BlockSkin, SkinnedBoard};
+use draw::{BlockSkin, SkinnedBoard, resize_skins};
 use piece::{Cell, Piece, Orientation};
 
 use std::collections::BinaryHeap;
+use std::path::PathBuf;
 
 use image::Rgba;
 use imageproc::image::{DynamicImage, GenericImageView};
@@ -24,8 +25,26 @@ enum UseGarbage {
     No
 }
 
+pub fn run(source: &PathBuf, output: &PathBuf, config: &Config, glob: &mut GlobalData) {
+    println!("Approximating an image: {}", source.display());
+
+    let mut source_img = image::open(source).expect("could not load source image");
+    println!("Loaded {}x{} image", source_img.width(), source_img.height());
+
+    // resize the skins globally if appropriate
+    let (image_width, image_height) = source_img.dimensions();
+    resize_skins(&mut glob.skins, image_width, image_height, config.board_width, config.board_height).unwrap();
+    println!("Resized skins to {}x{}", glob.skin_width(), glob.skin_height());
+
+    // resize the source image if needed
+    resize_image(&mut source_img, glob.skin_width(), glob.skin_height(), config.board_width, config.board_height);
+
+    let result_img = approx(&source_img, config, glob).expect("could not approximate image");
+    result_img.save(output).expect("could not save output image");
+}
+
 // the target image will be changed in order to fit the scaling of the board
-pub fn run(target_img: &DynamicImage, config: &Config, glob: &GlobalData) -> Result<DynamicImage, Box<dyn std::error::Error>> {
+pub fn approx(target_img: &DynamicImage, config: &Config, glob: &GlobalData) -> Result<DynamicImage, Box<dyn std::error::Error>> {
     // initialize the board
     let mut board = SkinnedBoard::new(config.board_width, config.board_height, &glob.skins);
 
@@ -327,7 +346,7 @@ mod tests {
     use std::{fs, path::PathBuf};
 
     use crate::cli::Config;
-    use crate::approx_image::draw::{self, resize_skins, SkinnedBoard};
+    use crate::approx_image::draw::{self, SkinnedBoard};
     use crate::approx_image::piece;
     use rayon::iter::{IntoParallelIterator, ParallelIterator};
     use super::*;
@@ -377,23 +396,15 @@ mod tests {
         let target = PathBuf::from("test_images/blank.jpeg");
         let output = PathBuf::from("test_results/blank.png");
 
-        let mut target_img = image::open(target).expect("could not load source image");
-        let (image_width, image_height) = target_img.dimensions();
         let board_width = 19;
         let board_height = 17;
-
-        let mut glob = GlobalData {skins: draw::create_skins()};
-        resize_skins(&mut glob.skins, image_width, image_height, board_width, board_height).unwrap();
-        resize_image(&mut target_img, glob.skin_width(), glob.skin_height(), board_width, board_height);
-
+        let mut glob = GlobalData::new();
         let config = Config {
             board_width: board_width,
             board_height: board_height,
             prioritize_tetrominos: PrioritizeColor::Yes,
             approx_audio: false,
         };
-
-        let approx_image = run(&mut target_img, &config, &glob).unwrap();
-        approx_image.save(output).expect("could not save output image");
+        run(&target, &output, &config, &mut glob);
     }
 }

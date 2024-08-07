@@ -5,14 +5,10 @@ mod cli;
 mod utils;
 
 use approx_image::PrioritizeColor;
-use approx_image::draw::resize_skins;
-use approx_image::{integration_test, resize_image};
+use approx_image::integration_test;
 use cli::{Config, GlobalData};
-use image::GenericImageView;
-use std::path::PathBuf;
 
 use clap::Parser;
-use imageproc::image;
 use rayon;
 
 fn main() {
@@ -48,7 +44,7 @@ fn main() {
                 prioritize_tetrominos,
                 approx_audio: false,
             };
-            run_approx_image(&source, &output, &config, &mut glob);
+            approx_image::run(&source, &output, &config, &mut glob);
         }
         cli::Commands::ApproxAudio { source, output } => {
             approx_audio::run(&source, &output).expect("failed to run approximation audio");
@@ -64,22 +60,4 @@ fn main() {
             approx_video::run(&source, &output, &config, &glob, &video_config).expect("failed to run approximation video");
         }
     }
-}
-
-fn run_approx_image(source: &PathBuf, output: &PathBuf, config: &Config, glob: &mut GlobalData) {
-    println!("Approximating an image: {}", source.display());
-
-    let mut source_img = image::open(source).expect("could not load source image");
-    println!("Loaded {}x{} image", source_img.width(), source_img.height());
-
-    // resize the skins globally if appropriate
-    let (image_width, image_height) = source_img.dimensions();
-    resize_skins(&mut glob.skins, image_width, image_height, config.board_width, config.board_height).unwrap();
-    println!("Resized skins to {}x{}", glob.skin_width(), glob.skin_height());
-
-    // resize the source image if needed
-    resize_image(&mut source_img, glob.skin_width(), glob.skin_height(), config.board_width, config.board_height);
-
-    let result_img = approx_image::run(&source_img, config, glob).expect("could not approximate image");
-    result_img.save(output).expect("could not save output image");
 }

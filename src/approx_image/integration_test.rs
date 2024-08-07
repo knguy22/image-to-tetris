@@ -58,7 +58,7 @@ fn score_image(path: PathBuf, old_config: &Config, glob: &GlobalData) -> Result<
     resize_skins(&mut local_glob.skins, image_width, image_height, config.board_width, config.board_height)?;
 
     // handle scoring
-    let approx_img = super::run(&mut target_img, &config, &local_glob)?;
+    let approx_img = super::approx(&mut target_img, &config, &local_glob)?;
     let dssim_diff = diff_images_dssim(&approx_img, &target_img)?;
     total_diff += dssim_diff;
     println!("Diff: {}, Source: {}", dssim_diff, path.display());
