@@ -62,6 +62,7 @@ fn main() {
                 approx_audio: cli.approx_audio,
             };
             let video_config = approx_video::init(&source, &output, &config).unwrap();
+            resize_skins(&mut glob.skins, video_config.image_width, video_config.image_height, board_width, board_height).unwrap();
             approx_video::run(&source, &output, &config, &glob, &video_config).expect("failed to run approximation video");
         }
     }

@@ -19,7 +19,7 @@ pub fn run(source: &PathBuf, output: &PathBuf, config: &Config, glob: &GlobalDat
     let source_path = source.to_str().expect("failed to convert source path to string");
     let output_path = output.to_str().expect("failed to convert output path to string");
 
-    println!("Approximating video with {}x{} dimensions using {}x{} board", video_config.width, video_config.height, config.board_width, config.board_height);
+    println!("Approximating video with {}x{} dimensions using {}x{} board", video_config.image_width, video_config.image_height, config.board_width, config.board_height);
     println!("Using {} fps", video_config.fps);
 
     // use ffmpeg to generate a directory full of images
@@ -88,7 +88,7 @@ pub fn run(source: &PathBuf, output: &PathBuf, config: &Config, glob: &GlobalDat
         .arg("-crf")
         .arg("10")
         .arg("-vf")
-        .arg(format!("scale={}:{}", video_config.width, video_config.height))
+        .arg(format!("scale={}:{}", video_config.image_width, video_config.image_height))
         .arg("-c:a")
         .arg("aac")
         .arg("-shortest")
@@ -145,8 +145,8 @@ fn progress_bar(pb_len: usize) -> Result<ProgressBar, Box<dyn std::error::Error>
 // contains important video metadata
 #[derive(Debug, Clone, Copy)]
 pub struct VideoConfig {
-    width: u32,
-    height: u32,
+    pub image_width: u32,
+    pub image_height: u32,
     fps: i32,
     approx_audio: bool,
 }
@@ -160,8 +160,8 @@ impl VideoConfig {
         let decoder = input.codec().decoder().video()?;
 
         Ok(VideoConfig {
-            width: decoder.width(),
-            height: decoder.height(),
+            image_width: decoder.width(),
+            image_height: decoder.height(),
             fps: fps.numerator() / fps.denominator(),
             approx_audio: config.approx_audio,
         })
