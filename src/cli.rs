@@ -1,5 +1,5 @@
 use crate::approx_image::PrioritizeColor;
-use crate::approx_image::draw::Skins;
+use crate::approx_image::draw::{Skins, create_skins};
 
 use std::path::PathBuf;
 use clap::{Parser, Subcommand};
@@ -49,4 +49,19 @@ pub enum Commands {
 
     /// approximates a single video using tetris blocks
     ApproxVideo{source: PathBuf, output: PathBuf, board_width: usize, board_height: usize},
+}
+
+impl GlobalData {
+    pub fn new() -> GlobalData {
+        GlobalData {
+            skins: create_skins(),
+        }
+    }
+
+    pub fn skin_width(&self) -> u32 {
+        self.skins[0].width()
+    }
+    pub fn skin_height(&self) -> u32 {
+        self.skins[0].height()
+    }
 }

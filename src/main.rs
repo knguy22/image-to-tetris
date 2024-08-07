@@ -5,9 +5,8 @@ mod cli;
 mod utils;
 
 use approx_image::PrioritizeColor;
-use approx_image::draw::create_skins;
-use approx_image::integration_test;
 use approx_image::draw::resize_skins;
+use approx_image::{integration_test, resize_image};
 use cli::{Config, GlobalData};
 use image::GenericImageView;
 use std::path::PathBuf;
@@ -30,7 +29,7 @@ fn main() {
     println!("Prioritizing tetrominos: {}", cli.prioritize_tetrominos);
 
     // a global skins will be copied by each thread to prevent needing IO to recreate skins for each thread
-    let mut glob = GlobalData { skins: create_skins() };
+    let mut glob = GlobalData::new();
 
     match cli.command {
         cli::Commands::Integration {board_width} => {
@@ -61,8 +60,7 @@ fn main() {
                 prioritize_tetrominos,
                 approx_audio: cli.approx_audio,
             };
-            let video_config = approx_video::init(&source, &output, &config).unwrap();
-            resize_skins(&mut glob.skins, video_config.image_width, video_config.image_height, board_width, board_height).unwrap();
+            let video_config = approx_video::init(&source, &output, &config, &mut glob).unwrap();
             approx_video::run(&source, &output, &config, &glob, &video_config).expect("failed to run approximation video");
         }
     }
@@ -77,8 +75,11 @@ fn run_approx_image(source: &PathBuf, output: &PathBuf, config: &Config, glob: &
     // resize the skins globally if appropriate
     let (image_width, image_height) = source_img.dimensions();
     resize_skins(&mut glob.skins, image_width, image_height, config.board_width, config.board_height).unwrap();
-    println!("Resized skins to {}x{}", glob.skins[0].width(), glob.skins[0].height());
+    println!("Resized skins to {}x{}", glob.skin_width(), glob.skin_height());
 
-    let result_img = approx_image::run(&mut source_img, config, glob).expect("could not approximate image");
+    // resize the source image if needed
+    resize_image(&mut source_img, glob.skin_width(), glob.skin_height(), config.board_width, config.board_height);
+
+    let result_img = approx_image::run(&source_img, config, glob).expect("could not approximate image");
     result_img.save(output).expect("could not save output image");
 }

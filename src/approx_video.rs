@@ -23,12 +23,13 @@ pub fn run(source: &PathBuf, output: &PathBuf, config: &Config, glob: &GlobalDat
     println!("Using {} fps", video_config.fps);
 
     // use ffmpeg to generate a directory full of images
+    // make sure those images correspond to the board dimenisions and blockskin dimensions
     println!("Generating source images from {}...", source_path);
     let gen_image_command = Command::new("ffmpeg")
         .arg("-i")
         .arg(source_path)
         .arg("-vf")
-        .arg(format!("fps={}", video_config.fps))
+        .arg(format!("fps={},scale={}x{}", video_config.fps, video_config.image_width, video_config.image_height))
         .arg("-start_number")
         .arg("0")
         .arg(format!("{}/%d.png", SOURCE_IMG_DIR))
@@ -96,16 +97,14 @@ pub fn run(source: &PathBuf, output: &PathBuf, config: &Config, glob: &GlobalDat
         .output()?;
     check_command_result(combine_command)?;
 
-    // clean up the directories
-    fs::remove_dir_all(SOURCE_IMG_DIR)?;
-    fs::remove_dir_all(APPROX_IMG_DIR)?;
+    cleanup()?;
 
     println!("Done!");
 
     Ok(())
 }
 
-pub fn init(source: &PathBuf, output: &PathBuf, config: &Config) -> Result<VideoConfig, Box<dyn std::error::Error>> {
+pub fn init(source: &PathBuf, output: &PathBuf, config: &Config, glob: &mut GlobalData) -> Result<VideoConfig, Box<dyn std::error::Error>> {
     ffmpeg_next::init()?;
 
     // check for the prerequisite directories to exist
@@ -130,8 +129,20 @@ pub fn init(source: &PathBuf, output: &PathBuf, config: &Config) -> Result<Video
     }
 
     // load config
-    let config = VideoConfig::new(source, config)?;
-    Ok(config)
+    let mut video_config = VideoConfig::new(source, config)?;
+
+    // modify the config based on resized skins
+    approx_image::draw::resize_skins(&mut glob.skins, video_config.image_width, video_config.image_height, config.board_width, config.board_height).unwrap();
+    video_config.image_width = glob.skin_width() * config.board_width as u32;
+    video_config.image_height = glob.skin_height() * config.board_height as u32;
+
+    Ok(video_config)
+}
+
+fn cleanup() -> Result<(), Box<dyn std::error::Error>> {
+    fs::remove_dir_all(SOURCE_IMG_DIR)?;
+    fs::remove_dir_all(APPROX_IMG_DIR)?;
+    Ok(())
 }
 
 fn progress_bar(pb_len: usize) -> Result<ProgressBar, Box<dyn std::error::Error>> {
@@ -165,5 +176,33 @@ impl VideoConfig {
             fps: fps.numerator() / fps.denominator(),
             approx_audio: config.approx_audio,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+    use super::*;
+    use approx_image::PrioritizeColor;
+
+    #[test]
+    #[ignore]
+    fn test_run() {
+        let source = PathBuf::from("test_videos/blank_video.mkv");
+        let output = PathBuf::from("test_results/blank_video.mp4");
+
+        let config = Config {
+            board_width: 63,
+            board_height: 35,
+            prioritize_tetrominos: PrioritizeColor::No,
+            approx_audio: false,
+        };
+
+        let mut glob = GlobalData::new();
+        let video_config = init(&source, &output, &config, &mut glob).unwrap();
+        run(&source, &output, &config, &glob, &video_config).expect("failed to run video approximator");
+
+        // remove output
+        fs::remove_file(&output).unwrap();
     }
 }

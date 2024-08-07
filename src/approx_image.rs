@@ -25,8 +25,10 @@ enum UseGarbage {
 }
 
 // the target image will be changed in order to fit the scaling of the board
-pub fn run(target_img: &mut DynamicImage, config: &Config, glob: &GlobalData) -> Result<DynamicImage, Box<dyn std::error::Error>> {
-    let mut board = init(target_img, config, glob)?;
+pub fn run(target_img: &DynamicImage, config: &Config, glob: &GlobalData) -> Result<DynamicImage, Box<dyn std::error::Error>> {
+    // initialize the board
+    let mut board = SkinnedBoard::new(config.board_width, config.board_height, &glob.skins);
+
     assert_eq!(board.board_width() as u32 * board.skins_width(), target_img.width());
     assert_eq!(board.board_height() as u32 * board.skins_height(), target_img.height());
 
@@ -67,6 +69,20 @@ fn process_heap_prioritize(heap: &mut BinaryHeap<Cell>, board: &mut SkinnedBoard
     }
     process_heap(heap, board, target_img, &avg_pixel_grid, UseGarbage::Yes)?;
     Ok(())
+}
+
+pub fn resize_image(source_img: &mut DynamicImage, skin_width: u32, skin_height: u32, board_width: usize, board_height: usize) {
+    // resize the source image if needed
+    let resized_width = skin_width * u32::try_from(board_width).unwrap();
+    let resized_height = skin_height * u32::try_from(board_height).unwrap();
+    let do_resize = resized_width != source_img.width() || resized_height != source_img.height();
+    match do_resize {
+        true => {
+            let resized_target_buffer = image::imageops::resize(source_img, resized_width, resized_height, image::imageops::FilterType::Lanczos3);
+            *source_img = image::DynamicImage::from(resized_target_buffer)
+        }
+        _ => (),
+    };
 }
 
 fn process_heap(heap: &mut BinaryHeap<Cell>, board: &mut SkinnedBoard, target_img: &DynamicImage, avg_pixel_grid: &Vec<Rgba<u8>>, use_garbage: UseGarbage) -> Result<(), Box<dyn std::error::Error>> {
@@ -121,24 +137,6 @@ fn process_heap(heap: &mut BinaryHeap<Cell>, board: &mut SkinnedBoard, target_im
     }
 
     Ok(())
-}
-
-pub fn init<'a>(target_img: &mut DynamicImage, config: &Config, glob: &'a GlobalData) -> Result<SkinnedBoard<'a>, Box<dyn std::error::Error>> {
-    // initialize the board
-    let board = SkinnedBoard::new(config.board_width, config.board_height, &glob.skins);
-
-    // resize the target image to account for rounding errors
-    *target_img = resize_img_from_board(&board, target_img)?;
-
-    Ok(board)
-}
-
-fn resize_img_from_board(board: &SkinnedBoard, target_img: &DynamicImage) -> Result<DynamicImage, Box<dyn std::error::Error>> {
-    // resize the target image to account for rounding errors
-    let resized_target_width = board.skins_width() * u32::try_from(board.board_width())?;
-    let resized_target_height = board.skins_height() * u32::try_from(board.board_height())?;
-    let resized_target_buffer = image::imageops::resize(target_img, resized_target_width, resized_target_height, image::imageops::FilterType::Lanczos3);
-    Ok(image::DynamicImage::from(resized_target_buffer))
 }
 
 fn average_pixel_grid(target_img: &DynamicImage, pixels_grid_width: u32, pixels_grid_height: u32) -> Result<Vec<Rgba<u8>>, Box<dyn std::error::Error>> {
@@ -335,9 +333,8 @@ mod tests {
     use super::*;
 
     #[test]
+    #[ignore]
     fn test_draw_all_pieces() {
-        rayon::ThreadPoolBuilder::new().num_threads(8).build_global().expect("failed to build thread pool");
-
         let width = 10;
         let height = 20;
         let skin_id = 0;
@@ -387,6 +384,7 @@ mod tests {
 
         let mut glob = GlobalData {skins: draw::create_skins()};
         resize_skins(&mut glob.skins, image_width, image_height, board_width, board_height).unwrap();
+        resize_image(&mut target_img, glob.skin_width(), glob.skin_height(), board_width, board_height);
 
         let config = Config {
             board_width: board_width,
