@@ -137,8 +137,8 @@ impl BlockSkin {
             s_img: new_images[5].clone(),
             z_img: new_images[2].clone(),
             width: section_width,
-            height: height,
-            id: id,
+            height,
+            id,
         })
     }
 
@@ -203,7 +203,7 @@ impl BlockSkin {
 
 impl BlockImage {
     pub fn new(img: DynamicImage) -> Result<BlockImage, Box<dyn std::error::Error>> {
-        let num_pixels: u32 = (img.width() * img.height()) as u32;
+        let num_pixels: u32 = img.width() * img.height();
         let avg_pixel: Rgba<u8> = img
             .pixels()
             // use u32 for summation instead of u8 to prevent overflow

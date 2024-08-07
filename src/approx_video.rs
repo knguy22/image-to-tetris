@@ -4,7 +4,7 @@ use crate::cli::{Config, GlobalData};
 use crate::utils::check_command_result;
 
 use std::fs;
-use std::path::PathBuf;
+use std::path::Path;
 use std::process::Command;
 
 use ffmpeg_next::format;
@@ -15,7 +15,7 @@ const SOURCE_IMG_DIR: &str = "video_sources";
 const APPROX_IMG_DIR: &str = "video_approx";
 const AUDIO_PATH: &str = "video_approx/audio.wav";
 
-pub fn run(source: &PathBuf, output: &PathBuf, config: &Config, glob: &GlobalData, video_config: &VideoConfig) -> Result<(), Box<dyn std::error::Error>> {
+pub fn run(source: &Path, output: &Path, config: &Config, glob: &GlobalData, video_config: &VideoConfig) -> Result<(), Box<dyn std::error::Error>> {
     let source_path = source.to_str().expect("failed to convert source path to string");
     let output_path = output.to_str().expect("failed to convert output path to string");
 
@@ -47,7 +47,7 @@ pub fn run(source: &PathBuf, output: &PathBuf, config: &Config, glob: &GlobalDat
 
     // approximate the audio file if wanted
     if video_config.approx_audio {
-        approx_audio::run(&PathBuf::from(AUDIO_PATH), &PathBuf::from(AUDIO_PATH))?;
+        approx_audio::run(Path::new(AUDIO_PATH), Path::new(AUDIO_PATH))?;
     } 
     else {
         println!("Skipping audio approximation");
@@ -55,7 +55,6 @@ pub fn run(source: &PathBuf, output: &PathBuf, config: &Config, glob: &GlobalDat
 
     // approximate the source images
     let images: Vec<_> = fs::read_dir(SOURCE_IMG_DIR)?
-        .into_iter()
         .collect();
     let pb = progress_bar(images.len())?;
     pb.set_message("Approximating source images...");
@@ -66,8 +65,8 @@ pub fn run(source: &PathBuf, output: &PathBuf, config: &Config, glob: &GlobalDat
             let source_path_without_dir = source_path.file_name().expect("failed to get source image path without directory");
             let approx_path = format!("{}/{}", APPROX_IMG_DIR, source_path_without_dir.to_str().expect("failed to convert source image path to string"));
 
-            let mut source_img = image::open(source_path).expect("failed to load source image");
-            let approx_img = approx_image::approx(&mut source_img, config, glob).expect("failed to approximate image");
+            let source_img = image::open(source_path).expect("failed to load source image");
+            let approx_img = approx_image::approx(&source_img, config, glob).expect("failed to approximate image");
             approx_img.save(approx_path).expect("failed to save approx image");
 
             // make sure the progress bar is updated
@@ -104,14 +103,14 @@ pub fn run(source: &PathBuf, output: &PathBuf, config: &Config, glob: &GlobalDat
     Ok(())
 }
 
-pub fn init(source: &PathBuf, output: &PathBuf, config: &Config, glob: &mut GlobalData) -> Result<VideoConfig, Box<dyn std::error::Error>> {
+pub fn init(source: &Path, output: &Path, config: &Config, glob: &mut GlobalData) -> Result<VideoConfig, Box<dyn std::error::Error>> {
     ffmpeg_next::init()?;
 
     // check for the prerequisite directories to exist
-    if !PathBuf::from(SOURCE_IMG_DIR).exists() {
+    if !Path::new(SOURCE_IMG_DIR).exists() {
         fs::create_dir(SOURCE_IMG_DIR)?;
     }
-    if !PathBuf::from(APPROX_IMG_DIR).exists() {
+    if !Path::new(APPROX_IMG_DIR).exists() {
         fs::create_dir(APPROX_IMG_DIR)?;
     }
 
@@ -164,7 +163,7 @@ pub struct VideoConfig {
 
 impl VideoConfig {
     // loads video metadata
-    fn new(path: &PathBuf, config: &Config) -> Result<VideoConfig, Box<dyn std::error::Error>> {
+    fn new(path: &Path, config: &Config) -> Result<VideoConfig, Box<dyn std::error::Error>> {
         let source = format::input(path)?;
         let input = source.streams().best(ffmpeg_next::media::Type::Video).ok_or("failed to find video stream")?;
         let fps = input.avg_frame_rate();
@@ -181,15 +180,14 @@ impl VideoConfig {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
     use super::*;
     use approx_image::PrioritizeColor;
 
     #[test]
     #[ignore]
     fn test_run() {
-        let source = PathBuf::from("test_videos/blank_video.mkv");
-        let output = PathBuf::from("test_results/blank_video.mp4");
+        let source = Path::new("test_videos/blank_video.mkv");
+        let output = Path::new("test_results/blank_video.mp4");
 
         let config = Config {
             board_width: 63,

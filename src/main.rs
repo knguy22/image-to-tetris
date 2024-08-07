@@ -9,7 +9,6 @@ use approx_image::integration_test;
 use cli::{Config, GlobalData};
 
 use clap::Parser;
-use rayon;
 
 fn main() {
     let cli = cli::Cli::parse();

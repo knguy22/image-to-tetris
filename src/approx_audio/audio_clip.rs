@@ -1,7 +1,7 @@
 use std::fmt;
 use std::fs;
 use std::io;
-use std::path::PathBuf;
+use std::path::Path;
 
 use fundsp::prelude::*;
 use hound::{WavWriter, WavSpec, SampleFormat};
@@ -21,7 +21,7 @@ pub struct AudioClip {
 }
 
 impl AudioClip {
-    pub fn new(source: &PathBuf) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(source: &Path) -> Result<Self, Box<dyn std::error::Error>> {
         let wave = Wave::load(source)?;
         let sample_rate = wave.sample_rate();
         let duration = wave.duration();
@@ -73,9 +73,8 @@ impl AudioClip {
         }
     }
 
-    pub fn write(&self, path: Option<&PathBuf>) -> Result<(), Box<dyn std::error::Error>> {
-        let self_path = PathBuf::from(&self.file_name);
-        let path = path.unwrap_or(&self_path);
+    pub fn write(&self, path: Option<&Path>) -> Result<(), Box<dyn std::error::Error>> {
+        let path = path.unwrap();
 
         // output file must be wav
         if path.extension().unwrap() != "wav" {
@@ -124,7 +123,7 @@ impl AudioClip {
             sample_rate: self.sample_rate,
             max_amplitude: self.max_amplitude,
             num_channels: self.num_channels,
-            num_samples: (end - start) as usize,
+            num_samples: end - start,
         }
     }
 
@@ -195,8 +194,8 @@ impl AudioClip {
                 sample_sum += self.channels[channel_idx][sample_idx];
             }
 
-            for new_channel_idx in self.num_channels..num_channels {
-                channels[new_channel_idx][sample_idx] = sample_sum / (self.num_channels as Sample);
+            for new_channel in self.channels.iter_mut().take(num_channels).skip(self.num_channels) {
+                new_channel[sample_idx] = sample_sum / (self.num_channels as Sample);
             }
         }
 
@@ -239,7 +238,7 @@ mod tests {
 
     #[test]
     fn test_create_audio_clip() {
-        let source = path::PathBuf::from("test_audio_clips/a6.mp3");
+        let source = path::Path::new("test_audio_clips/a6.mp3");
         let clip = AudioClip::new(&source).expect("failed to create audio clip");
 
         assert_ne!(clip.num_channels, 0);
@@ -266,8 +265,8 @@ mod tests {
 
     #[test]
     fn test_write_audio_clip() {
-        let source = path::PathBuf::from("test_audio_clips/a6.mp3");
-        let output = path::PathBuf::from("test_results/test.wav");
+        let source = path::Path::new("test_audio_clips/a6.mp3");
+        let output = path::Path::new("test_results/test.wav");
 
         let clip = AudioClip::new(&source).expect("failed to create audio clip");
         clip.write(Some(&output)).expect("failed to write audio clip");
@@ -281,7 +280,7 @@ mod tests {
     #[test]
     fn test_split_clip() {
         let duration = 0.2;
-        let source = path::PathBuf::from("test_audio_clips/a6.mp3");
+        let source = path::Path::new("test_audio_clips/a6.mp3");
         let clip = AudioClip::new(&source).expect("failed to create audio clip").split_by_duration(duration);
 
         assert_eq!(clip.len(), 15);
@@ -349,7 +348,7 @@ mod tests {
     #[test]
     fn test_zero_padding() {
         let num_samples = 1000000;
-        let source = path::PathBuf::from("test_audio_clips/a6.mp3");
+        let source = path::Path::new("test_audio_clips/a6.mp3");
         let clip = AudioClip::new(&source).expect("failed to create audio clip");
         let output = clip.zero_pad(num_samples).expect("failed to zero pad audio clip");
 
@@ -361,9 +360,9 @@ mod tests {
     fn test_dot_product() {
         // first resample the audio clips to 44100 Hz
         let sample_rate = 44100.0;
-        let source_dir = path::PathBuf::from("test_audio_clips");
-        let resample_source_dir = path::PathBuf::from("test_resampled_audio_clips");
-        resample::run_dir(&source_dir, &resample_source_dir, sample_rate).expect("failed to resample audio clips");
+        let source_dir = path::Path::new("test_audio_clips");
+        let resample_source_dir = path::Path::new("test_resampled_audio_clips");
+        resample::run_dir(source_dir, resample_source_dir, sample_rate).expect("failed to resample audio clips");
 
         // the same file should have the highest dot product with itself
         let mut clips = Vec::new();

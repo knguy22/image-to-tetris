@@ -82,7 +82,7 @@ impl AudioClip {
     }
 }
 
-fn get_norms(stft: &Vec<FFTResult>) -> StftNorms {
+fn get_norms(stft: &[FFTResult]) -> StftNorms {
     stft
         .iter()
         .map(|fft_result| {
@@ -151,7 +151,7 @@ mod tests {
 
     #[test]
     fn test_onsets() {
-        let clip = AudioClip::new(&path::PathBuf::from("test_audio_clips/comboTones.mp3")).unwrap();
+        let clip = AudioClip::new(&path::Path::new("test_audio_clips/comboTones.mp3")).unwrap();
         let onsets = clip.detect_onsets();
         let onset_count = onsets
             .iter()
@@ -164,7 +164,7 @@ mod tests {
 
     #[test]
     fn test_split_by_onsets() {
-        let clip = AudioClip::new(&path::PathBuf::from("test_audio_clips/comboTones.mp3")).unwrap();
+        let clip = AudioClip::new(&path::Path::new("test_audio_clips/comboTones.mp3")).unwrap();
         let onsets = clip.detect_onsets();
         let true_onsets = onsets.iter().filter(|o| o.is_onset).collect_vec();
         let clips = clip.split_by_onsets();

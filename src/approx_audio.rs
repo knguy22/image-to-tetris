@@ -8,7 +8,7 @@ use audio_clip::{AudioClip, Sample};
 use tetris_clips::TetrisClips;
 
 use std::fs;
-use std::path::PathBuf;
+use std::path::Path;
 use std::cmp;
 
 #[derive(Clone, Debug)]
@@ -21,52 +21,52 @@ struct MetaData {
     max_channels: usize,
 }
 
-pub fn run(source: &PathBuf, output: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
-    let tetris_sounds_orig = PathBuf::from("assets_sound");
-    let tetris_sounds_resampled = PathBuf::from("tmp_tetris_sounds_assets");
-    let source_resampled = PathBuf::from("tmp_source.wav");
+pub fn run(source: &Path, output: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let tetris_sounds_orig = Path::new("assets_sound");
+    let tetris_sounds_resampled = Path::new("tmp_tetris_sounds_assets");
+    let source_resampled = Path::new("tmp_source.wav");
 
-    let MetaData{max_sample_rate, max_channels} = init(source, &tetris_sounds_orig)?;
+    let MetaData{max_sample_rate, max_channels} = init(source, tetris_sounds_orig)?;
     println!("Approximating audio with sample rate {}", max_sample_rate);
 
     // standardize tetris clips + input clip; this makes later comparisons of clips easier
     println!("Resampling clips...");
-    resample::run_dir(&tetris_sounds_orig, &tetris_sounds_resampled, max_sample_rate)?;
-    resample::run(&source, &source_resampled, max_sample_rate)?;
-    let mut tetris_clips = TetrisClips::new(&tetris_sounds_resampled)?;
+    resample::run_dir(tetris_sounds_orig, tetris_sounds_resampled, max_sample_rate)?;
+    resample::run(source, source_resampled, max_sample_rate)?;
+    let mut tetris_clips = TetrisClips::new(tetris_sounds_resampled)?;
     for clip in &mut tetris_clips.clips {
         clip.add_new_channels(max_channels);
     }
-    tetris_clips.dump(&PathBuf::from("results"))?;
+    tetris_clips.dump(Path::new("results"))?;
 
     // now split the input
     println!("Approximating audio...");
-    let clip = InputAudioClip::new(&source_resampled, max_channels)?;
+    let clip = InputAudioClip::new(source_resampled, max_channels)?;
     let approx_clip = clip.approx(&tetris_clips);
     match approx_clip {
         Ok(approx_clip) => {
-            let source_clip = AudioClip::new(&source_resampled)?;
+            let source_clip = AudioClip::new(source_resampled)?;
             let final_clip = approx_clip.to_audio_clip();
             let final_approx_score = final_clip.dot_product(&source_clip);
 
             println!("Approximation score: {}", final_approx_score);
-            final_clip.write(Some(&output))?;
+            final_clip.write(Some(output))?;
         },
         Err(e) => println!("Error: {}", e),
     }
 
     // cleanup
     println!("Cleaning up...");
-    cleanup(&tetris_sounds_resampled, &source_resampled)?;
+    cleanup(tetris_sounds_resampled, source_resampled)?;
 
     Ok(())
 }
 
-fn init(source: &PathBuf, tetris_sounds: &PathBuf) -> Result<MetaData, Box<dyn std::error::Error>> {
+fn init(source: &Path, tetris_sounds: &Path) -> Result<MetaData, Box<dyn std::error::Error>> {
     let clip = AudioClip::new(source)?;
 
     // find important metadata
-    let orig_tetris_clips = TetrisClips::new(&tetris_sounds)?;
+    let orig_tetris_clips = TetrisClips::new(tetris_sounds)?;
     let mut max_sample_rate = clip.sample_rate;
     let mut max_channels = clip.num_channels;
     for clip in orig_tetris_clips.clips {
@@ -83,14 +83,14 @@ fn init(source: &PathBuf, tetris_sounds: &PathBuf) -> Result<MetaData, Box<dyn s
     })
 }
 
-fn cleanup(tetris_sounds_resampled: &PathBuf, input_resampled: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+fn cleanup(tetris_sounds_resampled: &Path, input_resampled: &Path) -> Result<(), Box<dyn std::error::Error>> {
     fs::remove_dir_all(tetris_sounds_resampled)?;
     fs::remove_file(input_resampled)?;
     Ok(())
 }
 
 impl InputAudioClip {
-    pub fn new(source: &PathBuf, num_channels: usize) -> Result<InputAudioClip, Box<dyn std::error::Error>> {
+    pub fn new(source: &Path, num_channels: usize) -> Result<InputAudioClip, Box<dyn std::error::Error>> {
         let mut clip = AudioClip::new(source)?;
         clip.add_new_channels(num_channels);
         let chunks = clip.split_by_onsets();
@@ -141,8 +141,8 @@ impl InputAudioClip {
     pub fn to_audio_clip(&self) -> AudioClip {
         let mut channels: Vec<Vec<Sample>> = vec![Vec::new(); self.chunks[0].num_channels];
         for chunk in &self.chunks {
-            for channel_idx in 0..chunk.num_channels {
-                channels[channel_idx].extend(&chunk.channels[channel_idx]);
+            for (channel_idx, channel) in channels.iter_mut().enumerate().take(chunk.num_channels) {
+                channel.extend(&chunk.channels[channel_idx]);
             }
         }
 
@@ -171,7 +171,7 @@ mod tests {
 
     #[test]
     fn test_split_input_to_audio_clip() {
-        let source = path::PathBuf::from("test_audio_clips/a6.mp3");
+        let source = path::Path::new("test_audio_clips/a6.mp3");
         let clip = AudioClip::new(&source).expect("failed to create audio clip");
         let input_clip = InputAudioClip::new(&source, clip.num_channels).expect("failed to create audio clip").to_audio_clip();
 
