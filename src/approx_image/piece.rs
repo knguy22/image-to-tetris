@@ -12,12 +12,12 @@ pub struct Cell {
     pub y: usize
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Orientation {
-    NORTH,
-    EAST,
-    SOUTH,
-    WEST
+    North,
+    East,
+    South,
+    West
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -86,21 +86,21 @@ const Z_SHAPE: [[Dir; 4]; 4] = [
 
 impl Orientation {
     pub fn all() -> [Orientation; 4] {
-        [Orientation::NORTH, Orientation::EAST, Orientation::SOUTH, Orientation::WEST]
+        [Orientation::North, Orientation::East, Orientation::South, Orientation::West]
     }
 }
 
 impl Piece {
     pub fn all_normal(cell: Cell, orientation: Orientation) -> Vec<Piece> {
-        let mut pieces = Vec::new();
-        pieces.push(Piece::I(cell.clone(), orientation.clone()));
-        pieces.push(Piece::O(cell.clone(), orientation.clone()));
-        pieces.push(Piece::T(cell.clone(), orientation.clone()));
-        pieces.push(Piece::L(cell.clone(), orientation.clone()));
-        pieces.push(Piece::J(cell.clone(), orientation.clone()));
-        pieces.push(Piece::S(cell.clone(), orientation.clone()));
-        pieces.push(Piece::Z(cell, orientation));
-        pieces
+        vec![
+            Piece::I(cell, orientation),
+            Piece::O(cell, orientation),
+            Piece::T(cell, orientation),
+            Piece::L(cell, orientation),
+            Piece::J(cell, orientation),
+            Piece::S(cell, orientation),
+            Piece::Z(cell, orientation),
+        ]
     }
 
     pub fn all_garbage(cell: Cell) -> Vec<Piece> {
@@ -123,28 +123,28 @@ impl Piece {
 
     pub fn get_orientation(&self) -> Orientation {
         match self {
-            Piece::I(_, o) => o.clone(),
-            Piece::O(_, o) => o.clone(),
-            Piece::T(_, o) => o.clone(),
-            Piece::L(_, o) => o.clone(),
-            Piece::J(_, o) => o.clone(),
-            Piece::S(_, o) => o.clone(),
-            Piece::Z(_, o) => o.clone(),
+            Piece::I(_, o) => *o,
+            Piece::O(_, o) => *o,
+            Piece::T(_, o) => *o,
+            Piece::L(_, o) => *o,
+            Piece::J(_, o) => *o,
+            Piece::S(_, o) => *o,
+            Piece::Z(_, o) => *o,
             _ => panic!("Garbage or black piece has no orientation")
         }
     }
 
     pub fn get_cell(&self) -> Cell {
         match self {
-            Piece::I(c, _) => c.clone(),
-            Piece::O(c, _) => c.clone(),
-            Piece::T(c, _) => c.clone(),
-            Piece::L(c, _) => c.clone(),
-            Piece::J(c, _) => c.clone(),
-            Piece::S(c, _) => c.clone(),
-            Piece::Z(c, _) => c.clone(),
-            Piece::Gray(c) => c.clone(),
-            Piece::Black(c) => c.clone()
+            Piece::I(c, _) => *c,
+            Piece::O(c, _) => *c,
+            Piece::T(c, _) => *c,
+            Piece::L(c, _) => *c,
+            Piece::J(c, _) => *c,
+            Piece::S(c, _) => *c,
+            Piece::Z(c, _) => *c,
+            Piece::Gray(c) => *c,
+            Piece::Black(c) => *c
         }
     }
 
@@ -163,16 +163,16 @@ impl Piece {
 
         let orien = self.get_orientation();
         let dirs = match orien {
-            Orientation::NORTH => shape[0].clone(),
-            Orientation::EAST => shape[1].clone(),
-            Orientation::SOUTH => shape[2].clone(),
-            Orientation::WEST => shape[3].clone()
+            Orientation::North => shape[0].clone(),
+            Orientation::East => shape[1].clone(),
+            Orientation::South => shape[2].clone(),
+            Orientation::West => shape[3].clone()
         };
 
         let mut occupancy = Vec::new();
-        for i in 0..4 {
-            let x = self.get_cell().x as i32 + dirs[i].x;
-            let y = self.get_cell().y as i32 + dirs[i].y;
+        for dir in dirs {
+            let x = self.get_cell().x as i32 + dir.x;
+            let y = self.get_cell().y as i32 + dir.y;
             if x < 0 || y < 0 {
                 return Err(format!("Cell ({}, {}) contains negative values", x, y).into());
             }
@@ -190,19 +190,19 @@ mod tests {
 
     #[test]
     fn test_get_orientation() {
-        let piece = Piece::I(Cell { x: 0, y: 0 }, Orientation::NORTH);
-        assert_eq!(piece.get_orientation(), Orientation::NORTH);
+        let piece = Piece::I(Cell { x: 0, y: 0 }, Orientation::North);
+        assert_eq!(piece.get_orientation(), Orientation::North);
     }
 
     #[test]
     fn test_get_cell() {
-        let piece = Piece::I(Cell { x: 1, y: 1 }, Orientation::NORTH);
+        let piece = Piece::I(Cell { x: 1, y: 1 }, Orientation::North);
         assert_eq!(piece.get_cell(), Cell { x: 1, y: 1 });
     }
 
     #[test]
     fn test_get_occupancy() {
-        let piece = Piece::I(Cell { x: 2, y: 2 }, Orientation::NORTH);
+        let piece = Piece::I(Cell { x: 2, y: 2 }, Orientation::North);
         assert!(piece.get_occupancy().is_ok());
     }
 

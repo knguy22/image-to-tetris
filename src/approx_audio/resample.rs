@@ -1,14 +1,14 @@
 use crate::utils::check_command_result;
 
 use std::fs;
-use std::path::PathBuf;
+use std::path::Path;
 use std::process::Command;
 
 // resamples the audio to the specified sample rate using ffmpeg
-pub fn run(source: &PathBuf, output: &PathBuf, sample_rate: f64) -> Result<(), Box<dyn std::error::Error>> {
+pub fn run(source: &Path, output: &Path, sample_rate: f64) -> Result<(), Box<dyn std::error::Error>> {
     // replace the file
     if output.exists() {
-        fs::remove_file(output.clone())?;
+        fs::remove_file(output)?;
     }
 
     let gen_audio_command = Command::new("ffmpeg")
@@ -24,7 +24,7 @@ pub fn run(source: &PathBuf, output: &PathBuf, sample_rate: f64) -> Result<(), B
 
 // the same as run but for an entire directory
 // note: all output files will have their extension changed to .wav
-pub fn run_dir(source: &PathBuf, output: &PathBuf, sample_rate: f64) -> Result<(), Box<dyn std::error::Error>> {
+pub fn run_dir(source: &Path, output: &Path, sample_rate: f64) -> Result<(), Box<dyn std::error::Error>> {
     // makes sure the output directory exists
     if !output.exists() {
         fs::create_dir_all(output)?;

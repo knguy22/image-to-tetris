@@ -46,7 +46,7 @@ fn score_image(path: PathBuf, old_config: &Config, glob: &GlobalData) -> Result<
     // set the board height to scale to the image
     let board_height = source_img.width() * (old_config.board_width as u32) / source_img.height();
     let config = Config {
-        board_width: old_config.board_width as usize,
+        board_width: old_config.board_width,
         board_height: board_height as usize,
         ..*old_config
     };
@@ -61,7 +61,7 @@ fn score_image(path: PathBuf, old_config: &Config, glob: &GlobalData) -> Result<
     resize_image(&mut source_img, glob.skin_width(), glob.skin_height(), config.board_width, config.board_height);
 
     // handle scoring
-    let approx_img = super::approx(&mut source_img, &config, &glob)?;
+    let approx_img = super::approx(&source_img, &config, &glob)?;
     let dssim_diff = diff_images_dssim(&approx_img, &source_img)?;
     total_diff += dssim_diff;
     println!("Diff: {}, Source: {}", dssim_diff, path.display());

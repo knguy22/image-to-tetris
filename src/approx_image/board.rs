@@ -17,8 +17,8 @@ impl Board {
         Board {
             cells: vec![EMPTY_CELL; width * height],
             pieces: Vec::new(),
-            width: width,
-            height: height,
+            width,
+            height,
         }
     }
 
@@ -71,7 +71,7 @@ impl Board {
 
     #[allow(dead_code)]
     pub fn undo_last_move(&mut self) -> Result<(), Box<dyn Error>> {
-        if self.pieces.len() == 0 {
+        if self.pieces.is_empty() {
             return Err("No moves to undo".into());
         }
         let piece = self.pieces.pop().expect("pieces should not be empty");
@@ -114,21 +114,21 @@ mod tests {
     #[test]
     fn test_place_empty_board() {
         let mut board = Board::new(10, 20);
-        let piece = Piece::I(Cell { x: 1, y: 0 }, Orientation::NORTH);
+        let piece = Piece::I(Cell { x: 1, y: 0 }, Orientation::North);
         assert!(board.place(&piece).is_ok());
     }
 
     #[test]
     fn test_place_out_of_bounds_high() {
         let mut board = Board::new(10, 20);
-        let piece = Piece::I(Cell { x: 8, y: 0 }, Orientation::NORTH);
+        let piece = Piece::I(Cell { x: 8, y: 0 }, Orientation::North);
         assert!(board.place(&piece).is_err());
     }
 
     #[test]
     fn test_place_overlap() {
         let mut board = Board::new(10, 20);
-        let piece = Piece::I(Cell { x: 2, y: 0 }, Orientation::NORTH);
+        let piece = Piece::I(Cell { x: 2, y: 0 }, Orientation::North);
         assert!(board.place(&piece).is_ok());
         assert!(board.place(&piece).is_err());
     }
@@ -136,8 +136,8 @@ mod tests {
     #[test]
     fn test_place_overlap_2() {
         let mut board = Board::new(10, 20);
-        let piece = Piece::I(Cell { x: 2, y: 0 }, Orientation::NORTH);
-        let piece2 = Piece::T(Cell { x: 2, y: 0 }, Orientation::NORTH);
+        let piece = Piece::I(Cell { x: 2, y: 0 }, Orientation::North);
+        let piece2 = Piece::T(Cell { x: 2, y: 0 }, Orientation::North);
         assert!(board.place(&piece).is_ok());
         assert!(board.place(&piece2).is_err());
     }

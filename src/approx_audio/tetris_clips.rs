@@ -1,6 +1,6 @@
 use super::AudioClip;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub struct TetrisClips {
@@ -8,7 +8,7 @@ pub struct TetrisClips {
 }
 
 impl TetrisClips {
-    pub fn new(source: &PathBuf) -> Result<TetrisClips, Box<dyn std::error::Error>> {
+    pub fn new(source: &Path) -> Result<TetrisClips, Box<dyn std::error::Error>> {
         let mut clips = Vec::new();
         for path in source.read_dir()? {
             let path = path?;
@@ -25,7 +25,7 @@ impl TetrisClips {
         }
 
         // songs to split by onsets
-        let songs_to_split = PathBuf::from("assets_sound_onset_split");
+        let songs_to_split = Path::new("assets_sound_onset_split");
         for path in songs_to_split.read_dir()? {
             let path = path?;
             let clip = AudioClip::new(&path.path())?.split_by_onsets();
@@ -45,11 +45,11 @@ impl TetrisClips {
     }
 
     #[allow(dead_code)]
-    pub fn dump(&self, output_dir: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn dump(&self, output_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
         for clip in self.clips.iter() {
             let clip_path = PathBuf::from(clip.file_name.clone());
             let clip_file_name = clip_path.file_name().unwrap();
-            clip.write(Some(&output_dir.join(&clip_file_name)))?;
+            clip.write(Some(&output_dir.join(clip_file_name)))?;
         }
         Ok(())
     }
@@ -63,7 +63,7 @@ mod tests {
 
     #[test]
     fn test_tetris_clips() {
-        let source = path::PathBuf::from("test_audio_clips");
+        let source = path::Path::new("test_audio_clips");
         let tetris_clips = TetrisClips::new(&source).expect("failed to create tetris clips");
 
         for clip in tetris_clips.clips.iter() {
@@ -78,7 +78,7 @@ mod tests {
 
     #[test]
     fn test_combotones() {
-        let source = path::PathBuf::from("test_audio_clips/comboTones.mp3");
+        let source = path::Path::new("test_audio_clips/comboTones.mp3");
         let combotones = AudioClip::new(&source).expect("failed to create audio clip");
         let split_combotones = TetrisClips::split_combotones(&combotones);
 

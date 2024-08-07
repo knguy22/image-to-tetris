@@ -1,6 +1,6 @@
 use super::audio_clip::{AudioClip, Sample};
 use std::fmt;
-use std::path::PathBuf;
+use std::path::Path;
 use itertools::Itertools;
 use rustfft::{FftPlanner, num_complex::Complex};
 
@@ -67,9 +67,9 @@ impl AudioClip {
 
 impl FFTResult {
     #[allow(dead_code)]
-    pub fn dump(&self, output: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn dump(&self, output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         let mut wtr = csv::Writer::from_path(output)?;
-        wtr.write_record(&["frequency", "norm"])?;
+        wtr.write_record(["frequency", "norm"])?;
         for (i, sample) in self.samples.iter().enumerate() {
             let frequency = self.frequency_resolution * i as f64;
             wtr.write_record(&[frequency.to_string(), sample.norm().to_string()])?;
@@ -94,7 +94,7 @@ mod tests {
 
     #[test]
     fn test_fft() {
-        let source = path::PathBuf::from("test_audio_clips/a6.mp3");
+        let source = path::Path::new("test_audio_clips/a6.mp3");
         let clip = AudioClip::new(&source).expect("failed to create audio clip");
         let fft = clip.fft();
         assert_ne!(fft.samples.len(), 0);
@@ -144,11 +144,11 @@ mod tests {
 
     #[test]
     fn test_dump() {
-        let source = path::PathBuf::from("test_audio_clips/a6.mp3");
-        let output = path::PathBuf::from("test_fft.csv");
+        let source = path::Path::new("test_audio_clips/a6.mp3");
+        let output = path::Path::new("test_fft.csv");
         let clip = AudioClip::new(&source).expect("failed to create audio clip");
         let fft = clip.fft();
-        fft.dump(&output).unwrap();
+        fft.dump(output).unwrap();
 
         // cleanup
         std::fs::remove_file(&output).unwrap();
