@@ -148,6 +148,7 @@ impl Piece {
         }
     }
 
+    #[allow(clippy::cast_sign_loss)]
     pub fn get_occupancy(&self) -> Result<Vec<Cell>, Box<dyn Error>> {
         // only non-garbage pieces should have a shape
         let shape: &[[Dir; 4]; 4] = match self {
@@ -171,12 +172,12 @@ impl Piece {
 
         let mut occupancy = Vec::new();
         for dir in dirs {
+            // check for cast sign loss manually
             let x = i32::try_from(self.get_cell().x)? + dir.x;
             let y = i32::try_from(self.get_cell().y)? + dir.y;
             if x < 0 || y < 0 {
                 return Err(format!("Cell({x}, {y}) contains negative values").into());
             }
-
             occupancy.push(Cell { x: x as usize, y: y as usize });
         }
         Ok(occupancy)

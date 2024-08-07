@@ -10,6 +10,7 @@ use dssim::Dssim;
 use rayon::prelude::*;
 
 // tests all image in the directory
+#[allow(clippy::cast_precision_loss)]
 pub fn run(dir: &str, config: &Config, glob: &GlobalData) -> Result<(), Box<dyn std::error::Error>> {
     println!("Running integration test on {dir}");
 

@@ -35,6 +35,7 @@ impl TetrisClips {
         Ok(TetrisClips { clips })
     }
 
+    #[allow(clippy::cast_precision_loss)]
     fn split_combotones(clips: &AudioClip) -> Vec<AudioClip> {
         const NUM_COMBOS: usize = 15;
         let combo_duration = clips.duration / NUM_COMBOS as f64;

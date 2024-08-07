@@ -21,6 +21,7 @@ pub struct AudioClip {
 }
 
 impl AudioClip {
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     pub fn new(source: &Path) -> Result<Self, Box<dyn std::error::Error>> {
         let wave = Wave::load(source)?;
         let sample_rate = wave.sample_rate();
@@ -49,7 +50,7 @@ impl AudioClip {
         })
     }
 
-    #[allow(dead_code)]
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, dead_code)]
     pub fn new_monotone(sample_rate: f64, duration: f64, amplitude: Sample) -> Self {
         let num_channels = 1;
         let num_samples = (duration * sample_rate) as usize;
@@ -73,6 +74,7 @@ impl AudioClip {
         }
     }
 
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     pub fn write(&self, path: Option<&Path>) -> Result<(), Box<dyn std::error::Error>> {
         let path = path.unwrap();
 
@@ -107,6 +109,7 @@ impl AudioClip {
 
     // takes a window of the audio clip
     // pads the window with 0s if the window extends out of bounds
+    #[allow(clippy::cast_precision_loss)]
     pub fn window(&self, start: usize, end: usize) -> Self {
         let mut channels = Vec::new();
         for channel in &self.channels {
@@ -129,6 +132,7 @@ impl AudioClip {
 
     // splits the audio clip into chunks the length of max_duration; if the last chunk is shorter than 
     // max_duration, it will still be included but will be smaller than max_duration
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     pub fn split_by_duration(&self, max_duration: f64) -> Vec<Self> {
         // split the original video into chunks; this will be useful for approximation later
         let mut chunks = Vec::new();
@@ -141,6 +145,7 @@ impl AudioClip {
         chunks
     }
 
+    #[allow(clippy::cast_precision_loss)]
     pub fn dot_product(&self, other: &Self) -> f64 {
         assert!(self.num_channels == other.num_channels);
         assert!((self.sample_rate - other.sample_rate).abs() < f64::EPSILON);
@@ -173,6 +178,7 @@ impl AudioClip {
 
     // add new channels to the audio clip
     // uses the average of existing channels for new values
+    #[allow(clippy::cast_precision_loss)]
     pub fn add_new_channels(&mut self, num_channels: usize) {
         assert!(num_channels >= self.num_channels);
         if self.num_channels == num_channels {

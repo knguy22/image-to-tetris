@@ -132,6 +132,7 @@ impl InputAudioClip {
     }
 
     // joins all the contained chunks into a single audio clip
+    #[allow(clippy::cast_precision_loss)]
     pub fn to_audio_clip(&self) -> AudioClip {
         let mut channels: Vec<Vec<Sample>> = vec![Vec::new(); self.chunks[0].num_channels];
         for chunk in &self.chunks {

@@ -47,6 +47,7 @@ impl AudioClip {
 
     // gives a vector of sample indices that are onsets
     // this currently uses spectrum onset detection
+    #[allow(clippy::cast_precision_loss)]
     fn detect_onsets(&self) -> Onsets {
         // perform short time fourier transform
         let window_size = 2048;
