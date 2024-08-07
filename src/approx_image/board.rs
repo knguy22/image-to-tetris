@@ -32,16 +32,9 @@ impl Board {
     }
 
     pub fn can_place(&self, piece: &Piece) -> bool {
-        let to_occupy = match piece.get_occupancy() {
-            Ok(to_occupy) => to_occupy,
-            Err(_) => return false,
-        };
-
-        for cell in to_occupy.iter() {
-            let curr = match self.get(cell) {
-                Ok(curr) => curr,
-                Err(_) => return false,
-            };
+        let Ok(to_occupy) = piece.get_occupancy() else {return false;};
+        for cell in &to_occupy {
+            let Ok(curr) = self.get(cell) else {return false};
             if *curr != EMPTY_CELL {
                 return false;
             }
@@ -53,15 +46,15 @@ impl Board {
         let to_occupy = piece.get_occupancy()?;
 
         // check if cells are empty
-        for cell in to_occupy.iter() {
+        for cell in &to_occupy {
             let curr = self.get(cell)?;
             if *curr != EMPTY_CELL {
-                return Err(format!("{:?} is not empty at {:?}", piece, cell).into());
+                return Err(format!("{piece:?} is not empty at {cell:?}").into());
             }
         }
 
         // if so, place
-        for cell in to_occupy.iter() {
+        for cell in &to_occupy {
             *self.get_mut(cell)? = piece.get_char();
         }
         self.pieces.push(piece.clone());
@@ -84,7 +77,7 @@ impl Board {
     #[allow(dead_code)]
     pub fn remove_piece(&mut self, piece: &Piece) -> Result<(), Box<dyn Error>> {
         let to_occupy = piece.get_occupancy()?;
-        for cell in to_occupy.iter() {
+        for cell in &to_occupy {
             *self.get_mut(cell)? = EMPTY_CELL;
         }
         self.pieces.retain(|p| p != piece);

@@ -48,8 +48,8 @@ pub fn approx(source_img: &DynamicImage, config: &Config, glob: &GlobalData) -> 
     // initialize the board
     let mut board = SkinnedBoard::new(config.board_width, config.board_height, &glob.skins);
 
-    assert_eq!(board.board_width() as u32 * board.skins_width(), source_img.width());
-    assert_eq!(board.board_height() as u32 * board.skins_height(), source_img.height());
+    assert_eq!(u32::try_from(board.board_width())? * board.skins_width(), source_img.width(), "board width, skin width, and image width do not match");
+    assert_eq!(u32::try_from(board.board_height())? * board.skins_height(), source_img.height(), "board height, skin height, and image height do not match");
 
     // initialize average pixels for context reasons during approximation
     let avg_pixel_grid = average_pixel_grid(source_img, board.skins_width(), board.skins_height())?;
@@ -66,16 +66,16 @@ pub fn approx(source_img: &DynamicImage, config: &Config, glob: &GlobalData) -> 
     // perform the approximation
     match config.prioritize_tetrominos {
         PrioritizeColor::Yes => process_heap_prioritize(&mut heap, &mut board, source_img, &avg_pixel_grid)?,
-        PrioritizeColor::No => process_heap(&mut heap, &mut board, source_img, &avg_pixel_grid, UseGarbage::Yes)?
+        PrioritizeColor::No => process_heap(&mut heap, &mut board, source_img, &avg_pixel_grid, &UseGarbage::Yes)?
     }
 
     // draw the board
-    Ok(draw::draw_board(&board))
+    draw::draw(&board)
 }
 
 fn process_heap_prioritize(heap: &mut BinaryHeap<Cell>, board: &mut SkinnedBoard, source_img: &DynamicImage, avg_pixel_grid: &[Rgba<u8>]) -> Result<(), Box<dyn std::error::Error>> {
     // first try to not use garbage to avoid gray and black blocks
-    process_heap(heap, board, source_img, avg_pixel_grid, UseGarbage::No)?;
+    process_heap(heap, board, source_img, avg_pixel_grid, &UseGarbage::No)?;
 
     // then use garbage with the remaining unfilled cells
     for y in (0..board.board_height()).rev() {
@@ -86,7 +86,7 @@ fn process_heap_prioritize(heap: &mut BinaryHeap<Cell>, board: &mut SkinnedBoard
             }
         }
     }
-    process_heap(heap, board, source_img, avg_pixel_grid, UseGarbage::Yes)?;
+    process_heap(heap, board, source_img, avg_pixel_grid, &UseGarbage::Yes)?;
     Ok(())
 }
 
@@ -96,11 +96,11 @@ pub fn resize_image(source_img: &mut DynamicImage, skin_width: u32, skin_height:
     let resized_height = skin_height * u32::try_from(board_height).unwrap();
     if resized_width != source_img.width() || resized_height != source_img.height() {
         let resized_source_buffer = image::imageops::resize(source_img, resized_width, resized_height, image::imageops::FilterType::Lanczos3);
-        *source_img = image::DynamicImage::from(resized_source_buffer)
+        *source_img = image::DynamicImage::from(resized_source_buffer);
     };
 }
 
-fn process_heap(heap: &mut BinaryHeap<Cell>, board: &mut SkinnedBoard, source_img: &DynamicImage, avg_pixel_grid: &[Rgba<u8>], use_garbage: UseGarbage) -> Result<(), Box<dyn std::error::Error>> {
+fn process_heap(heap: &mut BinaryHeap<Cell>, board: &mut SkinnedBoard, source_img: &DynamicImage, avg_pixel_grid: &[Rgba<u8>], use_garbage: &UseGarbage) -> Result<(), Box<dyn std::error::Error>> {
     // for each cell at the top of the heap:
     while let Some(cell) = heap.pop() {
         // 1. check if the cell is unoccupied
@@ -172,10 +172,10 @@ fn average_pixel_grid(source_img: &DynamicImage, pixels_grid_width: u32, pixels_
             for y in 0..pixels_grid_height {
                 for x in 0..pixels_grid_width {
                     let pixel = source_img.get_pixel(pixels_x_range + x, pixels_y_range + y);
-                    pixel_sum[0] += pixel[0] as u32;
-                    pixel_sum[1] += pixel[1] as u32;
-                    pixel_sum[2] += pixel[2] as u32;
-                    pixel_sum[3] += pixel[3] as u32;
+                    pixel_sum[0] += u32::from(pixel[0]);
+                    pixel_sum[1] += u32::from(pixel[1]);
+                    pixel_sum[2] += u32::from(pixel[2]);
+                    pixel_sum[3] += u32::from(pixel[3]);
                 }
             }
 
@@ -195,6 +195,11 @@ fn average_pixel_grid(source_img: &DynamicImage, pixels_grid_width: u32, pixels_
 }
 
 fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, source_img: &DynamicImage, avg_pixel_grid: &[Rgba<u8>]) -> Result<f64, Box<dyn std::error::Error>> {
+    // used to weigh the importance of each diff
+    const RED_WEIGHT: f64 = 1.0;
+    const GREEN_WEIGHT: f64 = 1.7;
+    const BLUE_WEIGHT: f64 = 0.8;
+
     let mut curr_pixel_diff: f64 = 0.0;
     let mut total_curr_pixels: u32 = 0;
 
@@ -205,12 +210,7 @@ fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, s
 
     let center_cell = piece.get_cell();
     let occupancy = piece.get_occupancy()?;
-    let context_cells = find_context_cells(board, &occupancy, &center_cell);
-
-    // used to weigh the importance of each diff
-    const RED_WEIGHT: f64 = 1.0;
-    const GREEN_WEIGHT: f64 = 1.7;
-    const BLUE_WEIGHT: f64 = 0.8;
+    let context_cells = find_context_cells(board, &occupancy, &center_cell)?;
 
     let avg_board_cell_pixel = block_image.get_average_pixel();
     let avg_source_cell_pixel = find_average_source_cell_pixel(avg_pixel_grid, &occupancy, board);
@@ -221,18 +221,18 @@ fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, s
             let skin_id = board.get_cells_skin(context_cell);
 
             let context_skin = board.get_skin(skin_id);
-            let context_block_image = context_skin.block_image_from_char(cell_char);
+            let context_block_image = context_skin.block_image_from_char(*cell_char);
             let avg_board_context_pixel = context_block_image.get_average_pixel();
 
             let avg_source_context_pixel = avg_pixel_grid[context_cell.y * board.board_width() + context_cell.x];
 
-            let board_context_diff = subtract_pixels(&avg_board_cell_pixel, &avg_board_context_pixel);
-            let source_context_diff = subtract_pixels(&avg_source_cell_pixel, &avg_source_context_pixel);
+            let board_context_diff = subtract_pixels(avg_board_cell_pixel, avg_board_context_pixel);
+            let source_context_diff = subtract_pixels(avg_source_cell_pixel, avg_source_context_pixel);
 
             context_pixel_diff += f64::sqrt(
-                (board_context_diff[0] - source_context_diff[0]).pow(2) as f64 * RED_WEIGHT +
-                (board_context_diff[1] - source_context_diff[1]).pow(2) as f64 * GREEN_WEIGHT +
-                (board_context_diff[2] - source_context_diff[2]).pow(2) as f64 * BLUE_WEIGHT
+                f64::from(board_context_diff[0] - source_context_diff[0].pow(2)) * RED_WEIGHT +
+                f64::from(board_context_diff[1] - source_context_diff[1].pow(2)) * GREEN_WEIGHT +
+                f64::from(board_context_diff[2] - source_context_diff[2].pow(2)) * BLUE_WEIGHT
             );
             total_context_pixels += 1;
         }
@@ -240,13 +240,15 @@ fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, s
         // then analyze the individual cell to find the pixel difference between the current cells
         for y in 0..skin.height() {
             for x in 0..skin.width() {
-                let source_pixel = source_img.get_pixel(cell.x as u32 * skin.width() + x, cell.y as u32 * skin.height() + y);
+                let pixel_x = u32::try_from(cell.x)? * skin.width() + x;
+                let pixel_y = u32::try_from(cell.y)? * skin.height() + y;
+                let source_pixel = source_img.get_pixel(pixel_x, pixel_y);
                 let approx_pixel = block_image.get_pixel(x, y);
-                let curr_diff = subtract_pixels(&source_pixel, &approx_pixel);
+                let curr_diff = subtract_pixels(source_pixel, approx_pixel);
                 curr_pixel_diff += 
-                    curr_diff[0].pow(2) as f64 * RED_WEIGHT +
-                    curr_diff[1].pow(2) as f64 * GREEN_WEIGHT +
-                    curr_diff[2].pow(2) as f64 * BLUE_WEIGHT
+                    f64::from(curr_diff[0].pow(2)) * RED_WEIGHT +
+                    f64::from(curr_diff[1].pow(2)) * GREEN_WEIGHT +
+                    f64::from(curr_diff[2].pow(2)) * BLUE_WEIGHT
                 ;
                 total_curr_pixels += 1;
             }
@@ -256,46 +258,39 @@ fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, s
     // weight the context diff in comparison with the current diff
     let avg_pixel_diff = 
         if total_context_pixels != 0 {
-            curr_pixel_diff / total_curr_pixels as f64 + context_pixel_diff / total_context_pixels as f64 
+            curr_pixel_diff / f64::from(total_curr_pixels) + context_pixel_diff / f64::from(total_context_pixels)
         } else {
-            curr_pixel_diff / total_curr_pixels as f64
+            curr_pixel_diff / f64::from(total_curr_pixels)
         };
 
 
     Ok(avg_pixel_diff)
 }
 
-fn find_context_cells(board: &SkinnedBoard, occupancy: &[Cell], center_cell: &Cell) -> Vec<Cell> {
-    let mut context_cells: Vec<Cell> = Vec::new();
-
-    // get the context cells
+fn find_context_cells(board: &SkinnedBoard, occupancy: &[Cell], center_cell: &Cell) -> Result<Vec<Cell>, Box<dyn std::error::Error>> {
     const MIN_DX: i32 = 0;
     const MIN_DY: i32 = 0;
     const MAX_DX: i32 = 8;
     const MAX_DY: i32 = 8;
 
+    // get the context cells
+    let mut context_cells: Vec<Cell> = Vec::new();
     let mut dy: i32 = MIN_DY;
     while dy < MAX_DY {
         // compute and check the new y coordinate
-        let new_y = usize::try_from((center_cell.y as i32) + dy);
-        let new_y = match new_y {
-            Ok(y) => y,
-            Err(_) => {
-                dy += 1;
-                continue
-            }
+        let new_y = usize::try_from(i32::try_from(center_cell.y)? + dy);
+        let Ok(new_y) = new_y else {
+            dy += 1;
+            continue
         };
 
         let mut dx: i32 = MIN_DX;
         while dx < MAX_DX {
             // compute and check the new x coordinate
-            let new_x = usize::try_from((center_cell.x as i32) + dx);
-            let new_x = match new_x {
-                Ok(x) => x,
-                Err(_) => {
-                    dx += 1;
-                    continue
-                }
+            let new_x = usize::try_from(i32::try_from(center_cell.x)? + dx);
+            let Ok(new_x) = new_x else {
+                dx += 1;
+                continue
             };
 
             // only append contexts that are occupied with other pieces we already placed
@@ -310,7 +305,7 @@ fn find_context_cells(board: &SkinnedBoard, occupancy: &[Cell], center_cell: &Ce
         dy += 1;
     }
 
-    context_cells
+    Ok(context_cells)
 }
 
 fn find_average_source_cell_pixel(avg_pixel_grid: &[Rgba<u8>], occupancy: &Vec<Cell>, board: &SkinnedBoard) -> Rgba<u8> {
@@ -318,20 +313,20 @@ fn find_average_source_cell_pixel(avg_pixel_grid: &[Rgba<u8>], occupancy: &Vec<C
 
     for cell in occupancy {
         let pixel = &avg_pixel_grid[cell.y * board.board_width() + cell.x];
-        pixel_sum[0] += pixel[0] as u32;
-        pixel_sum[1] += pixel[1] as u32;
-        pixel_sum[2] += pixel[2] as u32;
-        pixel_sum[3] += pixel[3] as u32;
+        pixel_sum[0] += u32::from(pixel[0]);
+        pixel_sum[1] += u32::from(pixel[1]);
+        pixel_sum[2] += u32::from(pixel[2]);
+        pixel_sum[3] += u32::from(pixel[3]);
     }
 
-    pixel_sum.map(|x| u8::try_from(x / occupancy.len() as u32).expect("pixel should be in range")).into()
+    pixel_sum.map(|x| u8::try_from(x / u32::try_from(occupancy.len()).expect("there must be at least one")).expect("pixel should be in range")).into()
 }
 
-fn subtract_pixels(a: &Rgba<u8>, b: &Rgba<u8>) -> [i32; 3] {
+fn subtract_pixels(a: Rgba<u8>, b: Rgba<u8>) -> [i32; 3] {
     [
-        a[0] as i32 - b[0] as i32,
-        a[1] as i32 - b[1] as i32,
-        a[2] as i32 - b[2] as i32,
+        i32::from(a[0]) - i32::from(b[0]),
+        i32::from(a[1]) - i32::from(b[1]),
+        i32::from(a[2]) - i32::from(b[2]),
     ]
 }
 
@@ -380,7 +375,7 @@ mod tests {
                     }
                 }
 
-                let img = draw::draw_board(&board);
+                let img = draw::draw(&board).unwrap();
                 img.save(format!("{}/{:?} {:?}.png", test_dir, piece, piece.get_orientation())).expect("failed to save image");
             });
     }

@@ -75,7 +75,7 @@ impl AudioClip {
             onsets.push(Onset {
                 index,
                 is_onset: *diff > avg_diff
-            })
+            });
         }
 
         onsets

@@ -24,7 +24,7 @@ pub fn run(source: &Path, output: &Path, config: &Config, glob: &GlobalData, vid
 
     // use ffmpeg to generate a directory full of images
     // make sure those images correspond to the board dimenisions and blockskin dimensions
-    println!("Generating source images from {}...", source_path);
+    println!("Generating source images from {source_path}...");
     let gen_image_command = Command::new("ffmpeg")
         .arg("-i")
         .arg(source_path)
@@ -32,18 +32,18 @@ pub fn run(source: &Path, output: &Path, config: &Config, glob: &GlobalData, vid
         .arg(format!("fps={},scale={}x{}", video_config.fps, video_config.image_width, video_config.image_height))
         .arg("-start_number")
         .arg("0")
-        .arg(format!("{}/%d.png", SOURCE_IMG_DIR))
+        .arg(format!("{SOURCE_IMG_DIR}/%d.png"))
         .output()?;
-    check_command_result(gen_image_command)?;
+    check_command_result(&gen_image_command)?;
 
     // use ffmpeg to generate the audio file
-    println!("Generating audio file from {}...", source_path);
+    println!("Generating audio file from {source_path}...");
     let gen_audio_command = Command::new("ffmpeg")
         .arg("-i")
         .arg(source_path)
         .arg(AUDIO_PATH)
         .output()?;
-    check_command_result(gen_audio_command)?;
+    check_command_result(&gen_audio_command)?;
 
     // approximate the audio file if wanted
     if video_config.approx_audio {
@@ -80,7 +80,7 @@ pub fn run(source: &Path, output: &Path, config: &Config, glob: &GlobalData, vid
         .arg("-framerate")
         .arg(format!("{}", video_config.fps))
         .arg("-i")
-        .arg(format!("{}/%d.png", APPROX_IMG_DIR))
+        .arg(format!("{APPROX_IMG_DIR}/%d.png"))
         .arg("-i")
         .arg(AUDIO_PATH)
         .arg("-c:v")
@@ -94,7 +94,7 @@ pub fn run(source: &Path, output: &Path, config: &Config, glob: &GlobalData, vid
         .arg("-shortest")
         .arg(output_path)
         .output()?;
-    check_command_result(combine_command)?;
+    check_command_result(&combine_command)?;
 
     cleanup()?;
 
@@ -132,8 +132,8 @@ pub fn init(source: &Path, output: &Path, config: &Config, glob: &mut GlobalData
 
     // modify the config based on resized skins
     approx_image::draw::resize_skins(&mut glob.skins, video_config.image_width, video_config.image_height, config.board_width, config.board_height).unwrap();
-    video_config.image_width = glob.skin_width() * config.board_width as u32;
-    video_config.image_height = glob.skin_height() * config.board_height as u32;
+    video_config.image_width = glob.skin_width() * u32::try_from(config.board_width)?;
+    video_config.image_height = glob.skin_height() * u32::try_from(config.board_height)?;
 
     Ok(video_config)
 }

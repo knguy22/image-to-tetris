@@ -27,7 +27,7 @@ pub fn run(source: &Path, output: &Path) -> Result<(), Box<dyn std::error::Error
     let source_resampled = Path::new("tmp_source.wav");
 
     let MetaData{max_sample_rate, max_channels} = init(source, tetris_sounds_orig)?;
-    println!("Approximating audio with sample rate {}", max_sample_rate);
+    println!("Approximating audio with sample rate {max_sample_rate}");
 
     // standardize tetris clips + input clip; this makes later comparisons of clips easier
     println!("Resampling clips...");
@@ -43,17 +43,11 @@ pub fn run(source: &Path, output: &Path) -> Result<(), Box<dyn std::error::Error
     println!("Approximating audio...");
     let clip = InputAudioClip::new(source_resampled, max_channels)?;
     let approx_clip = clip.approx(&tetris_clips);
-    match approx_clip {
-        Ok(approx_clip) => {
-            let source_clip = AudioClip::new(source_resampled)?;
-            let final_clip = approx_clip.to_audio_clip();
-            let final_approx_score = final_clip.dot_product(&source_clip);
-
-            println!("Approximation score: {}", final_approx_score);
-            final_clip.write(Some(output))?;
-        },
-        Err(e) => println!("Error: {}", e),
-    }
+    let source_clip = AudioClip::new(source_resampled)?;
+    let final_clip = approx_clip.to_audio_clip();
+    let final_approx_score = final_clip.dot_product(&source_clip);
+    println!("Approximation score: {final_approx_score}");
+    final_clip.write(Some(output))?;
 
     // cleanup
     println!("Cleaning up...");
@@ -97,7 +91,7 @@ impl InputAudioClip {
         Ok(InputAudioClip{chunks})
     }
 
-    pub fn approx(&self, tetris_clips: &TetrisClips) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn approx(&self, tetris_clips: &TetrisClips) -> Self {
         let mut output = self.clone();
 
         for (chunk_idx, chunk) in self.chunks.iter().enumerate() {
@@ -113,7 +107,7 @@ impl InputAudioClip {
             }
 
             assert!(chunk.num_channels == best_clip.num_channels);
-            assert!(chunk.sample_rate == best_clip.sample_rate);
+            assert!((chunk.sample_rate - best_clip.sample_rate).abs() < f64::EPSILON);
 
             // prevent index overflow since the last chunk can be smaller than the others
             let num_samples_to_write = cmp::min(chunk.num_samples, best_clip.num_samples);
@@ -134,7 +128,7 @@ impl InputAudioClip {
             }
         }
 
-        Ok(output)
+        output
     }
 
     // joins all the contained chunks into a single audio clip

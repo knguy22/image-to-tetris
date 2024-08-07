@@ -18,7 +18,7 @@ pub fn run(source: &Path, output: &Path, sample_rate: f64) -> Result<(), Box<dyn
         .arg(sample_rate.to_string())
         .arg(output)
         .output()?;
-    check_command_result(gen_audio_command)?;
+    check_command_result(&gen_audio_command)?;
     Ok(())
 }
 
