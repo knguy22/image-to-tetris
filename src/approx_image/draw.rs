@@ -53,6 +53,7 @@ impl<'a> SkinnedBoard<'a> {
     }
 
     pub fn get_skin(&self, index: usize) -> &BlockSkin {
+        assert_ne!(index, INVALID_SKIN_ID, "invalid skin index");
         &self.skins[index]
     }
 
@@ -111,18 +112,18 @@ pub fn resize_skins(skins: &mut Skins, image_width: u32, image_height: u32, boar
 
 impl BlockSkin {
     pub fn new(skin_path: &str, id: usize) -> Result<BlockSkin, Box<dyn std::error::Error>> {
-        let img = imageproc::image::open(skin_path)?;
+        const NUM_SECTIONS: u32 = 9;
 
-        const NUM_SECTIONS: usize = 9;
+        let img = imageproc::image::open(skin_path)?;
         let (width, height) = img.dimensions();
-        let section_width = width / NUM_SECTIONS as u32;
+        let section_width = width / NUM_SECTIONS;
         let img_buffer = img.into_rgb8();
 
         // split the skin into sections
         let mut new_images = Vec::new();
-        for i in 0..NUM_SECTIONS as u32 {
+        for i in 0..NUM_SECTIONS {
             let section = image::SubImage::new(&img_buffer, i * section_width, 0, section_width, height);
-            new_images.push(BlockImage::new(section.to_image().into())?);
+            new_images.push(BlockImage::new(section.to_image().into()));
         }
         
         // return the skin
@@ -173,8 +174,8 @@ impl BlockSkin {
         }
     }
 
-    pub fn block_image_from_char(&self, cell_val: &char) -> &BlockImage {
-        match *cell_val {
+    pub fn block_image_from_char(&self, cell_val: char) -> &BlockImage {
+        match cell_val {
             'I' => &self.i_img,
             'O' => &self.o_img,
             'T' => &self.t_img,
@@ -202,22 +203,22 @@ impl BlockSkin {
 }
 
 impl BlockImage {
-    pub fn new(img: DynamicImage) -> Result<BlockImage, Box<dyn std::error::Error>> {
+    pub fn new(img: DynamicImage) -> BlockImage {
         let num_pixels: u32 = img.width() * img.height();
         let avg_pixel: Rgba<u8> = img
             .pixels()
             // use u32 for summation instead of u8 to prevent overflow
             .fold([0, 0, 0, 0],
                 |acc, (_x, _y, p) |
-                [acc[0] + p[0] as u32, acc[1] + p[1] as u32, acc[2] + p[2] as u32, acc[3] + p[3] as u32])
+                [acc[0] + u32::from(p[0]), acc[1] + u32::from(p[1]), acc[2] + u32::from(p[2]), acc[3] + u32::from(p[3])])
             // divide by number of pixels
             .map(|x| u8::try_from(x / num_pixels).expect("could not convert pixel sum to u8"))
             .into();
 
-        Ok(BlockImage {
+        BlockImage {
             img,
             avg_pixel,
-        })
+        }
     }
 
     pub fn resize(&mut self, width: u32, height: u32) {
@@ -245,17 +246,21 @@ impl BlockImage {
     }
 }
 
-pub fn draw_board(skin_board: &SkinnedBoard) -> DynamicImage {
+pub fn draw(skin_board: &SkinnedBoard) -> Result<DynamicImage, Box<dyn std::error::Error>> {
     let board = &skin_board.board;
     let skins = skin_board.skins;
     let cells_skin = &skin_board.cells_skin;
 
-    let mut img = image::RgbaImage::new(board.width as u32 * skins[0].width, board.height as u32 * skins[0].height);
+    let width = u32::try_from(board.width)? * skins[0].width;
+    let height = u32::try_from(board.height)? * skins[0].height;
+
+    let mut img = image::RgbaImage::new(width, height);
     for y in 0..board.height {
         for x in 0..board.width {
             let skin_id = cells_skin[y * board.width + x];
             let skin = skin_board.get_skin(skin_id);
-            let block = match board.cells[y * board.width + x] {
+            let Some(cell) = board.cells.get(y * board.width + x) else {return Err("Invalid cell value".into());};
+            let block = match cell {
                 'I' => &skin.i_img,
                 'O' => &skin.o_img,
                 'T' => &skin.t_img,
@@ -267,10 +272,12 @@ pub fn draw_board(skin_board: &SkinnedBoard) -> DynamicImage {
                 'B' => &skin.black_img,
                 _ => panic!("Invalid cell value: {}", board.cells[y * board.width + x]),
             };
-            image::imageops::overlay(&mut img, &block.img, (x as u32 * skin.width).into(), (y as u32 * skin.height).into());
+            let pixel_x = u32::try_from(x)? * skin.width;
+            let pixel_y = u32::try_from(y)? * skin.height;
+            image::imageops::overlay(&mut img, &block.img, pixel_x.into(), pixel_y.into());
         }
     }
-    DynamicImage::from(img)
+    Ok(DynamicImage::from(img))
 }
 
 pub fn create_skins() -> Skins {
@@ -348,8 +355,7 @@ mod tests {
             }
         }
 
-        let image = draw_board(&board);
-
+        let image = draw(&board).unwrap();
         image.save("test_results/test_save_skinned_board.png").expect("failed to save image");
     }
 }

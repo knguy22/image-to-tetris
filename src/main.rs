@@ -15,12 +15,9 @@ fn main() {
 
     let threads = cli.threads.unwrap_or(4);
     rayon::ThreadPoolBuilder::new().num_threads(threads).build_global().expect("failed to build thread pool");
-    println!("Using {} threads", threads);
+    println!("Using {threads} threads");
 
-    let prioritize_tetrominos = match cli.prioritize_tetrominos {
-        true => PrioritizeColor::Yes,
-        false => PrioritizeColor::No,
-    };
+    let prioritize_tetrominos = if cli.prioritize_tetrominos {PrioritizeColor::Yes} else {PrioritizeColor::No};
     println!("Prioritizing tetrominos: {}", cli.prioritize_tetrominos);
 
     // a global skins will be copied by each thread to prevent needing IO to recreate skins for each thread

@@ -14,8 +14,8 @@ pub struct FFTResult {
 impl AudioClip {
 
     /// performs a short time fourier transform on the audio clip
-    /// window_size is the number of samples in the window; defaults to 2048
-    /// hop_size is the number of samples between each window; defaults to window_size // 4
+    /// `window_size` is the number of samples in the window; defaults to 2048
+    /// `hop_size` is the number of samples between each window; defaults to `window_size` // 4
     pub fn stft(&self, window_size: usize, hop_size: usize) -> Vec<FFTResult> {
         let mut stft_res = Vec::new();
 
@@ -38,6 +38,7 @@ impl AudioClip {
         stft_res
     }
 
+    #[allow(clippy::cast_precision_loss)]
     pub fn fft(&self) -> FFTResult {
         let mut planner = FftPlanner::<Sample>::new();
         let fft = planner.plan_fft_forward(self.num_samples);
@@ -66,7 +67,7 @@ impl AudioClip {
 }
 
 impl FFTResult {
-    #[allow(dead_code)]
+    #[allow(clippy::cast_precision_loss, dead_code)]
     pub fn dump(&self, output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         let mut wtr = csv::Writer::from_path(output)?;
         wtr.write_record(["frequency", "norm"])?;
@@ -79,6 +80,7 @@ impl FFTResult {
     }
 }
 
+#[allow(clippy::missing_fields_in_debug)]
 impl fmt::Debug for FFTResult {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("FFTResult")

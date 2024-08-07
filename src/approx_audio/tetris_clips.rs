@@ -18,7 +18,7 @@ impl TetrisClips {
                 // combotones are made of multiple clips, not just one
                 name if name == "comboTones.mp3" || name == "comboTones.wav" => {
                     let combos = TetrisClips::split_combotones(&clip);
-                    clips.extend(combos)
+                    clips.extend(combos);
                 },
                 _ => clips.push(clip),
             }
@@ -35,6 +35,7 @@ impl TetrisClips {
         Ok(TetrisClips { clips })
     }
 
+    #[allow(clippy::cast_precision_loss)]
     fn split_combotones(clips: &AudioClip) -> Vec<AudioClip> {
         const NUM_COMBOS: usize = 15;
         let combo_duration = clips.duration / NUM_COMBOS as f64;
@@ -46,7 +47,7 @@ impl TetrisClips {
 
     #[allow(dead_code)]
     pub fn dump(&self, output_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
-        for clip in self.clips.iter() {
+        for clip in &self.clips {
             let clip_path = PathBuf::from(clip.file_name.clone());
             let clip_file_name = clip_path.file_name().unwrap();
             clip.write(Some(&output_dir.join(clip_file_name)))?;

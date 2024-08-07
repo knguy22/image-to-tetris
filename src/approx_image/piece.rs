@@ -123,12 +123,12 @@ impl Piece {
 
     pub fn get_orientation(&self) -> Orientation {
         match self {
-            Piece::I(_, o) => *o,
-            Piece::O(_, o) => *o,
-            Piece::T(_, o) => *o,
-            Piece::L(_, o) => *o,
-            Piece::J(_, o) => *o,
-            Piece::S(_, o) => *o,
+            Piece::I(_, o) |
+            Piece::O(_, o) |
+            Piece::T(_, o) |
+            Piece::L(_, o) |
+            Piece::J(_, o) |
+            Piece::S(_, o) |
             Piece::Z(_, o) => *o,
             _ => panic!("Garbage or black piece has no orientation")
         }
@@ -136,18 +136,19 @@ impl Piece {
 
     pub fn get_cell(&self) -> Cell {
         match self {
-            Piece::I(c, _) => *c,
-            Piece::O(c, _) => *c,
-            Piece::T(c, _) => *c,
-            Piece::L(c, _) => *c,
-            Piece::J(c, _) => *c,
-            Piece::S(c, _) => *c,
-            Piece::Z(c, _) => *c,
-            Piece::Gray(c) => *c,
+            Piece::I(c, _) |
+            Piece::O(c, _) |
+            Piece::T(c, _) |
+            Piece::L(c, _) |
+            Piece::J(c, _) |
+            Piece::S(c, _) |
+            Piece::Z(c, _) |
+            Piece::Gray(c) |
             Piece::Black(c) => *c
         }
     }
 
+    #[allow(clippy::cast_sign_loss)]
     pub fn get_occupancy(&self) -> Result<Vec<Cell>, Box<dyn Error>> {
         // only non-garbage pieces should have a shape
         let shape: &[[Dir; 4]; 4] = match self {
@@ -171,12 +172,12 @@ impl Piece {
 
         let mut occupancy = Vec::new();
         for dir in dirs {
-            let x = self.get_cell().x as i32 + dir.x;
-            let y = self.get_cell().y as i32 + dir.y;
+            // check for cast sign loss manually
+            let x = i32::try_from(self.get_cell().x)? + dir.x;
+            let y = i32::try_from(self.get_cell().y)? + dir.y;
             if x < 0 || y < 0 {
-                return Err(format!("Cell ({}, {}) contains negative values", x, y).into());
+                return Err(format!("Cell({x}, {y}) contains negative values").into());
             }
-
             occupancy.push(Cell { x: x as usize, y: y as usize });
         }
         Ok(occupancy)

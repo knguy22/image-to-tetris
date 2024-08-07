@@ -1,7 +1,7 @@
 use super::{Config, GlobalData, draw::resize_skins, resize_image};
 
 use std::fs;
-use std::path::PathBuf;
+use std::path::Path;
 use std::time;
 
 use image::GenericImageView;
@@ -10,41 +10,40 @@ use dssim::Dssim;
 use rayon::prelude::*;
 
 // tests all image in the directory
+#[allow(clippy::cast_precision_loss)]
 pub fn run(dir: &str, config: &Config, glob: &GlobalData) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Running integration test on {}", dir);
+    println!("Running integration test on {dir}");
 
     let start = time::Instant::now();
     let num_files = fs::read_dir(dir)?.count();
     let images: Vec<_> = fs::read_dir(dir)?
-        .filter_map(|entry| entry.ok())
+        .filter_map(std::result::Result::ok)
         .collect();
 
-    println!("Approximating {} images", num_files);
+    println!("Approximating {num_files} images");
 
     let total_diff: f64 = images
         .par_iter()
         .map(|image| {
-            score_image(image.path(), config, glob).expect("failed to score image")
+            score_image(&image.path(), config, glob).expect("failed to score image")
         })
         .sum();
 
-    if num_files == 0 {
-        panic!("No images found in directory");
-    }
+    assert_ne!(num_files, 0, "No images found in directory");
 
-    println!("Number of images={}", num_files);
-    println!("Total Dssim diff={}", total_diff);
+    println!("Number of images={num_files}");
+    println!("Total Dssim diff={total_diff}");
     println!("Average Dssim diff={}", total_diff / (num_files as f64));
     println!("Time Elapsed: {:?}", start.elapsed());
     Ok(())
 }
 
-fn score_image(path: PathBuf, old_config: &Config, glob: &GlobalData) -> Result<f64, Box<dyn std::error::Error>> {
+fn score_image(path: &Path, old_config: &Config, glob: &GlobalData) -> Result<f64, Box<dyn std::error::Error>> {
     let mut total_diff = 0.0;
-    let mut source_img = image::open(path.clone())?;
+    let mut source_img = image::open(path)?;
     
     // set the board height to scale to the image
-    let board_height = source_img.width() * (old_config.board_width as u32) / source_img.height();
+    let board_height = source_img.width() * u32::try_from(old_config.board_width)? / source_img.height();
     let config = Config {
         board_width: old_config.board_width,
         board_height: board_height as usize,
@@ -62,14 +61,14 @@ fn score_image(path: PathBuf, old_config: &Config, glob: &GlobalData) -> Result<
 
     // handle scoring
     let approx_img = super::approx(&source_img, &config, &glob)?;
-    let dssim_diff = diff_images_dssim(&approx_img, &source_img)?;
+    let dssim_diff = diff_images_dssim(&approx_img, &source_img);
     total_diff += dssim_diff;
-    println!("Diff: {}, Source: {}", dssim_diff, path.display());
+    println!("Diff: {dssim_diff}, Source: {path:?}");
 
     Ok(total_diff)
 }
 
-fn diff_images_dssim(image1: &DynamicImage, image2: &DynamicImage) -> Result<f64, Box<dyn std::error::Error>> {
+fn diff_images_dssim(image1: &DynamicImage, image2: &DynamicImage) -> f64 {
     let d = Dssim::new();
 
     let image1_buffer = image1.to_rgb8();
@@ -82,5 +81,5 @@ fn diff_images_dssim(image1: &DynamicImage, image2: &DynamicImage) -> Result<f64
     let d_image2 = d.create_image_rgb(image2_rgb, image2.width() as usize, image2.height() as usize).expect("Failed to create dssim image");
 
     let (diff, _) = d.compare(&d_image1, &d_image2);
-    Ok(diff.into())
+    diff.into()
 }

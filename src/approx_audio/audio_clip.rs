@@ -21,6 +21,7 @@ pub struct AudioClip {
 }
 
 impl AudioClip {
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     pub fn new(source: &Path) -> Result<Self, Box<dyn std::error::Error>> {
         let wave = Wave::load(source)?;
         let sample_rate = wave.sample_rate();
@@ -49,7 +50,7 @@ impl AudioClip {
         })
     }
 
-    #[allow(dead_code)]
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, dead_code)]
     pub fn new_monotone(sample_rate: f64, duration: f64, amplitude: Sample) -> Self {
         let num_channels = 1;
         let num_samples = (duration * sample_rate) as usize;
@@ -73,6 +74,7 @@ impl AudioClip {
         }
     }
 
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     pub fn write(&self, path: Option<&Path>) -> Result<(), Box<dyn std::error::Error>> {
         let path = path.unwrap();
 
@@ -83,7 +85,7 @@ impl AudioClip {
 
         // create the output file and initialize the writer
         let spec = WavSpec {
-            channels: self.channels.len() as u16,
+            channels: u16::try_from(self.channels.len())?,
             sample_rate: self.sample_rate as u32,
             bits_per_sample: 32,
             sample_format: SampleFormat::Float,
@@ -96,7 +98,7 @@ impl AudioClip {
         // write each channel with interleaved samples
         assert!(self.channels.iter().all(|channel| channel.len() == self.num_samples));
         for i in 0..self.num_samples {
-            for channel in self.channels.iter() {
+            for channel in &self.channels {
                 wav_writer.write_sample(channel[i])?;
             }
         }
@@ -107,9 +109,10 @@ impl AudioClip {
 
     // takes a window of the audio clip
     // pads the window with 0s if the window extends out of bounds
+    #[allow(clippy::cast_precision_loss)]
     pub fn window(&self, start: usize, end: usize) -> Self {
         let mut channels = Vec::new();
-        for channel in self.channels.iter() {
+        for channel in &self.channels {
             let end_in_range = std::cmp::min(end, channel.len());
             let mut to_push = channel[start..end_in_range].to_vec();
             to_push.resize(end - start, 0.0);
@@ -129,6 +132,7 @@ impl AudioClip {
 
     // splits the audio clip into chunks the length of max_duration; if the last chunk is shorter than 
     // max_duration, it will still be included but will be smaller than max_duration
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     pub fn split_by_duration(&self, max_duration: f64) -> Vec<Self> {
         // split the original video into chunks; this will be useful for approximation later
         let mut chunks = Vec::new();
@@ -141,13 +145,14 @@ impl AudioClip {
         chunks
     }
 
+    #[allow(clippy::cast_precision_loss)]
     pub fn dot_product(&self, other: &Self) -> f64 {
         assert!(self.num_channels == other.num_channels);
-        assert!(self.sample_rate == other.sample_rate);
+        assert!((self.sample_rate - other.sample_rate).abs() < f64::EPSILON);
 
         let zero_pad_curr = self.num_samples < other.num_samples;
         let curr = if zero_pad_curr {
-            self.zero_pad(other.num_samples).unwrap()
+            self.zero_pad(other.num_samples)
         } else {
             self.clone()
         };
@@ -155,7 +160,7 @@ impl AudioClip {
         let other = if zero_pad_curr {
             other.clone()
         } else {
-            other.zero_pad(self.num_samples).unwrap()
+            other.zero_pad(self.num_samples)
         };
 
         let mut dot_product: f64 = 0.0;
@@ -173,6 +178,7 @@ impl AudioClip {
 
     // add new channels to the audio clip
     // uses the average of existing channels for new values
+    #[allow(clippy::cast_precision_loss)]
     pub fn add_new_channels(&mut self, num_channels: usize) {
         assert!(num_channels >= self.num_channels);
         if self.num_channels == num_channels {
@@ -204,21 +210,23 @@ impl AudioClip {
     }
 
     // zero pads the audio clip; this is useful for comparison of two audio clips
-    pub fn zero_pad(&self, num_samples: usize) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn zero_pad(&self, num_samples: usize) -> Self {
         assert!(num_samples >= self.num_samples);
 
         let mut clip = self.clone();
-        for channel in clip.channels.iter_mut() {
+        for channel in &mut clip.channels {
             channel.resize(num_samples, 0.0);
         }
         clip.num_samples = num_samples;
-        Ok(clip)
+        clip
     }
 }
 
+#[allow(clippy::missing_fields_in_debug)]
 impl fmt::Debug for AudioClip {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AudioClip")
+            .field("duration", &self.duration)
             .field("file_name", &self.file_name)
             .field("sample_rate", &self.sample_rate)
             .field("max_amplitude", &self.max_amplitude)
@@ -350,7 +358,7 @@ mod tests {
         let num_samples = 1000000;
         let source = path::Path::new("test_audio_clips/a6.mp3");
         let clip = AudioClip::new(&source).expect("failed to create audio clip");
-        let output = clip.zero_pad(num_samples).expect("failed to zero pad audio clip");
+        let output = clip.zero_pad(num_samples);
 
         assert_eq!(output.num_samples, num_samples);
         assert!(output.channels.iter().all(|channel| channel.len() == num_samples));

@@ -38,7 +38,7 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub enum Commands {
-    /// runs approximation tests using images located in the `sources` directory; board_width is set to 100 if unspecified
+    /// runs approximation tests using images located in the `sources` directory; `board_width` is set to 100 if unspecified
     Integration{board_width: Option<usize>},
 
     /// approximates a single image using tetris blocks
