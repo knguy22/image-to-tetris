@@ -230,9 +230,9 @@ fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, s
             let source_context_diff = subtract_pixels(avg_source_cell_pixel, avg_source_context_pixel);
 
             context_pixel_diff += f64::sqrt(
-                f64::from(board_context_diff[0] - source_context_diff[0].pow(2)) * RED_WEIGHT +
-                f64::from(board_context_diff[1] - source_context_diff[1].pow(2)) * GREEN_WEIGHT +
-                f64::from(board_context_diff[2] - source_context_diff[2].pow(2)) * BLUE_WEIGHT
+                f64::from(board_context_diff[0] - source_context_diff[0]).powf(2.0) * RED_WEIGHT +
+                f64::from(board_context_diff[1] - source_context_diff[1]).powf(2.0) * GREEN_WEIGHT +
+                f64::from(board_context_diff[2] - source_context_diff[2]).powf(2.0) * BLUE_WEIGHT
             );
             total_context_pixels += 1;
         }
