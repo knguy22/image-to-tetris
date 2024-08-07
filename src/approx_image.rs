@@ -14,7 +14,7 @@ use std::path::PathBuf;
 use image::Rgba;
 use imageproc::image::{DynamicImage, GenericImageView};
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum PrioritizeColor {
     Yes,
     No

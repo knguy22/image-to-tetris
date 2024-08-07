@@ -1,4 +1,4 @@
-use super::{Config, GlobalData, draw::resize_skins};
+use super::{Config, GlobalData, draw::resize_skins, resize_image};
 
 use std::fs;
 use std::path::PathBuf;
@@ -53,12 +53,15 @@ fn score_image(path: PathBuf, old_config: &Config, glob: &GlobalData) -> Result<
 
     // create a new glob for the local approximation since each image can contain different sizes
     // this means the block skin sizes should be tailored to the image
-    let mut local_glob = glob.clone();
+    let mut glob = glob.clone();
+
+    // resize the source image and skins as necessary
     let (image_width, image_height) = source_img.dimensions();
-    resize_skins(&mut local_glob.skins, image_width, image_height, config.board_width, config.board_height)?;
+    resize_skins(&mut glob.skins, image_width, image_height, config.board_width, config.board_height)?;
+    resize_image(&mut source_img, glob.skin_width(), glob.skin_height(), config.board_width, config.board_height);
 
     // handle scoring
-    let approx_img = super::approx(&mut source_img, &config, &local_glob)?;
+    let approx_img = super::approx(&mut source_img, &config, &glob)?;
     let dssim_diff = diff_images_dssim(&approx_img, &source_img)?;
     total_diff += dssim_diff;
     println!("Diff: {}, Source: {}", dssim_diff, path.display());

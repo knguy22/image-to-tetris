@@ -9,7 +9,7 @@ pub struct GlobalData {
     pub skins: Skins,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct Config {
     pub board_width: usize,
     pub board_height: usize,
