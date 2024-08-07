@@ -1,6 +1,6 @@
 use crate::approx_image;
 use crate::approx_audio;
-use crate::cli::Config;
+use crate::cli::{Config, GlobalData};
 use crate::utils::check_command_result;
 
 use std::fs;
@@ -11,48 +11,25 @@ use ffmpeg_next::format;
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 
-pub fn run(source: &PathBuf, output: &PathBuf, config: &Config) -> Result<(), Box<dyn std::error::Error>> {
-    const SOURCE_IMG_DIR: &str = "video_sources";
-    const APPROX_IMG_DIR: &str = "video_approx";
-    const AUDIO_PATH: &str = "video_approx/audio.wav";
+const SOURCE_IMG_DIR: &str = "video_sources";
+const APPROX_IMG_DIR: &str = "video_approx";
+const AUDIO_PATH: &str = "video_approx/audio.wav";
 
-    ffmpeg_next::init()?;
+pub fn run(source: &PathBuf, output: &PathBuf, config: &Config, glob: &GlobalData, video_config: &VideoConfig) -> Result<(), Box<dyn std::error::Error>> {
     let source_path = source.to_str().expect("failed to convert source path to string");
     let output_path = output.to_str().expect("failed to convert output path to string");
 
-    // check for the prerequisite directories to exist
-    if !PathBuf::from(SOURCE_IMG_DIR).exists() {
-        fs::create_dir(SOURCE_IMG_DIR)?;
-    }
-    if !PathBuf::from(APPROX_IMG_DIR).exists() {
-        fs::create_dir(APPROX_IMG_DIR)?;
-    }
-
-    // make sure the directories are empty; crash if not
-    if fs::read_dir(SOURCE_IMG_DIR)?.count() > 0 {
-        return Err("video_sources directory is not empty".into());
-    }
-    if fs::read_dir(APPROX_IMG_DIR)?.count() > 0 {
-        return Err("video_approx directory is not empty".into());
-    }
-
-    // make sure the output file is not there
-    if PathBuf::from(output_path).exists() {
-        return Err("output file already exists".into());
-    }
-
-    // load config
-    let video_config = VideoConfig::new(source)?;
-    println!("Approximating video with {}x{} dimensions using {}x{} board", video_config.width, video_config.height, config.board_width, config.board_height);
+    println!("Approximating video with {}x{} dimensions using {}x{} board", video_config.image_width, video_config.image_height, config.board_width, config.board_height);
     println!("Using {} fps", video_config.fps);
 
     // use ffmpeg to generate a directory full of images
+    // make sure those images correspond to the board dimenisions and blockskin dimensions
     println!("Generating source images from {}...", source_path);
     let gen_image_command = Command::new("ffmpeg")
         .arg("-i")
         .arg(source_path)
         .arg("-vf")
-        .arg(format!("fps={}", video_config.fps))
+        .arg(format!("fps={},scale={}x{}", video_config.fps, video_config.image_width, video_config.image_height))
         .arg("-start_number")
         .arg("0")
         .arg(format!("{}/%d.png", SOURCE_IMG_DIR))
@@ -69,7 +46,7 @@ pub fn run(source: &PathBuf, output: &PathBuf, config: &Config) -> Result<(), Bo
     check_command_result(gen_audio_command)?;
 
     // approximate the audio file if wanted
-    if config.approx_audio {
+    if video_config.approx_audio {
         approx_audio::run(&PathBuf::from(AUDIO_PATH), &PathBuf::from(AUDIO_PATH))?;
     } 
     else {
@@ -90,7 +67,7 @@ pub fn run(source: &PathBuf, output: &PathBuf, config: &Config) -> Result<(), Bo
             let approx_path = format!("{}/{}", APPROX_IMG_DIR, source_path_without_dir.to_str().expect("failed to convert source image path to string"));
 
             let mut source_img = image::open(source_path).expect("failed to load source image");
-            let approx_img = approx_image::run(&mut source_img, &config).expect("failed to approximate image");
+            let approx_img = approx_image::approx(&mut source_img, config, glob).expect("failed to approximate image");
             approx_img.save(approx_path).expect("failed to save approx image");
 
             // make sure the progress bar is updated
@@ -112,7 +89,7 @@ pub fn run(source: &PathBuf, output: &PathBuf, config: &Config) -> Result<(), Bo
         .arg("-crf")
         .arg("10")
         .arg("-vf")
-        .arg(format!("scale={}:{}", video_config.width, video_config.height))
+        .arg(format!("scale={}:{}", video_config.image_width, video_config.image_height))
         .arg("-c:a")
         .arg("aac")
         .arg("-shortest")
@@ -120,12 +97,51 @@ pub fn run(source: &PathBuf, output: &PathBuf, config: &Config) -> Result<(), Bo
         .output()?;
     check_command_result(combine_command)?;
 
-    // clean up the directories
-    fs::remove_dir_all(SOURCE_IMG_DIR)?;
-    fs::remove_dir_all(APPROX_IMG_DIR)?;
+    cleanup()?;
 
     println!("Done!");
 
+    Ok(())
+}
+
+pub fn init(source: &PathBuf, output: &PathBuf, config: &Config, glob: &mut GlobalData) -> Result<VideoConfig, Box<dyn std::error::Error>> {
+    ffmpeg_next::init()?;
+
+    // check for the prerequisite directories to exist
+    if !PathBuf::from(SOURCE_IMG_DIR).exists() {
+        fs::create_dir(SOURCE_IMG_DIR)?;
+    }
+    if !PathBuf::from(APPROX_IMG_DIR).exists() {
+        fs::create_dir(APPROX_IMG_DIR)?;
+    }
+
+    // make sure the directories are empty; crash if not
+    if fs::read_dir(SOURCE_IMG_DIR)?.count() > 0 {
+        return Err("video_sources directory is not empty".into());
+    }
+    if fs::read_dir(APPROX_IMG_DIR)?.count() > 0 {
+        return Err("video_approx directory is not empty".into());
+    }
+
+    // make sure the output file is not there
+    if output.exists() {
+        return Err("output file already exists".into());
+    }
+
+    // load config
+    let mut video_config = VideoConfig::new(source, config)?;
+
+    // modify the config based on resized skins
+    approx_image::draw::resize_skins(&mut glob.skins, video_config.image_width, video_config.image_height, config.board_width, config.board_height).unwrap();
+    video_config.image_width = glob.skin_width() * config.board_width as u32;
+    video_config.image_height = glob.skin_height() * config.board_height as u32;
+
+    Ok(video_config)
+}
+
+fn cleanup() -> Result<(), Box<dyn std::error::Error>> {
+    fs::remove_dir_all(SOURCE_IMG_DIR)?;
+    fs::remove_dir_all(APPROX_IMG_DIR)?;
     Ok(())
 }
 
@@ -139,24 +155,54 @@ fn progress_bar(pb_len: usize) -> Result<ProgressBar, Box<dyn std::error::Error>
 
 // contains important video metadata
 #[derive(Debug, Clone, Copy)]
-struct VideoConfig {
-    width: u32,
-    height: u32,
+pub struct VideoConfig {
+    pub image_width: u32,
+    pub image_height: u32,
     fps: i32,
+    approx_audio: bool,
 }
 
 impl VideoConfig {
     // loads video metadata
-    fn new(path: &PathBuf) -> Result<VideoConfig, Box<dyn std::error::Error>> {
+    fn new(path: &PathBuf, config: &Config) -> Result<VideoConfig, Box<dyn std::error::Error>> {
         let source = format::input(path)?;
         let input = source.streams().best(ffmpeg_next::media::Type::Video).ok_or("failed to find video stream")?;
         let fps = input.avg_frame_rate();
         let decoder = input.codec().decoder().video()?;
 
         Ok(VideoConfig {
-            width: decoder.width(),
-            height: decoder.height(),
+            image_width: decoder.width(),
+            image_height: decoder.height(),
             fps: fps.numerator() / fps.denominator(),
+            approx_audio: config.approx_audio,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+    use super::*;
+    use approx_image::PrioritizeColor;
+
+    #[test]
+    #[ignore]
+    fn test_run() {
+        let source = PathBuf::from("test_videos/blank_video.mkv");
+        let output = PathBuf::from("test_results/blank_video.mp4");
+
+        let config = Config {
+            board_width: 63,
+            board_height: 35,
+            prioritize_tetrominos: PrioritizeColor::No,
+            approx_audio: false,
+        };
+
+        let mut glob = GlobalData::new();
+        let video_config = init(&source, &output, &config, &mut glob).unwrap();
+        run(&source, &output, &config, &glob, &video_config).expect("failed to run video approximator");
+
+        // remove output
+        fs::remove_file(&output).unwrap();
     }
 }

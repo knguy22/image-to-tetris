@@ -5,13 +5,10 @@ mod cli;
 mod utils;
 
 use approx_image::PrioritizeColor;
-use approx_image::draw::create_skins;
 use approx_image::integration_test;
-use cli::Config;
-use std::path::PathBuf;
+use cli::{Config, GlobalData};
 
 use clap::Parser;
-use imageproc::image;
 use rayon;
 
 fn main() {
@@ -28,7 +25,7 @@ fn main() {
     println!("Prioritizing tetrominos: {}", cli.prioritize_tetrominos);
 
     // a global skins will be copied by each thread to prevent needing IO to recreate skins for each thread
-    let skins = create_skins();
+    let mut glob = GlobalData::new();
 
     match cli.command {
         cli::Commands::Integration {board_width} => {
@@ -37,9 +34,8 @@ fn main() {
                 board_height: 0, // height doesn't matter here since it will be auto-scaled
                 prioritize_tetrominos,
                 approx_audio: false,
-                skins: &skins,
             };
-            integration_test::run("sources", &config).expect("failed to run integration test");
+            integration_test::run("sources", &config, &glob).expect("failed to run integration test");
         },
         cli::Commands::ApproxImage { source, output, board_width, board_height } => {
             let config = Config {
@@ -47,9 +43,8 @@ fn main() {
                 board_height,
                 prioritize_tetrominos,
                 approx_audio: false,
-                skins: &skins,
             };
-            run_approx_image(&source, &output, &config)
+            approx_image::run(&source, &output, &config, &mut glob);
         }
         cli::Commands::ApproxAudio { source, output } => {
             approx_audio::run(&source, &output).expect("failed to run approximation audio");
@@ -60,19 +55,9 @@ fn main() {
                 board_height,
                 prioritize_tetrominos,
                 approx_audio: cli.approx_audio,
-                skins: &skins,
             };
-            approx_video::run(&source, &output, &config).expect("failed to run approximation video");
+            let video_config = approx_video::init(&source, &output, &config, &mut glob).unwrap();
+            approx_video::run(&source, &output, &config, &glob, &video_config).expect("failed to run approximation video");
         }
     }
-}
-
-fn run_approx_image(source: &PathBuf, output: &PathBuf, config: &Config) {
-    println!("Approximating an image: {}", source.display());
-
-    let mut source_img = image::open(source).expect("could not load source image");
-    println!("Loaded {}x{} image", source_img.width(), source_img.height());
-
-    let result_img = approx_image::run(&mut source_img, &config).expect("could not approximate image");
-    result_img.save(output).expect("could not save output image");
 }
