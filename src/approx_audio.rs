@@ -100,7 +100,7 @@ impl InputAudioClip {
         let output_clips = self.chunks
             .par_iter()
             .map(|chunk| {
-                let approx_chunk = self.approx_chunk(chunk, tetris_clips);
+                let approx_chunk = Self::approx_chunk(chunk, tetris_clips);
                 pb.inc(1);
                 approx_chunk
                 })
@@ -110,13 +110,13 @@ impl InputAudioClip {
         Ok(Self { chunks: output_clips })
     }
 
-    fn approx_chunk(&self, chunk: &AudioClip, tetris_clips: &TetrisClips) -> AudioClip {
+    fn approx_chunk(chunk: &AudioClip, tetris_clips: &TetrisClips) -> AudioClip {
         let mut output = chunk.clone();
 
         // choose a best tetris clip for the specific chunk
         let mut best_clip: Option<&AudioClip> = None;
         let mut best_dot_product: Option<f64> = None;
-        for clip in tetris_clips.clips.iter() {
+        for clip in &tetris_clips.clips {
             let dot_product = chunk.dot_product(clip);
 
             // tetris clips longer than the chunk are not considered to prevent early termination of sound clips
