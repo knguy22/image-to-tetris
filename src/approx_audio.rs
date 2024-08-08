@@ -6,10 +6,13 @@ mod resample;
 
 use audio_clip::{AudioClip, Sample};
 use tetris_clips::TetrisClips;
+use crate::utils::progress_bar;
 
 use std::fs;
 use std::path::Path;
 use std::cmp;
+
+use rayon::prelude::*;
 
 #[derive(Clone, Debug)]
 struct InputAudioClip {
@@ -40,9 +43,8 @@ pub fn run(source: &Path, output: &Path) -> Result<(), Box<dyn std::error::Error
     tetris_clips.dump(Path::new("results"))?;
 
     // now split the input
-    println!("Approximating audio...");
     let clip = InputAudioClip::new(source_resampled, max_channels)?;
-    let approx_clip = clip.approx(&tetris_clips);
+    let approx_clip = clip.approx(&tetris_clips)?;
     let source_clip = AudioClip::new(source_resampled)?;
     let final_clip = approx_clip.to_audio_clip();
     let final_approx_score = final_clip.dot_product(&source_clip);
@@ -91,13 +93,21 @@ impl InputAudioClip {
         Ok(InputAudioClip{chunks})
     }
 
-    pub fn approx(&self, tetris_clips: &TetrisClips) -> Self {
-        let output_clips = self.chunks
-            .iter()
-            .map(|chunk| self.approx_chunk(chunk, tetris_clips))
-            .collect();
+    pub fn approx(&self, tetris_clips: &TetrisClips) -> Result<Self, Box<dyn std::error::Error>> {
+        let pb = progress_bar(self.chunks.len())?;
 
-        Self { chunks: output_clips }
+        pb.set_message("Approximating audio chunks...");
+        let output_clips = self.chunks
+            .par_iter()
+            .map(|chunk| {
+                let approx_chunk = self.approx_chunk(chunk, tetris_clips);
+                pb.inc(1);
+                approx_chunk
+                })
+            .collect();
+        pb.finish_with_message("Done approximating audio chunks!");
+
+        Ok(Self { chunks: output_clips })
     }
 
     fn approx_chunk(&self, chunk: &AudioClip, tetris_clips: &TetrisClips) -> AudioClip {
