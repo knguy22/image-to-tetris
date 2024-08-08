@@ -209,6 +209,17 @@ impl AudioClip {
         self.num_channels = num_channels;
     }
 
+    pub fn scale_amplitude(&self, rhs: Sample) -> Self {
+        let mut output = self.clone();
+        for channel in &mut output.channels {
+            for sample in channel {
+                *sample *= rhs;
+            }
+        }
+        output.max_amplitude = output.max_amplitude * rhs;
+        output
+    }
+
     // zero pads the audio clip; this is useful for comparison of two audio clips
     pub fn zero_pad(&self, num_samples: usize) -> Self {
         assert!(num_samples >= self.num_samples);
@@ -383,5 +394,21 @@ mod tests {
 
         // cleanup
         fs::remove_dir_all(resample_source_dir).expect("failed to remove resampled audio clips");
+    }
+
+    #[test]
+    fn test_scale_amplitude() {
+        let sample_rate = 44100.0;
+        let duration = 1.0;
+        let amplitude = 0.5;
+        let multiplier: f32 = 0.33;
+
+        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude);
+        let new_clip = clip.scale_amplitude(multiplier);
+
+        assert!(new_clip.num_channels > 0);
+        assert_eq!(new_clip.num_samples, clip.num_samples);
+        assert_eq!(new_clip.channels[0].len(), clip.num_samples);
+        assert!(new_clip.channels[0].iter().all(|v| *v == amplitude * multiplier));
     }
 }
