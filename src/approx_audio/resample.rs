@@ -25,10 +25,11 @@ pub fn run(source: &Path, output: &Path, sample_rate: f64) -> Result<(), Box<dyn
 // the same as run but for an entire directory
 // note: all output files will have their extension changed to .wav
 pub fn run_dir(source: &Path, output: &Path, sample_rate: f64) -> Result<(), Box<dyn std::error::Error>> {
-    // makes sure the output directory exists
-    if !output.exists() {
-        fs::create_dir_all(output)?;
+    // makes sure the output directory exists and is empty
+    if output.exists() {
+        fs::remove_dir_all(output)?;
     }
+    fs::create_dir(output)?;
 
     for path in source.read_dir()? {
         let source_path = path.expect("failed to read source image").path();

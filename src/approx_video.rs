@@ -105,21 +105,15 @@ pub fn run(source: &Path, output: &Path, config: &Config, glob: &GlobalData, vid
 pub fn init(source: &Path, output: &Path, config: &Config, glob: &mut GlobalData) -> Result<VideoConfig, Box<dyn std::error::Error>> {
     ffmpeg_next::init()?;
 
-    // check for the prerequisite directories to exist
-    if !Path::new(SOURCE_IMG_DIR).exists() {
-        fs::create_dir(SOURCE_IMG_DIR)?;
+    // make sure the prerequisite directories exist and are empty
+    if Path::new(SOURCE_IMG_DIR).exists() {
+        fs::remove_dir_all(SOURCE_IMG_DIR)?;
     }
-    if !Path::new(APPROX_IMG_DIR).exists() {
-        fs::create_dir(APPROX_IMG_DIR)?;
+    if Path::new(APPROX_IMG_DIR).exists() {
+        fs::remove_dir_all(APPROX_IMG_DIR)?;
     }
-
-    // make sure the directories are empty; crash if not
-    if fs::read_dir(SOURCE_IMG_DIR)?.count() > 0 {
-        return Err("video_sources directory is not empty".into());
-    }
-    if fs::read_dir(APPROX_IMG_DIR)?.count() > 0 {
-        return Err("video_approx directory is not empty".into());
-    }
+    fs::create_dir(SOURCE_IMG_DIR)?;
+    fs::create_dir(APPROX_IMG_DIR)?;
 
     // make sure the output file is not there
     if output.exists() {
