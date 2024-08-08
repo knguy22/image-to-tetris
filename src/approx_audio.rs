@@ -118,6 +118,13 @@ impl InputAudioClip {
         let mut best_dot_product: Option<f64> = None;
         for clip in tetris_clips.clips.iter() {
             let dot_product = chunk.dot_product(clip);
+
+            // tetris clips longer than the chunk are not considered to prevent early termination of sound clips
+            if clip.num_samples > chunk.num_samples {
+                continue;
+            }
+
+            // find the best clip
             if best_dot_product.is_none() || dot_product > best_dot_product.unwrap() {
                 best_dot_product = Some(dot_product);
                 best_clip = Some(clip);
