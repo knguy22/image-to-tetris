@@ -68,6 +68,12 @@ impl TetrisClips {
         }
         Ok(())
     }
+
+    pub fn all_pairs(&self) -> impl Iterator<Item = (&AudioClip, &AudioClip)> {
+        self.clips.iter().enumerate().flat_map(|(i, a)| 
+            self.clips.iter().skip(i + 1).map(move |b| (a, b))
+        )
+    }
 }
 
 #[cfg(test)]
