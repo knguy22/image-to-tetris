@@ -29,7 +29,7 @@ pub fn run_dir(source: &Path, output: &Path, sample_rate: f64) -> Result<(), Box
     if output.exists() {
         fs::remove_dir_all(output)?;
     }
-    fs::create_dir_all(output)?;
+    fs::create_dir(output)?;
 
     for path in source.read_dir()? {
         let source_path = path.expect("failed to read source image").path();
