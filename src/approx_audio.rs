@@ -6,10 +6,13 @@ mod resample;
 
 use audio_clip::{AudioClip, Sample};
 use tetris_clips::TetrisClips;
+use crate::utils::progress_bar;
 
 use std::fs;
 use std::path::Path;
 use std::cmp;
+
+use rayon::prelude::*;
 
 #[derive(Clone, Debug)]
 struct InputAudioClip {
@@ -40,9 +43,8 @@ pub fn run(source: &Path, output: &Path) -> Result<(), Box<dyn std::error::Error
     tetris_clips.dump(Path::new("results"))?;
 
     // now split the input
-    println!("Approximating audio...");
     let clip = InputAudioClip::new(source_resampled, max_channels)?;
-    let approx_clip = clip.approx(&tetris_clips);
+    let approx_clip = clip.approx(&tetris_clips)?;
     let source_clip = AudioClip::new(source_resampled)?;
     let final_clip = approx_clip.to_audio_clip();
     let final_approx_score = final_clip.dot_product(&source_clip);
@@ -91,40 +93,55 @@ impl InputAudioClip {
         Ok(InputAudioClip{chunks})
     }
 
-    pub fn approx(&self, tetris_clips: &TetrisClips) -> Self {
-        let mut output = self.clone();
+    pub fn approx(&self, tetris_clips: &TetrisClips) -> Result<Self, Box<dyn std::error::Error>> {
+        let pb = progress_bar(self.chunks.len())?;
 
-        for (chunk_idx, chunk) in self.chunks.iter().enumerate() {
-            // choose a best tetris clip for the specific chunk
-            let mut best_clip: &AudioClip = &tetris_clips.clips[0];
-            let mut best_dot_product = chunk.dot_product(best_clip);
-            for clip in tetris_clips.clips.iter().skip(1) {
-                let dot_product = chunk.dot_product(clip);
-                if dot_product > best_dot_product {
-                    best_dot_product = dot_product;
-                    best_clip = clip;
-                }
+        pb.set_message("Approximating audio chunks...");
+        let output_clips = self.chunks
+            .par_iter()
+            .map(|chunk| {
+                let approx_chunk = self.approx_chunk(chunk, tetris_clips);
+                pb.inc(1);
+                approx_chunk
+                })
+            .collect();
+        pb.finish_with_message("Done approximating audio chunks!");
+
+        Ok(Self { chunks: output_clips })
+    }
+
+    fn approx_chunk(&self, chunk: &AudioClip, tetris_clips: &TetrisClips) -> AudioClip {
+        let mut output = chunk.clone();
+
+        // choose a best tetris clip for the specific chunk
+        let mut best_clip: &AudioClip = &tetris_clips.clips[0];
+        let mut best_dot_product = chunk.dot_product(best_clip);
+        for clip in tetris_clips.clips.iter().skip(1) {
+            let dot_product = chunk.dot_product(clip);
+            if dot_product > best_dot_product {
+                best_dot_product = dot_product;
+                best_clip = clip;
+            }
+        }
+
+        assert!(chunk.num_channels == best_clip.num_channels);
+        assert!((chunk.sample_rate - best_clip.sample_rate).abs() < f64::EPSILON);
+
+        // prevent index overflow since the last chunk can be smaller than the others
+        let num_samples_to_write = cmp::min(chunk.num_samples, best_clip.num_samples);
+
+        // then overwrite the best clip to the output
+        for channel_idx in 0..best_clip.num_channels {
+            assert!(chunk.num_samples == output.channels[channel_idx].len());
+            assert!(best_clip.num_samples == best_clip.channels[channel_idx].len());
+
+            for sample_idx in 0..num_samples_to_write {
+                output.channels[channel_idx][sample_idx] = best_clip.channels[channel_idx][sample_idx];
             }
 
-            assert!(chunk.num_channels == best_clip.num_channels);
-            assert!((chunk.sample_rate - best_clip.sample_rate).abs() < f64::EPSILON);
-
-            // prevent index overflow since the last chunk can be smaller than the others
-            let num_samples_to_write = cmp::min(chunk.num_samples, best_clip.num_samples);
-
-            // then overwrite the best clip to the output
-            for channel_idx in 0..best_clip.num_channels {
-                assert!(chunk.num_samples == output.chunks[chunk_idx].channels[channel_idx].len());
-                assert!(best_clip.num_samples == best_clip.channels[channel_idx].len());
-
-                for sample_idx in 0..num_samples_to_write {
-                    output.chunks[chunk_idx].channels[channel_idx][sample_idx] = best_clip.channels[channel_idx][sample_idx];
-                }
-
-                // let extra samples not covered by best clip be 0
-                for sample_idx in num_samples_to_write..chunk.num_samples {
-                    output.chunks[chunk_idx].channels[channel_idx][sample_idx] = 0.0;
-                }
+            // let extra samples not covered by best clip be 0
+            for sample_idx in num_samples_to_write..chunk.num_samples {
+                output.channels[channel_idx][sample_idx] = 0.0;
             }
         }
 
