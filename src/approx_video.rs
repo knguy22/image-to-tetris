@@ -1,14 +1,13 @@
 use crate::approx_image;
 use crate::approx_audio;
 use crate::cli::{Config, GlobalData};
-use crate::utils::check_command_result;
+use crate::utils::{check_command_result, progress_bar};
 
 use std::fs;
 use std::path::Path;
 use std::process::Command;
 
 use ffmpeg_next::format;
-use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 
 const SOURCE_IMG_DIR: &str = "video_sources";
@@ -142,14 +141,6 @@ fn cleanup() -> Result<(), Box<dyn std::error::Error>> {
     fs::remove_dir_all(SOURCE_IMG_DIR)?;
     fs::remove_dir_all(APPROX_IMG_DIR)?;
     Ok(())
-}
-
-fn progress_bar(pb_len: usize) -> Result<ProgressBar, Box<dyn std::error::Error>> {
-    let spinner_style = ProgressStyle::with_template("[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}")?
-        .tick_chars("##-");
-    let pb = ProgressBar::new(u64::try_from(pb_len)?);
-    pb.set_style(spinner_style.clone());
-    Ok(pb)
 }
 
 // contains important video metadata
