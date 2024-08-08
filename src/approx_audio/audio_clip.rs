@@ -54,14 +54,7 @@ impl AudioClip {
     pub fn new_monotone(sample_rate: f64, duration: f64, amplitude: Sample) -> Self {
         let num_channels = 1;
         let num_samples = (duration * sample_rate) as usize;
-        let mut channels: Vec<Channel> = Vec::new();
-        for _ in 0..num_channels {
-            let mut channel = Channel::new();
-            for _ in 0..num_samples {
-                channel.push(amplitude);
-            }
-            channels.push(channel);
-        }
+        let channels: Vec<Channel> = vec![vec![amplitude; num_samples]; num_channels];
 
         AudioClip {
             channels,
