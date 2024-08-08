@@ -114,33 +114,41 @@ impl InputAudioClip {
         let mut output = chunk.clone();
 
         // choose a best tetris clip for the specific chunk
-        let mut best_clip: &AudioClip = &tetris_clips.clips[0];
-        let mut best_dot_product = chunk.dot_product(best_clip);
-        for clip in tetris_clips.clips.iter().skip(1) {
+        let mut best_clip: Option<&AudioClip> = None;
+        let mut best_dot_product: Option<f64> = None;
+        for clip in tetris_clips.clips.iter() {
             let dot_product = chunk.dot_product(clip);
-            if dot_product > best_dot_product {
-                best_dot_product = dot_product;
-                best_clip = clip;
+            if best_dot_product.is_none() || dot_product > best_dot_product.unwrap() {
+                best_dot_product = Some(dot_product);
+                best_clip = Some(clip);
             }
         }
 
-        assert!(chunk.num_channels == best_clip.num_channels);
-        assert!((chunk.sample_rate - best_clip.sample_rate).abs() < f64::EPSILON);
+        let mut samples_overwritten = 0;
 
-        // prevent index overflow since the last chunk can be smaller than the others
-        let num_samples_to_write = cmp::min(chunk.num_samples, best_clip.num_samples);
+        // if a best clip is found, write it to the output
+        if best_clip.is_some() {
+            let best_clip = best_clip.unwrap();
+            assert!(chunk.num_channels == best_clip.num_channels);
+            assert!((chunk.sample_rate - best_clip.sample_rate).abs() < f64::EPSILON);
 
-        // then overwrite the best clip to the output
-        for channel_idx in 0..best_clip.num_channels {
-            assert!(chunk.num_samples == output.channels[channel_idx].len());
-            assert!(best_clip.num_samples == best_clip.channels[channel_idx].len());
+            // prevent index overflow since the last chunk can be smaller than the others
+            samples_overwritten = cmp::min(chunk.num_samples, best_clip.num_samples);
 
-            for sample_idx in 0..num_samples_to_write {
-                output.channels[channel_idx][sample_idx] = best_clip.channels[channel_idx][sample_idx];
+            // then overwrite the best clip to the output
+            for channel_idx in 0..best_clip.num_channels {
+                assert!(chunk.num_samples == output.channels[channel_idx].len());
+                assert!(best_clip.num_samples == best_clip.channels[channel_idx].len());
+
+                for sample_idx in 0..samples_overwritten {
+                    output.channels[channel_idx][sample_idx] = best_clip.channels[channel_idx][sample_idx];
+                }
             }
+        }
 
-            // let extra samples not covered by best clip be 0
-            for sample_idx in num_samples_to_write..chunk.num_samples {
+        // regardless of result, initialize the rest to 0
+        for channel_idx in 0..chunk.num_channels {
+            for sample_idx in samples_overwritten..chunk.num_samples {
                 output.channels[channel_idx][sample_idx] = 0.0;
             }
         }
