@@ -26,10 +26,15 @@ impl TetrisClips {
 
         // songs to split by onsets
         let songs_to_split = Path::new("assets_sound_onset_split");
-        for path in songs_to_split.read_dir()? {
-            let path = path?;
-            let clip = AudioClip::new(&path.path())?.split_by_onsets();
-            clips.extend(clip);
+        if songs_to_split.exists() {
+            for path in songs_to_split.read_dir()? {
+                let path = path?;
+                let clip = AudioClip::new(&path.path())?.split_by_onsets();
+                clips.extend(clip);
+            }
+        }
+        else {
+            println!("Warning: no songs to split by onsets found");
         }
 
         // add clips with 1/3, 2/3, and 4/3 of the volume for each clip
