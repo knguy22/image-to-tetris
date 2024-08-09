@@ -142,30 +142,18 @@ impl AudioClip {
         assert!(self.num_channels == other.num_channels);
         assert!((self.sample_rate - other.sample_rate).abs() < f64::EPSILON);
 
-        let zero_pad_curr = self.num_samples < other.num_samples;
-        let curr = if zero_pad_curr {
-            self.zero_pad(other.num_samples)
-        } else {
-            self.clone()
-        };
-
-        let other = if zero_pad_curr {
-            other.clone()
-        } else {
-            other.zero_pad(self.num_samples)
-        };
-
         let mut diff: f64 = 0.0;
-        for channel_idx in 0..curr.num_channels {
-            for sample_idx in 0..curr.num_samples {
-                let curr_sample = curr.channels[channel_idx][sample_idx];
-                let other_sample = other.channels[channel_idx][sample_idx];
+        let zero: f32 = 0.0;
+        for channel_idx in 0..self.num_channels {
+            for sample_idx in 0..self.num_samples {
+                let curr_sample = *self.channels[channel_idx].get(sample_idx).unwrap_or(&zero);
+                let other_sample = *other.channels[channel_idx].get(sample_idx).unwrap_or(&zero);
                 diff += f64::from(curr_sample) * f64::from(other_sample);
             }
         }
 
         assert!(!diff.is_nan());
-        diff / ((curr.num_samples * curr.num_channels) as f64)
+        diff / ((self.num_samples * self.num_channels) as f64)
     }
 
     // add new channels to the audio clip
