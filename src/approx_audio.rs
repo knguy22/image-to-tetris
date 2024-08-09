@@ -134,12 +134,13 @@ impl InputAudioClip {
         // if a best clip is found, write it to the output
         if best_clip.is_some() {
             let best_clip = best_clip.unwrap();
+            let limit = std::cmp::min(output.num_samples, best_clip.num_samples);
             assert!(output.num_channels == best_clip.num_channels);
             assert!((chunk.sample_rate - best_clip.sample_rate).abs() < f64::EPSILON);
 
             // then overwrite the best clip to the output
             for channel_idx in 0..best_clip.num_channels {
-                for sample_idx in 0..best_clip.num_samples {
+                for sample_idx in 0..limit {
                     output.channels[channel_idx][sample_idx] = best_clip.channels[channel_idx][sample_idx];
                 }
             }
