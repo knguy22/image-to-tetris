@@ -110,10 +110,11 @@ impl InputAudioClip {
     }
 
     fn approx_chunk(chunk: &AudioClip, tetris_clips: &TetrisClips) -> AudioClip {
-        const MULTIPLIERS: [Sample; 3] = [0.33, 0.66, 1.33];
+        const MULTIPLIERS: [Sample; 4] = [0.33, 0.66, 1.0, 1.33];
 
-        let mut output = AudioClip::new_monotone(chunk.sample_rate, chunk.duration, chunk.max_amplitude);
+        let mut output = AudioClip::new_monotone(chunk.sample_rate, chunk.duration, chunk.max_amplitude, chunk.num_channels);
         assert!(chunk.num_samples == output.num_samples);
+        assert!(chunk.num_channels == output.num_channels);
 
         // choose a best tetris clip for the specific chunk
         let mut best_clip: Option<&AudioClip> = None;
@@ -123,7 +124,7 @@ impl InputAudioClip {
             let dot_product = chunk.dot_product(clip, *multiplier);
 
             // tetris clips longer than the chunk are not considered to prevent early termination of sound clips
-            if clip.num_samples > chunk.num_samples {
+            if clip.num_samples > output.num_samples {
                 continue;
             }
 
@@ -139,15 +140,12 @@ impl InputAudioClip {
         if best_clip.is_some() {
             let best_clip = best_clip.unwrap();
             let best_multiplier = best_multiplier.expect("no best multiplier found");
-            assert!(chunk.num_channels == best_clip.num_channels);
+            assert!(output.num_channels == best_clip.num_channels);
             assert!((chunk.sample_rate - best_clip.sample_rate).abs() < f64::EPSILON);
 
             // then overwrite the best clip to the output
             for channel_idx in 0..best_clip.num_channels {
-                assert!(chunk.num_samples == output.channels[channel_idx].len());
-                assert!(best_clip.num_samples == best_clip.channels[channel_idx].len());
-
-                for sample_idx in 0..output.num_samples {
+                for sample_idx in 0..best_clip.num_samples {
                     output.channels[channel_idx][sample_idx] = best_clip.channels[channel_idx][sample_idx] * best_multiplier;
                 }
             }

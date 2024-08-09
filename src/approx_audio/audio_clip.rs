@@ -51,8 +51,7 @@ impl AudioClip {
     }
 
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, dead_code)]
-    pub fn new_monotone(sample_rate: f64, duration: f64, amplitude: Sample) -> Self {
-        let num_channels = 1;
+    pub fn new_monotone(sample_rate: f64, duration: f64, amplitude: Sample, num_channels: usize) -> Self {
         let num_samples = (duration * sample_rate) as usize;
         let channels: Vec<Channel> = vec![vec![amplitude; num_samples]; num_channels];
 
@@ -267,11 +266,11 @@ mod tests {
         let duration = 1.0;
         let amplitude = 0.5;
 
-        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude);
+        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude, 1);
 
         assert!(clip.num_channels > 0);
         assert_eq!(clip.num_samples, sample_rate as usize * duration as usize);
-        assert_eq!(clip.channels[0].len(), clip.num_samples);
+        assert!(clip.channels.iter().all(|v| v.len() == clip.num_samples));
         assert!(clip.channels[0].iter().all(|v| *v == amplitude));
     }
 
@@ -323,7 +322,7 @@ mod tests {
         let end: usize = 8000;
         let window_len = end - start;
 
-        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude);
+        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude, 1);
         let window_clip = clip.window(start, end);
 
         assert!(window_clip.num_channels > 0);
@@ -343,7 +342,7 @@ mod tests {
         let end: usize = 46000;
         let window_len = end - start;
 
-        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude);
+        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude, 1);
         let window_clip = clip.window(start, end);
 
         assert!(window_clip.num_channels > 0);
@@ -396,7 +395,7 @@ mod tests {
         let amplitude = 0.5;
         let multiplier: f32 = 0.33;
 
-        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude);
+        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude, 1);
         let new_clip = clip.scale_amplitude(multiplier);
 
         assert!(new_clip.num_channels > 0);
