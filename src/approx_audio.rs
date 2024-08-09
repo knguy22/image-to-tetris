@@ -13,6 +13,7 @@ use std::path::Path;
 use std::cmp;
 
 use rayon::prelude::*;
+use itertools::iproduct;
 
 #[derive(Clone, Debug)]
 struct InputAudioClip {
@@ -40,14 +41,13 @@ pub fn run(source: &Path, output: &Path) -> Result<(), Box<dyn std::error::Error
     for clip in &mut tetris_clips.clips {
         clip.add_new_channels(max_channels);
     }
-    tetris_clips.dump(Path::new("results"))?;
 
     // now split the input
     let clip = InputAudioClip::new(source_resampled, max_channels)?;
     let approx_clip = clip.approx(&tetris_clips)?;
     let source_clip = AudioClip::new(source_resampled)?;
     let final_clip = approx_clip.to_audio_clip();
-    let final_approx_score = final_clip.dot_product(&source_clip);
+    let final_approx_score = final_clip.dot_product(&source_clip, 1.0);
     println!("Approximation score: {final_approx_score}");
     final_clip.write(Some(output))?;
 
@@ -95,7 +95,6 @@ impl InputAudioClip {
 
     pub fn approx(&self, tetris_clips: &TetrisClips) -> Result<Self, Box<dyn std::error::Error>> {
         let pb = progress_bar(self.chunks.len())?;
-
         pb.set_message("Approximating audio chunks...");
         let output_clips = self.chunks
             .par_iter()
@@ -111,52 +110,44 @@ impl InputAudioClip {
     }
 
     fn approx_chunk(chunk: &AudioClip, tetris_clips: &TetrisClips) -> AudioClip {
-        let mut output = chunk.clone();
+        const MULTIPLIERS: [Sample; 6] = [0.2, 0.33, 0.66, 1.0, 1.33, 1.75];
+
+        let mut output = AudioClip::new_monotone(chunk.sample_rate, chunk.duration, chunk.max_amplitude, chunk.num_channels);
+        assert!(chunk.num_samples == output.num_samples);
+        assert!(chunk.num_channels == output.num_channels);
 
         // choose a best tetris clip for the specific chunk
         let mut best_clip: Option<&AudioClip> = None;
         let mut best_dot_product: Option<f64> = None;
-        for clip in &tetris_clips.clips {
-            let dot_product = chunk.dot_product(clip);
+        let mut best_multiplier: Option<f32> = None;
+        for (multiplier, clip) in iproduct!(&MULTIPLIERS, &tetris_clips.clips) {
+            let dot_product = chunk.dot_product(clip, *multiplier);
 
             // tetris clips longer than the chunk are not considered to prevent early termination of sound clips
-            if clip.num_samples > chunk.num_samples {
+            if clip.num_samples > output.num_samples {
                 continue;
             }
 
             // find the best clip
             if best_dot_product.is_none() || dot_product > best_dot_product.unwrap() {
                 best_dot_product = Some(dot_product);
+                best_multiplier = Some(*multiplier);
                 best_clip = Some(clip);
             }
         }
 
-        let mut samples_overwritten = 0;
-
         // if a best clip is found, write it to the output
         if best_clip.is_some() {
             let best_clip = best_clip.unwrap();
-            assert!(chunk.num_channels == best_clip.num_channels);
+            let best_multiplier = best_multiplier.expect("no best multiplier found");
+            assert!(output.num_channels == best_clip.num_channels);
             assert!((chunk.sample_rate - best_clip.sample_rate).abs() < f64::EPSILON);
-
-            // prevent index overflow since the last chunk can be smaller than the others
-            samples_overwritten = cmp::min(chunk.num_samples, best_clip.num_samples);
 
             // then overwrite the best clip to the output
             for channel_idx in 0..best_clip.num_channels {
-                assert!(chunk.num_samples == output.channels[channel_idx].len());
-                assert!(best_clip.num_samples == best_clip.channels[channel_idx].len());
-
-                for sample_idx in 0..samples_overwritten {
-                    output.channels[channel_idx][sample_idx] = best_clip.channels[channel_idx][sample_idx];
+                for sample_idx in 0..best_clip.num_samples {
+                    output.channels[channel_idx][sample_idx] = best_clip.channels[channel_idx][sample_idx] * best_multiplier;
                 }
-            }
-        }
-
-        // regardless of result, initialize the rest to 0
-        for channel_idx in 0..chunk.num_channels {
-            for sample_idx in samples_overwritten..chunk.num_samples {
-                output.channels[channel_idx][sample_idx] = 0.0;
             }
         }
 

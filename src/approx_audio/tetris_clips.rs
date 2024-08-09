@@ -1,4 +1,4 @@
-use super::{audio_clip::Sample, AudioClip};
+use super::AudioClip;
 
 use std::path::{Path, PathBuf};
 
@@ -35,15 +35,6 @@ impl TetrisClips {
         }
         else {
             println!("Warning: no songs to split by onsets found");
-        }
-
-        // add clips with 1/3, 2/3, and 4/3 of the volume for each clip
-        let num_clips = clips.len();
-        let multipliers: [Sample; 3] = [0.33, 0.66, 1.33];
-        for i in 0..num_clips {
-            for multiplier in &multipliers {
-                clips.push(clips[i].scale_amplitude(*multiplier));
-            }
         }
 
         Ok(TetrisClips { clips })

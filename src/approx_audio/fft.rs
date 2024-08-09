@@ -109,7 +109,7 @@ mod tests {
         let duration = 1.0;
         let amplitude = 0.5;
 
-        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude);
+        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude, 1);
         let fft = clip.fft();
         assert_eq!(fft.samples.len(), clip.num_samples);
     }
@@ -122,7 +122,7 @@ mod tests {
 
         let window = 1024;
         let hop = window / 4;
-        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude);
+        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude, 1);
         let stft = clip.stft(window, hop);
 
         // we expect the number of ffts done to be windows + hop that can fit in the clip
@@ -137,7 +137,7 @@ mod tests {
 
         let window = 2048;
         let hop = window / 4;
-        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude);
+        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude, 1);
         let stft = clip.stft(window, hop);
 
         // we expect the number of ffts done to be windows + hop that can fit in the clip

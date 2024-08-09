@@ -51,17 +51,9 @@ impl AudioClip {
     }
 
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, dead_code)]
-    pub fn new_monotone(sample_rate: f64, duration: f64, amplitude: Sample) -> Self {
-        let num_channels = 1;
+    pub fn new_monotone(sample_rate: f64, duration: f64, amplitude: Sample, num_channels: usize) -> Self {
         let num_samples = (duration * sample_rate) as usize;
-        let mut channels: Vec<Channel> = Vec::new();
-        for _ in 0..num_channels {
-            let mut channel = Channel::new();
-            for _ in 0..num_samples {
-                channel.push(amplitude);
-            }
-            channels.push(channel);
-        }
+        let channels: Vec<Channel> = vec![vec![amplitude; num_samples]; num_channels];
 
         AudioClip {
             channels,
@@ -146,7 +138,7 @@ impl AudioClip {
     }
 
     #[allow(clippy::cast_precision_loss)]
-    pub fn dot_product(&self, other: &Self) -> f64 {
+    pub fn dot_product(&self, other: &Self, multiplier: f32) -> f64 {
         assert!(self.num_channels == other.num_channels);
         assert!((self.sample_rate - other.sample_rate).abs() < f64::EPSILON);
 
@@ -167,7 +159,7 @@ impl AudioClip {
         for channel_idx in 0..curr.num_channels {
             for sample_idx in 0..curr.num_samples {
                 let curr_sample = curr.channels[channel_idx][sample_idx];
-                let other_sample = other.channels[channel_idx][sample_idx];
+                let other_sample = other.channels[channel_idx][sample_idx] * multiplier;
                 dot_product += f64::from(curr_sample) * f64::from(other_sample);
             }
         }
@@ -216,7 +208,7 @@ impl AudioClip {
                 *sample *= rhs;
             }
         }
-        output.max_amplitude = output.max_amplitude * rhs;
+        output.max_amplitude *= rhs;
         output
     }
 
@@ -274,11 +266,11 @@ mod tests {
         let duration = 1.0;
         let amplitude = 0.5;
 
-        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude);
+        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude, 1);
 
         assert!(clip.num_channels > 0);
         assert_eq!(clip.num_samples, sample_rate as usize * duration as usize);
-        assert_eq!(clip.channels[0].len(), clip.num_samples);
+        assert!(clip.channels.iter().all(|v| v.len() == clip.num_samples));
         assert!(clip.channels[0].iter().all(|v| *v == amplitude));
     }
 
@@ -330,7 +322,7 @@ mod tests {
         let end: usize = 8000;
         let window_len = end - start;
 
-        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude);
+        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude, 1);
         let window_clip = clip.window(start, end);
 
         assert!(window_clip.num_channels > 0);
@@ -350,7 +342,7 @@ mod tests {
         let end: usize = 46000;
         let window_len = end - start;
 
-        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude);
+        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude, 1);
         let window_clip = clip.window(start, end);
 
         assert!(window_clip.num_channels > 0);
@@ -389,8 +381,8 @@ mod tests {
             clips.push(AudioClip::new(&source.unwrap().path()).expect("failed to create audio clip"));
         }
 
-        let self_dot_product = clips[0].dot_product(&clips[0]);
-        assert!(clips.iter().skip(1).all(|clip| clip.dot_product(&clips[0]) < self_dot_product));
+        let self_dot_product = clips[0].dot_product(&clips[0], 1.0);
+        assert!(clips.iter().skip(1).all(|clip| clip.dot_product(&clips[0], 1.0) < self_dot_product));
 
         // cleanup
         fs::remove_dir_all(resample_source_dir).expect("failed to remove resampled audio clips");
@@ -403,7 +395,7 @@ mod tests {
         let amplitude = 0.5;
         let multiplier: f32 = 0.33;
 
-        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude);
+        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude, 1);
         let new_clip = clip.scale_amplitude(multiplier);
 
         assert!(new_clip.num_channels > 0);
