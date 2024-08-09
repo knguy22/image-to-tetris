@@ -47,8 +47,8 @@ pub fn run(source: &Path, output: &Path) -> Result<(), Box<dyn std::error::Error
     let approx_clip = clip.approx(&tetris_clips)?;
     let source_clip = AudioClip::new(source_resampled)?;
     let final_clip = approx_clip.to_audio_clip();
-    let final_approx_score = final_clip.diff(&source_clip);
-    println!("Approximation score: {final_approx_score}");
+    println!("Final MSE: {}", final_clip.mse(&source_clip));
+    println!("Final Dot: {}", final_clip.dot_product(&source_clip));
     final_clip.write(Some(output))?;
 
     // cleanup
