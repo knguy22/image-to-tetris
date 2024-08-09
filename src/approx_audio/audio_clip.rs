@@ -138,8 +138,8 @@ impl AudioClip {
     }
 
     #[allow(clippy::cast_precision_loss)]
-    pub fn diff(&self, other: &Self) -> f64 {
-        self.mse(other)
+    pub fn diff(&self, other: &Self, multiplier: Sample) -> f64 {
+        self.mse(other, multiplier)
     }
 
     // add new channels to the audio clip

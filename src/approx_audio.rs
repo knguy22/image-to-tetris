@@ -14,6 +14,7 @@ use std::path::Path;
 use std::cmp;
 
 use rayon::prelude::*;
+use itertools::iproduct;
 
 #[derive(Clone, Debug)]
 struct InputAudioClip {
@@ -47,8 +48,8 @@ pub fn run(source: &Path, output: &Path) -> Result<(), Box<dyn std::error::Error
     let approx_clip = clip.approx(&tetris_clips)?;
     let source_clip = AudioClip::new(source_resampled)?;
     let final_clip = approx_clip.to_audio_clip();
-    println!("Final MSE: {}", final_clip.mse(&source_clip));
-    println!("Final Dot: {}", final_clip.dot_product(&source_clip));
+    println!("Final MSE: {}", final_clip.mse(&source_clip, 1.0));
+    println!("Final Dot: {}", final_clip.dot_product(&source_clip, 1.0));
     final_clip.write(Some(output))?;
 
     // cleanup
@@ -110,6 +111,8 @@ impl InputAudioClip {
     }
 
     fn approx_chunk(chunk: &AudioClip, tetris_clips: &TetrisClips) -> AudioClip {
+        const MULTIPLIERS: [Sample; 4] = [0.33, 0.66, 1.0, 1.33];
+
         let mut output = AudioClip::new_monotone(chunk.sample_rate, chunk.duration, chunk.max_amplitude, chunk.num_channels);
         assert!(chunk.num_samples == output.num_samples);
         assert!(chunk.num_channels == output.num_channels);
@@ -117,8 +120,9 @@ impl InputAudioClip {
         // choose a best tetris clip for the specific chunk
         let mut best_clip: Option<&AudioClip> = None;
         let mut best_diff: Option<f64> = None;
-        for clip in &tetris_clips.clips {
-            let diff = chunk.diff(clip);
+        let mut best_multiplier: Option<Sample> = None;
+        for (multiplier, clip) in iproduct!(MULTIPLIERS, &tetris_clips.clips) {
+            let diff = chunk.diff(clip, multiplier);
 
             // tetris clips longer than the chunk are not considered to prevent early termination of sound clips
             if clip.num_samples > output.num_samples {
@@ -128,13 +132,15 @@ impl InputAudioClip {
             // find the best clip
             if best_diff.is_none() || diff < best_diff.unwrap() {
                 best_diff = Some(diff);
+                best_multiplier = Some(multiplier);
                 best_clip = Some(clip);
             }
         }
 
         // if a best clip is found, write it to the output
         if best_clip.is_some() {
-            let best_clip = best_clip.unwrap();
+            let best_clip = best_clip.expect("No best clip found");
+            let best_multiplier = best_multiplier.expect("No best multiplier found");
             let limit = std::cmp::min(output.num_samples, best_clip.num_samples);
             assert!(output.num_channels == best_clip.num_channels);
             assert!((chunk.sample_rate - best_clip.sample_rate).abs() < f64::EPSILON);
@@ -142,7 +148,7 @@ impl InputAudioClip {
             // then overwrite the best clip to the output
             for channel_idx in 0..best_clip.num_channels {
                 for sample_idx in 0..limit {
-                    output.channels[channel_idx][sample_idx] = best_clip.channels[channel_idx][sample_idx];
+                    output.channels[channel_idx][sample_idx] = best_clip.channels[channel_idx][sample_idx] * best_multiplier;
                 }
             }
         }

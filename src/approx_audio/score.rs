@@ -4,18 +4,18 @@ use itertools::Itertools;
 
 impl AudioClip {
     #[allow(clippy::cast_precision_loss, unused)]
-    pub fn mse(&self, other: &Self) -> f64 {
+    pub fn mse(&self, other: &Self, multiplier: Sample) -> f64 {
         let diff = self.zip_samples(other)
-            .map(|(s1, s2)| (f64::from(s1) - f64::from(s2)).powf(2.0))
+            .map(|(s1, s2)| (f64::from(s1) - f64::from(s2) * f64::from(multiplier)).powf(2.0))
             .sum::<f64>();
         assert!(!diff.is_nan());
         diff / ((self.num_samples * self.num_channels) as f64)
     }
 
     #[allow(clippy::cast_precision_loss, unused)]
-    pub fn dot_product(&self, other: &Self) -> f64 {
+    pub fn dot_product(&self, other: &Self, multiplier: Sample) -> f64 {
         let diff = self.zip_samples(other)
-            .map(|(s1, s2)| f64::from(s1) * f64::from(s2))
+            .map(|(s1, s2)| f64::from(s1) * f64::from(s2) * f64::from(multiplier))
             .sum::<f64>();
         assert!(!diff.is_nan());
         diff / ((self.num_samples * self.num_channels) as f64)
@@ -46,7 +46,7 @@ mod tests {
     fn test_mse_same_file() {
         let source = Path::new("test_audio_clips/a6.mp3");
         let clip = AudioClip::new(&source).expect("failed to create audio clip");
-        let diff = clip.mse(&clip);
+        let diff = clip.mse(&clip, 1.0);
         assert_eq!(diff, 0.0);
     }
 
@@ -54,7 +54,7 @@ mod tests {
     fn test_dot_same_file() {
         let source = Path::new("test_audio_clips/a6.mp3");
         let clip = AudioClip::new(&source).expect("failed to create audio clip");
-        let diff = clip.dot_product(&clip);
+        let diff = clip.dot_product(&clip, 1.0);
         assert_ne!(diff, 0.0);
     }
 
@@ -63,12 +63,12 @@ mod tests {
         let clips = get_clips();
 
         // mse
-        let self_diff = clips[0].mse(&clips[0]);
-        assert!(clips.iter().skip(1).all(|clip| clip.mse(&clips[0]) > self_diff), "Similar files should have lower MSEs");
+        let self_diff = clips[0].mse(&clips[0], 1.0);
+        assert!(clips.iter().skip(1).all(|clip| clip.mse(&clips[0], 1.0) > self_diff), "Similar files should have lower MSEs");
 
         // dot 
-        let self_diff = clips[0].dot_product(&clips[0]);
-        assert!(clips.iter().skip(1).all(|clip| clip.dot_product(&clips[0]) < self_diff), "Similar files should have greater dot products");
+        let self_diff = clips[0].dot_product(&clips[0], 1.0);
+        assert!(clips.iter().skip(1).all(|clip| clip.dot_product(&clips[0], 1.0) < self_diff), "Similar files should have greater dot products");
 
         cleanup_clips();
     }
