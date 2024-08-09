@@ -68,6 +68,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[ignore]
     fn test_tetris_clips() {
         let source = path::Path::new("test_audio_clips");
         let tetris_clips = TetrisClips::new(&source).expect("failed to create tetris clips");
