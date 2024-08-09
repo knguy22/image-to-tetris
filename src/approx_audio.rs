@@ -113,14 +113,14 @@ impl InputAudioClip {
     fn approx_chunk(chunk: &AudioClip, tetris_clips: &TetrisClips) -> AudioClip {
         const MULTIPLIERS: [Sample; 4] = [0.33, 0.66, 1.0, 1.33];
 
-        let mut output = AudioClip::new_monotone(chunk.sample_rate, chunk.duration, chunk.max_amplitude, chunk.num_channels);
+        let mut output = AudioClip::new_monotone(chunk.sample_rate, chunk.duration, 0.0, chunk.num_channels);
         assert!(chunk.num_samples == output.num_samples);
         assert!(chunk.num_channels == output.num_channels);
 
         // choose a best tetris clip for the specific chunk
         let mut best_clip: Option<&AudioClip> = None;
-        let mut best_diff: Option<f64> = None;
         let mut best_multiplier: Option<Sample> = None;
+        let mut best_diff: f64 = chunk.diff(&output, 0.0);
         for (multiplier, clip) in iproduct!(MULTIPLIERS, &tetris_clips.clips) {
             let diff = chunk.diff(clip, multiplier);
 
@@ -130,10 +130,10 @@ impl InputAudioClip {
             }
 
             // find the best clip
-            if best_diff.is_none() || diff < best_diff.unwrap() {
-                best_diff = Some(diff);
+            if diff < best_diff {
                 best_multiplier = Some(multiplier);
                 best_clip = Some(clip);
+                best_diff = diff;
             }
         }
 
