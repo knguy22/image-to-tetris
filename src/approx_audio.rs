@@ -125,7 +125,7 @@ impl InputAudioClip {
             }
 
             // find the best clip
-            if best_diff.is_none() || diff > best_diff.unwrap() {
+            if best_diff.is_none() || diff < best_diff.unwrap() {
                 best_diff = Some(diff);
                 best_clip = Some(clip);
             }
