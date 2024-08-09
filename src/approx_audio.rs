@@ -40,7 +40,7 @@ pub fn run(source: &Path, output: &Path) -> Result<(), Box<dyn std::error::Error
     resample::run(source, source_resampled, max_sample_rate)?;
     let mut tetris_clips = TetrisClips::new(tetris_sounds_resampled)?;
     for clip in &mut tetris_clips.clips {
-        clip.add_new_channels(max_channels);
+        clip.add_new_channels_mut(max_channels);
     }
 
     // now split the input
@@ -89,7 +89,7 @@ fn cleanup(tetris_sounds_resampled: &Path, input_resampled: &Path) -> Result<(),
 impl InputAudioClip {
     pub fn new(source: &Path, num_channels: usize) -> Result<InputAudioClip, Box<dyn std::error::Error>> {
         let mut clip = AudioClip::new(source)?;
-        clip.add_new_channels(num_channels);
+        clip.add_new_channels_mut(num_channels);
         let chunks = clip.split_by_onsets();
         Ok(InputAudioClip{chunks})
     }
@@ -141,16 +141,7 @@ impl InputAudioClip {
         if best_clip.is_some() {
             let best_clip = best_clip.expect("No best clip found");
             let best_multiplier = best_multiplier.expect("No best multiplier found");
-            let limit = std::cmp::min(output.num_samples, best_clip.num_samples);
-            assert!(output.num_channels == best_clip.num_channels);
-            assert!((chunk.sample_rate - best_clip.sample_rate).abs() < f64::EPSILON);
-
-            // then overwrite the best clip to the output
-            for channel_idx in 0..best_clip.num_channels {
-                for sample_idx in 0..limit {
-                    output.channels[channel_idx][sample_idx] = best_clip.channels[channel_idx][sample_idx] * best_multiplier;
-                }
-            }
+            output.add_mut(&best_clip, best_multiplier);
         }
 
         output

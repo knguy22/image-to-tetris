@@ -145,7 +145,7 @@ impl AudioClip {
     // add new channels to the audio clip
     // uses the average of existing channels for new values
     #[allow(clippy::cast_precision_loss)]
-    pub fn add_new_channels(&mut self, num_channels: usize) {
+    pub fn add_new_channels_mut(&mut self, num_channels: usize) {
         assert!(num_channels >= self.num_channels);
         if self.num_channels == num_channels {
             return
@@ -173,6 +173,19 @@ impl AudioClip {
 
         self.channels = channels;
         self.num_channels = num_channels;
+    }
+
+    pub fn add_mut(&mut self, rhs: &Self, multiplier: Sample) {
+        assert!(self.num_channels == rhs.num_channels);
+        assert!((self.sample_rate - rhs.sample_rate).abs() < f64::EPSILON);
+        assert!(self.num_samples >= rhs.num_samples);
+
+        let limit = std::cmp::min(self.num_samples, rhs.num_samples);
+        for channel_idx in 0..self.num_channels {
+            for sample_idx in 0..limit {
+                self.channels[channel_idx][sample_idx] += rhs.channels[channel_idx][sample_idx] * multiplier;
+            }
+        }
     }
 
     pub fn scale_amplitude(&self, rhs: Sample) -> Self {
@@ -353,5 +366,19 @@ mod tests {
         assert_eq!(new_clip.num_samples, clip.num_samples);
         assert_eq!(new_clip.channels[0].len(), clip.num_samples);
         assert!(new_clip.channels[0].iter().all(|v| *v == amplitude * multiplier));
+    }
+
+    #[test]
+    fn test_add_mut() {
+        let sample_rate = 44100.0;
+        let duration = 1.0;
+        let amplitude_0 = 0.25;
+        let amplitude_1 = 0.5;
+
+        let mut clip_0 = AudioClip::new_monotone(sample_rate, duration, amplitude_0, 1);
+        let clip_1 = AudioClip::new_monotone(sample_rate, duration, amplitude_1, 1);
+        clip_0.add_mut(&clip_1, 1.0);
+
+        assert!(clip_0.channels[0].iter().all(|v| *v == amplitude_0 + amplitude_1));
     }
 }
