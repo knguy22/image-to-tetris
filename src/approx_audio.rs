@@ -110,7 +110,7 @@ impl InputAudioClip {
     }
 
     fn approx_chunk(chunk: &AudioClip, tetris_clips: &TetrisClips) -> AudioClip {
-        const MULTIPLIERS: [Sample; 4] = [0.33, 0.66, 1.0, 1.33];
+        const MULTIPLIERS: [Sample; 6] = [0.2, 0.33, 0.66, 1.0, 1.33, 1.75];
 
         let mut output = AudioClip::new_monotone(chunk.sample_rate, chunk.duration, chunk.max_amplitude, chunk.num_channels);
         assert!(chunk.num_samples == output.num_samples);
