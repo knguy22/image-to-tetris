@@ -1,6 +1,7 @@
 mod audio_clip;
 mod fft;
 mod onset_detect;
+mod score;
 mod tetris_clips;
 mod resample;
 
