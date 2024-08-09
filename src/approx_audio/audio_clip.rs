@@ -138,34 +138,8 @@ impl AudioClip {
     }
 
     #[allow(clippy::cast_precision_loss)]
-    pub fn dot_product(&self, other: &Self, multiplier: f32) -> f64 {
-        assert!(self.num_channels == other.num_channels);
-        assert!((self.sample_rate - other.sample_rate).abs() < f64::EPSILON);
-
-        let zero_pad_curr = self.num_samples < other.num_samples;
-        let curr = if zero_pad_curr {
-            self.zero_pad(other.num_samples)
-        } else {
-            self.clone()
-        };
-
-        let other = if zero_pad_curr {
-            other.clone()
-        } else {
-            other.zero_pad(self.num_samples)
-        };
-
-        let mut dot_product: f64 = 0.0;
-        for channel_idx in 0..curr.num_channels {
-            for sample_idx in 0..curr.num_samples {
-                let curr_sample = curr.channels[channel_idx][sample_idx];
-                let other_sample = other.channels[channel_idx][sample_idx] * multiplier;
-                dot_product += f64::from(curr_sample) * f64::from(other_sample);
-            }
-        }
-
-        assert!(!dot_product.is_nan());
-        dot_product / ((curr.num_samples * curr.num_channels) as f64)
+    pub fn diff(&self, other: &Self, multiplier: Sample) -> f64 {
+        self.mse(other, multiplier)
     }
 
     // add new channels to the audio clip
@@ -242,8 +216,6 @@ impl fmt::Debug for AudioClip {
 #[cfg(test)]
 mod tests {
     use std::path;
-
-    use crate::approx_audio::resample;
 
     use super::*;
 
@@ -365,27 +337,6 @@ mod tests {
 
         assert_eq!(output.num_samples, num_samples);
         assert!(output.channels.iter().all(|channel| channel.len() == num_samples));
-    }
-
-    #[test]
-    fn test_dot_product() {
-        // first resample the audio clips to 44100 Hz
-        let sample_rate = 44100.0;
-        let source_dir = path::Path::new("test_audio_clips");
-        let resample_source_dir = path::Path::new("test_resampled_audio_clips");
-        resample::run_dir(source_dir, resample_source_dir, sample_rate).expect("failed to resample audio clips");
-
-        // the same file should have the highest dot product with itself
-        let mut clips = Vec::new();
-        for source in resample_source_dir.read_dir().unwrap() {
-            clips.push(AudioClip::new(&source.unwrap().path()).expect("failed to create audio clip"));
-        }
-
-        let self_dot_product = clips[0].dot_product(&clips[0], 1.0);
-        assert!(clips.iter().skip(1).all(|clip| clip.dot_product(&clips[0], 1.0) < self_dot_product));
-
-        // cleanup
-        fs::remove_dir_all(resample_source_dir).expect("failed to remove resampled audio clips");
     }
 
     #[test]

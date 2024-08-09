@@ -1,6 +1,7 @@
 mod audio_clip;
 mod fft;
 mod onset_detect;
+mod score;
 mod tetris_clips;
 mod resample;
 
@@ -47,8 +48,8 @@ pub fn run(source: &Path, output: &Path) -> Result<(), Box<dyn std::error::Error
     let approx_clip = clip.approx(&tetris_clips)?;
     let source_clip = AudioClip::new(source_resampled)?;
     let final_clip = approx_clip.to_audio_clip();
-    let final_approx_score = final_clip.dot_product(&source_clip, 1.0);
-    println!("Approximation score: {final_approx_score}");
+    println!("Final MSE: {}", final_clip.mse(&source_clip, 1.0));
+    println!("Final Dot: {}", final_clip.dot_product(&source_clip, 1.0));
     final_clip.write(Some(output))?;
 
     // cleanup
@@ -110,18 +111,18 @@ impl InputAudioClip {
     }
 
     fn approx_chunk(chunk: &AudioClip, tetris_clips: &TetrisClips) -> AudioClip {
-        const MULTIPLIERS: [Sample; 6] = [0.2, 0.33, 0.66, 1.0, 1.33, 1.75];
+        const MULTIPLIERS: [Sample; 4] = [0.33, 0.66, 1.0, 1.33];
 
-        let mut output = AudioClip::new_monotone(chunk.sample_rate, chunk.duration, chunk.max_amplitude, chunk.num_channels);
+        let mut output = AudioClip::new_monotone(chunk.sample_rate, chunk.duration, 0.0, chunk.num_channels);
         assert!(chunk.num_samples == output.num_samples);
         assert!(chunk.num_channels == output.num_channels);
 
         // choose a best tetris clip for the specific chunk
         let mut best_clip: Option<&AudioClip> = None;
-        let mut best_dot_product: Option<f64> = None;
-        let mut best_multiplier: Option<f32> = None;
-        for (multiplier, clip) in iproduct!(&MULTIPLIERS, &tetris_clips.clips) {
-            let dot_product = chunk.dot_product(clip, *multiplier);
+        let mut best_multiplier: Option<Sample> = None;
+        let mut best_diff: f64 = chunk.diff(&output, 0.0);
+        for (multiplier, clip) in iproduct!(MULTIPLIERS, &tetris_clips.clips) {
+            let diff = chunk.diff(clip, multiplier);
 
             // tetris clips longer than the chunk are not considered to prevent early termination of sound clips
             if clip.num_samples > output.num_samples {
@@ -129,23 +130,24 @@ impl InputAudioClip {
             }
 
             // find the best clip
-            if best_dot_product.is_none() || dot_product > best_dot_product.unwrap() {
-                best_dot_product = Some(dot_product);
-                best_multiplier = Some(*multiplier);
+            if diff < best_diff {
+                best_multiplier = Some(multiplier);
                 best_clip = Some(clip);
+                best_diff = diff;
             }
         }
 
         // if a best clip is found, write it to the output
         if best_clip.is_some() {
-            let best_clip = best_clip.unwrap();
-            let best_multiplier = best_multiplier.expect("no best multiplier found");
+            let best_clip = best_clip.expect("No best clip found");
+            let best_multiplier = best_multiplier.expect("No best multiplier found");
+            let limit = std::cmp::min(output.num_samples, best_clip.num_samples);
             assert!(output.num_channels == best_clip.num_channels);
             assert!((chunk.sample_rate - best_clip.sample_rate).abs() < f64::EPSILON);
 
             // then overwrite the best clip to the output
             for channel_idx in 0..best_clip.num_channels {
-                for sample_idx in 0..best_clip.num_samples {
+                for sample_idx in 0..limit {
                     output.channels[channel_idx][sample_idx] = best_clip.channels[channel_idx][sample_idx] * best_multiplier;
                 }
             }
