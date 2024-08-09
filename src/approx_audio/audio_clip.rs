@@ -208,7 +208,7 @@ impl AudioClip {
                 *sample *= rhs;
             }
         }
-        output.max_amplitude = output.max_amplitude * rhs;
+        output.max_amplitude *= rhs;
         output
     }
 
