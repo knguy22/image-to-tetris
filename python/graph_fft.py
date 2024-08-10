@@ -66,7 +66,27 @@ def test_spectral_onset():
     plt.title('Input Signal')
     plt.savefig('input_signal.png')
 
-def main():
+def graph_audio_clip():
+    df = pd.read_csv('audio.csv')
+
+    # expected structure: channel, index, normalized value
+    channels = df.groupby('channel')
+    for channel, group in channels:
+        index = group['index']
+        magnitude = group['magnitude']
+
+        plt.figure(figsize=(10, 6))
+        plt.plot(index, magnitude, 'b-', label='Magnitude')
+
+        plt.xlabel('Index')
+        plt.ylabel('Magnitude')
+        plt.title(f'Channel {channel}')
+        plt.legend()
+
+        plt.grid(True)
+        plt.savefig(f'audio_channel_{channel}.png')
+
+def graph_fft():
     df = pd.read_csv('fft.csv')
 
     # expected structure: channel, index, normalized value
@@ -88,5 +108,4 @@ def main():
         plt.savefig(f'fft_channel_{channel}.png')
 
 if __name__ == "__main__":
-    test_spectral_onset()
-    # main()
+    graph_audio_clip()
