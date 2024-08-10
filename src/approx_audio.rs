@@ -141,7 +141,7 @@ impl InputAudioClip {
         if best_clip.is_some() {
             let best_clip = best_clip.expect("No best clip found");
             let best_multiplier = best_multiplier.expect("No best multiplier found");
-            output.add_mut(&best_clip, best_multiplier);
+            output.add_mut(best_clip, best_multiplier);
         }
 
         output

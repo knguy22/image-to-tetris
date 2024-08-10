@@ -68,7 +68,7 @@ impl AudioClip {
 
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     pub fn write(&self, path: Option<&Path>) -> Result<(), Box<dyn std::error::Error>> {
-        let path = path.unwrap();
+        let path = path.unwrap_or(Path::new(&self.file_name));
 
         // output file must be wav
         if path.extension().unwrap() != "wav" {

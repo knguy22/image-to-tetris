@@ -58,6 +58,39 @@ impl AudioClip {
 }
 
 impl FFTResult {
+    #[allow(clippy::cast_precision_loss)]
+    pub fn ifft_to_audio_clip(&self) -> AudioClip {
+        let samples = self.ifft();
+        let sample_rate = self.samples.len() as f64 * self.frequency_resolution;
+        let duration = self.samples.len() as f64 / sample_rate;
+
+        let max_amplitude = samples
+            .iter()
+            .fold(0.0, |a, &b| if a > b { a } else { b });
+        assert!(!max_amplitude.is_nan());
+
+        AudioClip {
+            channels: vec![samples],
+            file_name: String::new(),
+            duration,
+            sample_rate,
+            max_amplitude,
+            num_channels: 1,
+            num_samples: self.samples.len(),
+        }
+    }
+
+    #[allow(clippy::cast_precision_loss)]
+    pub fn ifft(&self) -> Vec<Sample> {
+        let mut planner = FftPlanner::<Sample>::new();
+        let fft = planner.plan_fft_inverse(self.samples.len());
+        let mut ifft_samples = self.samples.clone();
+        fft.process(&mut ifft_samples);
+
+        // amplitudes across iffts are not standardize so we need to normalize them (with sample len)
+        ifft_samples.iter().map(|s| s.norm() / self.samples.len() as Sample).collect()
+    }
+
     #[allow(clippy::cast_precision_loss, dead_code)]
     pub fn dump(&self, output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         let mut wtr = csv::Writer::from_path(output)?;
@@ -143,5 +176,32 @@ mod tests {
 
         // cleanup
         std::fs::remove_file(&output).unwrap();
+    }
+
+    #[test]
+    fn test_ifft() {
+        let source = path::Path::new("test_audio_clips/a6.mp3");
+        let clip = AudioClip::new(&source).expect("failed to create audio clip");
+        let fft = clip.fft();
+        let ifft = fft.ifft();
+        assert_eq!(ifft.len(), clip.num_samples);
+    }
+
+    #[test]
+    fn test_ifft_clip() {
+        let source = path::Path::new("test_audio_clips/a6.mp3");
+        let output = path::Path::new("test_ifft_clip.wav");
+        let clip = AudioClip::new(&source).expect("failed to create audio clip");
+        let fft = clip.fft();
+        let ifft_clip = fft.ifft_to_audio_clip();
+
+        assert!((clip.duration - ifft_clip.duration).abs() < 0.001);
+        assert!(clip.sample_rate == ifft_clip.sample_rate);
+
+        // there is no need to check max amplitude for exact correctness because the channels have been merged with the ifft, which means
+        // amplitudes are averaged out
+        assert!(ifft_clip.max_amplitude <= clip.max_amplitude);
+
+        ifft_clip.write(Some(output)).unwrap();
     }
 }
