@@ -15,7 +15,7 @@ pub struct AudioClip {
     pub file_name: String,
     pub duration: f64,
     pub sample_rate: f64,
-    pub max_amplitude: f32,
+    pub max_amplitude: Sample,
     pub num_channels: usize,
     pub num_samples: usize,
 }
@@ -26,7 +26,7 @@ impl AudioClip {
         let wave = Wave::load(source)?;
         let sample_rate = wave.sample_rate();
         let duration = wave.duration();
-        let max_amplitude = wave.amplitude();
+        let max_amplitude = Sample::from(wave.amplitude());
         let num_channels = wave.channels();
         let num_samples: usize = (duration * sample_rate) as usize;
         let mut channels: Vec<Channel> = Vec::new();
@@ -34,7 +34,7 @@ impl AudioClip {
         for channel_idx in 0..num_channels {
             let mut channel = Channel::new();
             for sample_idx in 0..num_samples {
-                channel.push(wave.at(channel_idx, sample_idx));
+                channel.push(Sample::from(wave.at(channel_idx, sample_idx)));
             }
             channels.push(channel);
         }
@@ -357,7 +357,7 @@ mod tests {
         let sample_rate = 44100.0;
         let duration = 1.0;
         let amplitude = 0.5;
-        let multiplier: f32 = 0.33;
+        let multiplier: Sample = 0.33;
 
         let clip = AudioClip::new_monotone(sample_rate, duration, amplitude, 1);
         let new_clip = clip.scale_amplitude(multiplier);

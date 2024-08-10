@@ -70,8 +70,8 @@ impl AudioClip {
         let index_iter = (0..self.num_samples).step_by(hop_size);
         let avg_diff = diffs
             .iter()
-            .sum::<f32>()
-            / diffs.len() as f32;
+            .sum::<Sample>()
+            / diffs.len() as Sample;
         for (diff, index) in diffs.iter().zip(index_iter) {
             onsets.push(Onset {
                 index,
