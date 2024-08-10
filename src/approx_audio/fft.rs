@@ -20,19 +20,10 @@ impl AudioClip {
         let mut stft_res = Vec::new();
 
         let mut curr_index = 0;
-        let mut in_window: bool = true;
         while curr_index < self.num_samples {
-            if in_window {
-                let window = self.window(curr_index, curr_index + window_size);
-                stft_res.push(window.fft());
-                curr_index += window_size;
-                in_window = false;
-            }
-            // perform a hop
-            else {
-                curr_index += hop_size;
-                in_window = true;
-            }
+            let window = self.window(curr_index, curr_index + window_size);
+            stft_res.push(window.fft());
+            curr_index += hop_size;
         }
 
         stft_res
@@ -126,7 +117,7 @@ mod tests {
         let stft = clip.stft(window, hop);
 
         // we expect the number of ffts done to be windows + hop that can fit in the clip
-        assert_eq!(stft.len(), clip.num_samples / (hop + window) + 1);
+        assert_eq!(stft.len(), clip.num_samples / hop + 1);
     }
 
     #[test]
@@ -140,8 +131,8 @@ mod tests {
         let clip = AudioClip::new_monotone(sample_rate, duration, amplitude, 1);
         let stft = clip.stft(window, hop);
 
-        // we expect the number of ffts done to be windows + hop that can fit in the clip
-        assert_eq!(stft.len(), clip.num_samples / (hop + window) + 1);
+        // we expect the number of ffts done to be the number of hops that can fit in the clip
+        assert_eq!(stft.len(), clip.num_samples / hop + 1);
     }
 
     #[test]

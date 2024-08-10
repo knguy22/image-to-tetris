@@ -67,7 +67,7 @@ impl AudioClip {
         // perform onset detection using the derivative
         // onsets will typically have higher derivative values
         let mut onsets = Vec::new();
-        let index_iter = (0..self.num_samples).step_by(window_size + hop_size);
+        let index_iter = (0..self.num_samples).step_by(hop_size);
         let avg_diff = diffs
             .iter()
             .sum::<f32>()
