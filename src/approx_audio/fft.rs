@@ -116,7 +116,6 @@ mod tests {
         let clip = AudioClip::new_monotone(sample_rate, duration, amplitude, 1);
         let stft = clip.stft(window, hop);
 
-        // we expect the number of ffts done to be windows + hop that can fit in the clip
         assert_eq!(stft.len(), clip.num_samples / hop + 1);
     }
 
@@ -131,7 +130,6 @@ mod tests {
         let clip = AudioClip::new_monotone(sample_rate, duration, amplitude, 1);
         let stft = clip.stft(window, hop);
 
-        // we expect the number of ffts done to be the number of hops that can fit in the clip
         assert_eq!(stft.len(), clip.num_samples / hop + 1);
     }
 
