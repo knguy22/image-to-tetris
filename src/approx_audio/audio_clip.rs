@@ -6,6 +6,8 @@ use std::path::Path;
 use fundsp::prelude::*;
 use hound::{WavWriter, WavSpec, SampleFormat};
 
+use super::windowing::rectangle_window;
+
 pub type Channel = Vec<Sample>;
 pub type Sample = f32;
 // the fundamental structure of an audio clip in this project
@@ -108,7 +110,7 @@ impl AudioClip {
         let chunk_num_samples = (max_duration * self.sample_rate) as usize;
         for begin in (0..self.num_samples).step_by(chunk_num_samples) {
             let end = std::cmp::min(begin + chunk_num_samples, self.num_samples);
-            let chunk = self.window(begin, end);
+            let chunk = self.window(begin, end, rectangle_window);
             chunks.push(chunk);
         }
         chunks

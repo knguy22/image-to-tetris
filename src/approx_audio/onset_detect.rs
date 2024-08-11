@@ -2,6 +2,7 @@ use itertools::Itertools;
 
 use super::audio_clip::{AudioClip, Sample, Channel};
 use super::fft::FFTResult;
+use super::windowing::*;
 
 pub type  Onsets = Vec<Onset>;
 #[derive(Debug)]
@@ -45,7 +46,7 @@ impl AudioClip {
             .map(|(a, b)| {
                 let start = a.index;
                 let end = b.index;
-                self.window(start, end)
+                self.window(start, end, rectangle_window)
             })
             .collect_vec()
     }

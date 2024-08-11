@@ -1,15 +1,17 @@
-use super::AudioClip;
+use super::audio_clip::{AudioClip, Sample, Channel};
+use std::f32::consts::PI;
 
 impl AudioClip {
     // takes a window of the audio clip
     // pads the window with 0s if the window extends out of bounds
     #[allow(clippy::cast_precision_loss)]
-    pub fn window(&self, start: usize, end: usize) -> Self {
+    pub fn window(&self, start: usize, end: usize, windowing_fn: fn(&mut Channel)) -> Self {
         let mut channels = Vec::new();
         for channel in &self.channels {
             let end_in_range = std::cmp::min(end, channel.len());
             let mut to_push = channel[start..end_in_range].to_vec();
             to_push.resize(end - start, 0.0);
+            windowing_fn(&mut to_push);
             channels.push(to_push);
         }
         let file_name = format!("{}_{}_{}.wav", self.file_name, start, end);
@@ -22,6 +24,18 @@ impl AudioClip {
             num_channels: self.num_channels,
             num_samples: end - start,
         }
+    }
+}
+
+#[allow(unused)]
+pub fn rectangle_window(_channel: &mut Channel) {
+}
+
+#[allow(unused)]
+pub fn hanning_window(channel: &mut Channel) {
+    let big_n = channel.len() as Sample;
+    for (n, sample) in channel.iter_mut().enumerate() {
+        *sample *= 0.5 * (1.0 - (2.0 * PI * n as Sample / (big_n - 1.0)).cos());
     }
 }
 
@@ -40,7 +54,7 @@ mod tests {
         let window_len = end - start;
 
         let clip = AudioClip::new_monotone(sample_rate, duration, amplitude, 1);
-        let window_clip = clip.window(start, end);
+        let window_clip = clip.window(start, end, rectangle_window);
 
         assert!(window_clip.num_channels > 0);
         assert_eq!(window_clip.num_samples, window_len);
@@ -60,7 +74,7 @@ mod tests {
         let window_len = end - start;
 
         let clip = AudioClip::new_monotone(sample_rate, duration, amplitude, 1);
-        let window_clip = clip.window(start, end);
+        let window_clip = clip.window(start, end, rectangle_window);
 
         assert!(window_clip.num_channels > 0);
         assert_eq!(window_clip.num_samples, window_len);
