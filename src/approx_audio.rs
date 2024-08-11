@@ -4,6 +4,7 @@ mod onset_detect;
 mod score;
 mod tetris_clips;
 mod resample;
+mod windowing;
 
 use audio_clip::{AudioClip, Sample};
 use tetris_clips::TetrisClips;
