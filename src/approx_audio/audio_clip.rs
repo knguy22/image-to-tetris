@@ -10,8 +10,9 @@ use thiserror::Error;
 
 use super::windowing::rectangle_window;
 
+/// not limited to direct samples but also coefficients applied onto samples
+pub type Sample = f32; 
 pub type Channel = Vec<Sample>;
-pub type Sample = f32;
 
 // the fundamental structure of an audio clip in this project
 #[derive(Clone)]

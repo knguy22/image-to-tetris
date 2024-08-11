@@ -1,6 +1,6 @@
 use itertools::Itertools;
 
-use super::audio_clip::{AudioClip, Sample, Channel};
+use super::audio_clip::{AudioClip, Sample};
 use super::fft::FFTResult;
 use super::windowing::rectangle_window;
 
@@ -11,13 +11,24 @@ pub struct Onset {
     pub is_onset: bool,
 }
 
-// each fft is computed per channel
-// stft is a combination of ffts
-// thus, indexing will generally go FFT clip -> channel -> sample
-type FFTDiffs = Channel;
-type FFTNorms = Vec<Channel>;
-type STFTDiffs = Vec<FFTDiffs>;
+/// a channel of norms; usually converted from a channel of complex samples
+type FFTChannelNorm = Vec<Sample>;
+
+/// multiple FFTChannelNorms over different channels
+/// 
+/// indexed by channel,sample
+type FFTNorms = Vec<FFTChannelNorm>;
+
+/// multiple FFTNorms over different timestamps
+/// 
+/// indexed by timestamp,channel,sample
 type STFTNorms = Vec<FFTNorms>;
+
+/// the difference between two fft timestamps, expressed as a single sample
+type FFTDiff = Sample;
+
+/// multiple FFTDiffs over different timestamps
+type STFTDiffs = Vec<FFTDiff>;
 
 impl AudioClip {
     pub fn split_by_onsets(&self) -> Vec<AudioClip> {
@@ -70,25 +81,18 @@ impl AudioClip {
         let diffs = find_diffs(&stft);
         let diffs = normalize_diffs(&diffs);
 
-        // find the average diff for each channel
-        // also, recall that diffs is indexed by diffs[FFT clip][channel][sample]
-        let mut avg_diff: Vec<Sample> = Vec::new();
-        for i in 0..self.num_channels {
-            avg_diff.push(diffs.iter().map(|fft_diff| fft_diff[i]).sum::<Sample>() / diffs.len() as Sample);
-        }
-
         // perform onset detection using the derivative
         // onsets will typically have higher derivative values
         let mut onsets = Vec::new();
         let index_iter = (0..self.num_samples).step_by(hop_size);
-        for index in index_iter {
-            // find an average diff
-            let diffs = self.channels.iter().map(|channel| channel[index]).collect_vec();
-            let mut zipped_diffs = diffs.iter().zip_eq(avg_diff.iter());
-
+        let avg_diff = diffs
+            .iter()
+            .sum::<f32>()
+            / diffs.len() as f32;
+        for (diff, index) in diffs.iter().zip(index_iter) {
             onsets.push(Onset {
                 index,
-                is_onset: zipped_diffs.any(|(diff, avg)| diff > avg),
+                is_onset: *diff > avg_diff
             });
         }
 
@@ -127,56 +131,48 @@ fn apply_gamma_log(stft: &STFTNorms, gamma: Sample) -> STFTNorms {
         .collect_vec()
 }
 
-// finds the diffs of an stft
-// this is equivalent to finding the derivative of the stft
-// negative derivatives are ignored since we don't care about offsets
+/// this is mostly equivalent to finding the derivative of the stft
+/// derivative = rate of gain of energy over time
+/// onsets have higher derivative values
 fn find_diffs(stft: &STFTNorms) -> STFTDiffs {
-    fn diff_fft_norm(fft_norm: &FFTNorms) -> FFTDiffs {
-        let mut diffs = fft_norm
-            .iter()
-            .tuple_windows()
-            .map(|(a, b)| {
-                b
-                    .iter()
-                    .zip(a.iter())
-                    .map(|(b, a)| if b - a >= 0.0 { b - a } else { 0.0 })
-                    .reduce(|a, b| a + b)
-                    .unwrap()
-            })
-            .collect_vec();
+    fn delta(curr: &FFTNorms, next: &FFTNorms) -> FFTDiff {
+        // each norm contains a vector of channel norms
+        // we will compare channel to channel, norm to norm
+        let mut total_diff = 0.0;
+        for (curr_channel, next_channel) in curr.iter().zip_eq(next.iter()) {
+            for (curr_norm, next_norm) in curr_channel.iter().zip_eq(next_channel.iter()) {
+                total_diff += next_norm - curr_norm;
+            }
+        }
 
-        // insert 0 at index 0 to maintain same length
-        diffs.insert(0, 0.0);
-        diffs
+        // ignore a negative derivative
+        FFTDiff::max(total_diff, 0.0)
     }
 
-    stft
+    let mut diffs = stft
         .iter()
-        .map(diff_fft_norm)
-        .collect_vec()
+        .tuple_windows()
+        .map(|(curr, next)| delta(curr, next))
+        .collect_vec();
+
+    // the first differential is 0 since there is no preceding sample
+    diffs.insert(0, 0.0);
+
+    diffs
 }
 
 // reduce the scale so diffs are at most 1.0
 fn normalize_diffs(diffs: &STFTDiffs) -> STFTDiffs {
-    fn normalize_diff(diff: &FFTDiffs) -> FFTDiffs {
-        let max = diff
-            .iter()
-            .reduce(|a, b| if a > b { a } else { b })
-            .unwrap();
-        assert!(!max.is_nan());
-
-        if *max == 0.0 {
-            return diff.clone();
-        }
-        diff
-            .iter()
-            .map(|diff| diff / max)
-            .collect_vec()
-    }
+    let max = diffs
+        .iter()
+        .reduce(|a, b| if a > b { a } else { b })
+        .unwrap();
+    assert!(!max.is_nan());
+    assert!(*max > 0.0);
 
     diffs
         .iter()
-        .map(normalize_diff)
+        .map(|diff| diff / max)
         .collect_vec()
 }
 
