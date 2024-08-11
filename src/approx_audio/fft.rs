@@ -99,8 +99,8 @@ impl FFTResult {
                 let mut ifft_samples = channel.clone();
                 fft.process(&mut ifft_samples);
 
-                // amplitudes across iffts are not standardize so we need to normalize them (with sample len)
-                ifft_samples.iter().map(|s| s.norm() / self.num_samples as Sample).collect()
+                // amplitudes across iffts are not standardized so we need to normalize them (with sample len)
+                ifft_samples.iter().map(|s| s.re / self.num_samples as Sample).collect()
             })
             .collect_vec()
     }
