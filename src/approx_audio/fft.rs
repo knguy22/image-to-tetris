@@ -12,6 +12,7 @@ pub type FFTChannel = Vec<FFTSample>;
 pub struct FFTResult {
     pub channels: Vec<FFTChannel>,
     pub frequency_resolution: f64,
+    pub sample_rate: f64,
     pub num_samples: usize,
 }
 
@@ -58,6 +59,7 @@ impl AudioClip {
         FFTResult {
             channels: complex_channels,
             frequency_resolution: self.sample_rate / self.num_samples as f64,
+            sample_rate: self.sample_rate,
             num_samples: self.num_samples,
         }
     }
@@ -67,8 +69,7 @@ impl FFTResult {
     #[allow(clippy::cast_precision_loss)]
     pub fn ifft_to_audio_clip(&self) -> AudioClip {
         let channels = self.ifft();
-        let sample_rate = self.num_samples as f64 * self.frequency_resolution;
-        let duration = self.num_samples as f64 / sample_rate;
+        let duration = self.num_samples as f64 / self.sample_rate;
         let max_amplitude = channels
             .iter()
             .map(|channel| 
@@ -83,7 +84,7 @@ impl FFTResult {
             channels,
             file_name: String::new(),
             duration,
-            sample_rate,
+            sample_rate: self.sample_rate,
             max_amplitude,
             num_channels: 1,
             num_samples: self.num_samples,
@@ -105,6 +106,10 @@ impl FFTResult {
                 ifft_samples.iter().map(|s| s.re / self.num_samples as Sample).collect()
             })
             .collect_vec()
+    }
+
+    pub fn nyquist_frequency(&self) -> f64 {
+        self.sample_rate / 2.0
     }
 
     #[allow(clippy::cast_precision_loss, dead_code)]
