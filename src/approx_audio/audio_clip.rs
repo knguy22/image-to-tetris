@@ -210,6 +210,19 @@ impl AudioClip {
         clip.num_samples = num_samples;
         clip
     }
+
+    #[allow(clippy::cast_precision_loss, dead_code)]
+    pub fn dump(&self, output: &Path) -> Result<(), Box<dyn std::error::Error>> {
+        let mut wtr = csv::Writer::from_path(output)?;
+        wtr.write_record(["channel", "index" ,"magnitude"])?;
+        for (i, sample) in self.channels.iter().enumerate() {
+            for (j, magnitude) in sample.iter().enumerate() {
+                wtr.write_record(&[i.to_string(), j.to_string(), magnitude.to_string()])?;
+            }
+        }
+
+        Ok(())
+    }
 }
 
 #[allow(clippy::missing_fields_in_debug)]

@@ -1,6 +1,6 @@
 use itertools::Itertools;
 
-use super::audio_clip::{AudioClip, Sample};
+use super::audio_clip::{AudioClip, Sample, Channel};
 use super::fft::FFTResult;
 
 pub type  Onsets = Vec<Onset>;
@@ -10,8 +10,13 @@ pub struct Onset {
     pub is_onset: bool,
 }
 
-type StftNorms = Vec<Vec<Sample>>;
-type StftDiffs = Vec<Sample>;
+// each fft is computed per channel
+// stft is a combination of ffts
+// thus, indexing will generally go FFT clip -> channel -> sample
+type FFTDiffs = Channel;
+type FFTNorms = Vec<Channel>;
+type STFTDiffs = Vec<FFTDiffs>;
+type STFTNorms = Vec<FFTNorms>;
 
 impl AudioClip {
     pub fn split_by_onsets(&self) -> Vec<AudioClip> {
@@ -64,18 +69,25 @@ impl AudioClip {
         let diffs = find_diffs(&stft);
         let diffs = normalize_diffs(&diffs);
 
+        // find the average diff for each channel
+        // also, recall that diffs is indexed by diffs[FFT clip][channel][sample]
+        let mut avg_diff: Vec<Sample> = Vec::new();
+        for i in 0..self.num_channels {
+            avg_diff.push(diffs.iter().map(|fft_diff| fft_diff[i]).sum::<Sample>() / diffs.len() as Sample);
+        }
+
         // perform onset detection using the derivative
         // onsets will typically have higher derivative values
         let mut onsets = Vec::new();
         let index_iter = (0..self.num_samples).step_by(hop_size);
-        let avg_diff = diffs
-            .iter()
-            .sum::<Sample>()
-            / diffs.len() as Sample;
-        for (diff, index) in diffs.iter().zip(index_iter) {
+        for index in index_iter {
+            // find an average diff
+            let diffs = self.channels.iter().map(|channel| channel[index]).collect_vec();
+            let mut zipped_diffs = diffs.iter().zip_eq(avg_diff.iter());
+
             onsets.push(Onset {
                 index,
-                is_onset: *diff > avg_diff
+                is_onset: zipped_diffs.any(|(diff, avg)| diff > avg),
             });
         }
 
@@ -83,64 +95,87 @@ impl AudioClip {
     }
 }
 
-fn get_norms(stft: &[FFTResult]) -> StftNorms {
+fn get_norms(stft: &[FFTResult]) -> STFTNorms {
+    fn norms_fft_result(fft_result: &FFTResult) -> FFTNorms {
+        fft_result
+            .channels
+            .iter()
+            .map(|channel| channel.iter().map(|&sample| sample.norm()).collect_vec())
+            .collect_vec()
+    }
+
     stft
         .iter()
-        .map(|fft_result| {
-            fft_result
-                .samples
-                .iter()
-                .map(|sample| sample.norm())
-                .collect_vec()
-        })
+        .map(|fft_result| norms_fft_result(fft_result))
         .collect_vec()
 }
 
 // effects: increases prominence of higher frequencies
-fn apply_gamma_log(stft: &StftNorms, gamma: Sample) -> StftNorms {
+fn apply_gamma_log(stft: &STFTNorms, gamma: Sample) -> STFTNorms {
+    fn gamma_log_fft_norm(fft_norm: &FFTNorms, gamma: Sample) -> FFTNorms {
+        fft_norm
+            .iter()
+            .map(|channel|
+                channel.iter().map(|&sample| (1.0 + gamma * sample).ln()).collect_vec())
+            .collect_vec()
+    }
+
     stft
         .iter()
-        .map(|fft_result| {
-            fft_result
-                .iter()
-                .map(|sample| (1.0 + gamma * sample).ln())
-                .collect_vec()
-        })
+        .map(|fft_norm| gamma_log_fft_norm(&fft_norm, gamma))
         .collect_vec()
 }
 
 // finds the diffs of an stft
 // this is equivalent to finding the derivative of the stft
 // negative derivatives are ignored since we don't care about offsets
-fn find_diffs(stft: &StftNorms) -> StftDiffs {
-    let mut diffs = stft
+fn find_diffs(stft: &STFTNorms) -> STFTDiffs {
+    fn diff_fft_norm(fft_norm: &FFTNorms) -> FFTDiffs {
+        let mut diffs = fft_norm
+            .iter()
+            .tuple_windows()
+            .map(|(a, b)| {
+                b
+                    .iter()
+                    .zip(a.iter())
+                    .map(|(b, a)| if b - a >= 0.0 { b - a } else { 0.0 })
+                    .reduce(|a, b| a + b)
+                    .unwrap()
+            })
+            .collect_vec();
+
+        // insert 0 at index 0 to maintain same length
+        diffs.insert(0, 0.0);
+        diffs
+    }
+
+    stft
         .iter()
-        .tuple_windows()
-        .map(|(a, b)| {
-            b
-                .iter()
-                .zip(a.iter())
-                .map(|(b, a)| if b - a >= 0.0 { b - a } else { 0.0 })
-                .reduce(|a, b| a + b)
-                .unwrap()
-        })
-        .collect_vec();
-    diffs.insert(0, 0.0);
-    diffs
+        .map(|fft_norm| diff_fft_norm(&fft_norm))
+        .collect_vec()
 }
 
 // reduce the scale so diffs are at most 1.0
-fn normalize_diffs(diffs: &StftDiffs) -> StftDiffs {
-    let max = diffs
-        .iter()
-        .reduce(|a, b| if a > b { a } else { b })
-        .unwrap();
-    assert!(!max.is_nan());
-    assert!(*max > 0.0);
+fn normalize_diffs(diffs: &STFTDiffs) -> STFTDiffs {
+    fn normalize_diff(diff: &FFTDiffs) -> FFTDiffs {
+        let max = diff
+            .iter()
+            .reduce(|a, b| if a > b { a } else { b })
+            .unwrap();
+        assert!(!max.is_nan());
+
+        if *max == 0.0 {
+            return diff.to_vec();
+        }
+        diff
+            .iter()
+            .map(|diff| diff / max)
+            .collect_vec()
+    }
 
     diffs
         .iter()
-        .map(|diff| diff / max)
+        .map(|diff| normalize_diff(&diff))
         .collect_vec()
 }
 
