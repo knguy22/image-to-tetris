@@ -17,7 +17,6 @@ pub struct FFTResult {
 }
 
 impl AudioClip {
-
     /// performs a short time fourier transform on the audio clip
     /// `window_size` is the number of samples in the window; defaults to 2048
     /// `hop_size` is the number of samples between each window; defaults to `window_size` // 4
@@ -66,6 +65,15 @@ impl AudioClip {
 }
 
 impl FFTResult {
+    pub fn empty(sample_rate: f64, num_samples: usize, num_channels: usize) -> Self {
+        FFTResult {
+            channels: vec![vec![Complex::new(0.0, 0.0); num_samples]; num_channels],
+            frequency_resolution: sample_rate / num_samples as f64,
+            sample_rate,
+            num_samples,
+        }
+    }
+
     #[allow(clippy::cast_precision_loss)]
     pub fn ifft_to_audio_clip(&self) -> AudioClip {
         let channels = self.ifft();
@@ -106,10 +114,6 @@ impl FFTResult {
                 ifft_samples.iter().map(|s| s.re / self.num_samples as Sample).collect()
             })
             .collect_vec()
-    }
-
-    pub fn nyquist_frequency(&self) -> f64 {
-        self.sample_rate / 2.0
     }
 
     #[allow(clippy::cast_precision_loss, dead_code)]
