@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+anyhow = "1.0.86"
 clap = { version = "4.5.9", features = ["derive"] }
 csv = "1.3.0"
 dssim = "3.3.2"
@@ -21,3 +22,4 @@ rayon = "1.10.0"
 rgb = "0.8.44"
 rustfft = "6.2.0"
 symphonia = "0.5.4"
+thiserror = "1.0.63"

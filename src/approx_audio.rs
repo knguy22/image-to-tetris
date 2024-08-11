@@ -14,6 +14,7 @@ use std::fs;
 use std::path::Path;
 use std::cmp;
 
+use anyhow::Result;
 use rayon::prelude::*;
 use itertools::iproduct;
 
@@ -27,7 +28,7 @@ struct MetaData {
     max_channels: usize,
 }
 
-pub fn run(source: &Path, output: &Path) -> Result<(), Box<dyn std::error::Error>> {
+pub fn run(source: &Path, output: &Path) -> Result<()> {
     let tetris_sounds_orig = Path::new("assets_sound");
     let tetris_sounds_resampled = Path::new("tmp_tetris_sounds_assets");
     let source_resampled = Path::new("tmp_source.wav");
@@ -60,7 +61,7 @@ pub fn run(source: &Path, output: &Path) -> Result<(), Box<dyn std::error::Error
     Ok(())
 }
 
-fn init(source: &Path, tetris_sounds: &Path) -> Result<MetaData, Box<dyn std::error::Error>> {
+fn init(source: &Path, tetris_sounds: &Path) -> Result<MetaData> {
     let clip = AudioClip::new(source)?;
 
     // find important metadata
@@ -81,21 +82,21 @@ fn init(source: &Path, tetris_sounds: &Path) -> Result<MetaData, Box<dyn std::er
     })
 }
 
-fn cleanup(tetris_sounds_resampled: &Path, input_resampled: &Path) -> Result<(), Box<dyn std::error::Error>> {
+fn cleanup(tetris_sounds_resampled: &Path, input_resampled: &Path) -> Result<()> {
     fs::remove_dir_all(tetris_sounds_resampled)?;
     fs::remove_file(input_resampled)?;
     Ok(())
 }
 
 impl InputAudioClip {
-    pub fn new(source: &Path, num_channels: usize) -> Result<InputAudioClip, Box<dyn std::error::Error>> {
+    pub fn new(source: &Path, num_channels: usize) -> Result<InputAudioClip> {
         let mut clip = AudioClip::new(source)?;
         clip.add_new_channels_mut(num_channels);
         let chunks = clip.split_by_onsets();
         Ok(InputAudioClip{chunks})
     }
 
-    pub fn approx(&self, tetris_clips: &TetrisClips) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn approx(&self, tetris_clips: &TetrisClips) -> Result<Self> {
         let pb = progress_bar(self.chunks.len())?;
         pb.set_message("Approximating audio chunks...");
         let output_clips = self.chunks

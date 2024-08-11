@@ -2,13 +2,15 @@ use super::AudioClip;
 
 use std::path::{Path, PathBuf};
 
+use anyhow::Result;
+
 #[derive(Debug)]
 pub struct TetrisClips {
     pub clips: Vec<AudioClip>
 }
 
 impl TetrisClips {
-    pub fn new(source: &Path) -> Result<TetrisClips, Box<dyn std::error::Error>> {
+    pub fn new(source: &Path) -> Result<TetrisClips> {
         let mut clips = Vec::new();
         for path in source.read_dir()? {
             let path = path?;
@@ -51,7 +53,7 @@ impl TetrisClips {
     }
 
     #[allow(dead_code)]
-    pub fn dump(&self, output_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn dump(&self, output_dir: &Path) -> Result<()> {
         for clip in &self.clips {
             let clip_path = PathBuf::from(clip.file_name.clone());
             let clip_file_name = clip_path.file_name().unwrap();

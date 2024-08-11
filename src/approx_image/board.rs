@@ -1,12 +1,23 @@
-use std::error::Error;
 use super::piece::{Cell, Piece};
+
+use anyhow::Result;
+use thiserror::Error;
 
 #[derive(Clone)]
 pub struct Board {
-    pub cells: Vec<char>,
-    pub pieces: Vec<Piece>,
+    cells: Vec<char>,
+    pieces: Vec<Piece>,
     pub width: usize,
     pub height: usize
+}
+
+#[derive(Debug, Error)]
+pub enum BoardError {
+    #[error("Invalid cell: {0:?}")]
+    InvalidCell(Cell),
+
+    #[error("Occupied cell: {0:?}")]
+    OccupiedCell(Cell),
 }
 
 pub const BLOCKED_CELL: char = 'B';
@@ -35,21 +46,21 @@ impl Board {
         let Ok(to_occupy) = piece.get_occupancy() else {return false;};
         for cell in &to_occupy {
             let Ok(curr) = self.get(cell) else {return false};
-            if *curr != EMPTY_CELL {
+            if curr != EMPTY_CELL {
                 return false;
             }
         }
         true
     }
 
-    pub fn place(&mut self, piece: &Piece) -> Result<(), Box<dyn Error>> {
+    pub fn place(&mut self, piece: &Piece) -> Result<()> {
         let to_occupy = piece.get_occupancy()?;
 
         // check if cells are empty
         for cell in &to_occupy {
             let curr = self.get(cell)?;
-            if *curr != EMPTY_CELL {
-                return Err(format!("{piece:?} is not empty at {cell:?}").into());
+            if curr != EMPTY_CELL {
+                return Err(BoardError::OccupiedCell(*cell))?;
             }
         }
 
@@ -63,10 +74,9 @@ impl Board {
     }
 
     #[allow(dead_code)]
-    pub fn undo_last_move(&mut self) -> Result<(), Box<dyn Error>> {
-        if self.pieces.is_empty() {
-            return Err("No moves to undo".into());
-        }
+    pub fn undo_last_move(&mut self) -> Result<()> {
+        assert!(!self.pieces.is_empty());
+
         let piece = self.pieces.pop().expect("pieces should not be empty");
         for cell in piece.get_occupancy()? {
             *self.get_mut(&cell)? = EMPTY_CELL;
@@ -75,7 +85,7 @@ impl Board {
     }
 
     #[allow(dead_code)]
-    pub fn remove_piece(&mut self, piece: &Piece) -> Result<(), Box<dyn Error>> {
+    pub fn remove_piece(&mut self, piece: &Piece) -> Result<()> {
         let to_occupy = piece.get_occupancy()?;
         for cell in &to_occupy {
             *self.get_mut(cell)? = EMPTY_CELL;
@@ -84,16 +94,16 @@ impl Board {
         Ok(())
     }
 
-    pub fn get(&self, cell: &Cell) -> Result<&char, Box<dyn Error>> {
+    pub fn get(&self, cell: &Cell) -> Result<char> {
         if !(cell.x < self.width && cell.y < self.height) {
-            return Err(format!("Cell ({}, {}) is out of bounds", cell.x, cell.y).into());
+            return Err(BoardError::InvalidCell(*cell))?;
         }
-        Ok(&self.cells[cell.y * self.width + cell.x])
+        Ok(self.cells[cell.y * self.width + cell.x])
     }
 
-    pub fn get_mut(&mut self, cell: &Cell) -> Result<&mut char, Box<dyn Error>> {
+    pub fn get_mut(&mut self, cell: &Cell) -> Result<&mut char> {
         if !(cell.x < self.width && cell.y < self.height) {
-            return Err(format!("Cell ({}, {}) is out of bounds", cell.x, cell.y).into());
+            return Err(BoardError::InvalidCell(*cell))?;
         }
         Ok(&mut self.cells[cell.y * self.width + cell.x])
     }

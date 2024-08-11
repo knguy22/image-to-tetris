@@ -11,6 +11,7 @@ use piece::{Cell, Piece, Orientation};
 use std::collections::BinaryHeap;
 use std::path::Path;
 
+use anyhow::Result;
 use image::Rgba;
 use imageproc::image::{DynamicImage, GenericImageView};
 
@@ -44,7 +45,7 @@ pub fn run(source: &Path, output: &Path, config: &Config, glob: &mut GlobalData)
 }
 
 // the source image will be changed in order to fit the scaling of the board
-pub fn approx(source_img: &DynamicImage, config: &Config, glob: &GlobalData) -> Result<DynamicImage, Box<dyn std::error::Error>> {
+pub fn approx(source_img: &DynamicImage, config: &Config, glob: &GlobalData) -> Result<DynamicImage> {
     // initialize the board
     let mut board = SkinnedBoard::new(config.board_width, config.board_height, &glob.skins);
 
@@ -73,7 +74,7 @@ pub fn approx(source_img: &DynamicImage, config: &Config, glob: &GlobalData) -> 
     draw::draw(&board)
 }
 
-fn process_heap_prioritize(heap: &mut BinaryHeap<Cell>, board: &mut SkinnedBoard, source_img: &DynamicImage, avg_pixel_grid: &[Rgba<u8>]) -> Result<(), Box<dyn std::error::Error>> {
+fn process_heap_prioritize(heap: &mut BinaryHeap<Cell>, board: &mut SkinnedBoard, source_img: &DynamicImage, avg_pixel_grid: &[Rgba<u8>]) -> Result<()> {
     // first try to not use garbage to avoid gray and black blocks
     process_heap(heap, board, source_img, avg_pixel_grid, &UseGarbage::No)?;
 
@@ -100,7 +101,7 @@ pub fn resize_image(source_img: &mut DynamicImage, skin_width: u32, skin_height:
     };
 }
 
-fn process_heap(heap: &mut BinaryHeap<Cell>, board: &mut SkinnedBoard, source_img: &DynamicImage, avg_pixel_grid: &[Rgba<u8>], use_garbage: &UseGarbage) -> Result<(), Box<dyn std::error::Error>> {
+fn process_heap(heap: &mut BinaryHeap<Cell>, board: &mut SkinnedBoard, source_img: &DynamicImage, avg_pixel_grid: &[Rgba<u8>], use_garbage: &UseGarbage) -> Result<()> {
     // for each cell at the top of the heap:
     while let Some(cell) = heap.pop() {
         // 1. check if the cell is unoccupied
@@ -152,12 +153,11 @@ fn process_heap(heap: &mut BinaryHeap<Cell>, board: &mut SkinnedBoard, source_im
     Ok(())
 }
 
-fn average_pixel_grid(source_img: &DynamicImage, pixels_grid_width: u32, pixels_grid_height: u32) -> Result<Vec<Rgba<u8>>, Box<dyn std::error::Error>> {
+fn average_pixel_grid(source_img: &DynamicImage, pixels_grid_width: u32, pixels_grid_height: u32) -> Result<Vec<Rgba<u8>>> {
     // check pixels are evenly divided into the grid
     let (pixels_w, pixels_h) = source_img.dimensions();
-    if pixels_w % pixels_grid_width != 0 || pixels_h % pixels_grid_height != 0 {
-        return Err("Pixels must be evenly divided into the grid".into());
-    }
+    assert!(pixels_w % pixels_grid_width == 0, "Pixel width not evenly divided into the grid");
+    assert!(pixels_h % pixels_grid_height == 0, "Pixel height not evenly divided into the grid");
 
     // now divide pixels into the grid and compute the average pixel for each
     let pixels_per_grid = pixels_grid_width * pixels_grid_height;
@@ -194,7 +194,7 @@ fn average_pixel_grid(source_img: &DynamicImage, pixels_grid_width: u32, pixels_
     Ok(avg_pixels)
 }
 
-fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, source_img: &DynamicImage, avg_pixel_grid: &[Rgba<u8>]) -> Result<f64, Box<dyn std::error::Error>> {
+fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, source_img: &DynamicImage, avg_pixel_grid: &[Rgba<u8>]) -> Result<f64> {
     // used to weigh the importance of each diff
     const RED_WEIGHT: f64 = 1.0;
     const GREEN_WEIGHT: f64 = 1.7;
@@ -221,7 +221,7 @@ fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, s
             let skin_id = board.get_cells_skin(context_cell);
 
             let context_skin = board.get_skin(skin_id);
-            let context_block_image = context_skin.block_image_from_char(*cell_char);
+            let context_block_image = context_skin.block_image_from_char(cell_char);
             let avg_board_context_pixel = context_block_image.get_average_pixel();
 
             let avg_source_context_pixel = avg_pixel_grid[context_cell.y * board.board_width() + context_cell.x];
@@ -267,7 +267,7 @@ fn avg_piece_pixel_diff(piece: &Piece, board: &SkinnedBoard, skin: &BlockSkin, s
     Ok(avg_pixel_diff)
 }
 
-fn find_context_cells(board: &SkinnedBoard, occupancy: &[Cell], center_cell: &Cell) -> Result<Vec<Cell>, Box<dyn std::error::Error>> {
+fn find_context_cells(board: &SkinnedBoard, occupancy: &[Cell], center_cell: &Cell) -> Result<Vec<Cell>> {
     const MIN_DX: i32 = 0;
     const MIN_DY: i32 = 0;
     const MAX_DX: i32 = 8;
@@ -296,7 +296,7 @@ fn find_context_cells(board: &SkinnedBoard, occupancy: &[Cell], center_cell: &Ce
             // only append contexts that are occupied with other pieces we already placed
             let context_cell = Cell {x: new_x, y: new_y};
             let context_char = board.board().get(&context_cell);
-            if context_char.is_ok() && *context_char.expect("there must be a context char") != EMPTY_CELL && !occupancy.contains(&context_cell) {
+            if context_char.is_ok() && context_char.expect("there must be a context char") != EMPTY_CELL && !occupancy.contains(&context_cell) {
                 context_cells.push(context_cell);
             }
             dx += 1;

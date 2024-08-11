@@ -1,6 +1,7 @@
-use std::error::Error;
+use anyhow::Result;
+use thiserror::Error;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Dir {
     pub x: i32,
     pub y: i32
@@ -31,6 +32,12 @@ pub enum Piece {
     Z(Cell, Orientation),
     Gray(Cell),
     Black(Cell),
+}
+
+#[derive(Error, Debug)]
+pub enum PieceError {
+    #[error("Invalid piece shape: {0:?}")]
+    NegativeOccupancy(Box<[Dir]>),
 }
 
 // constants modified from https://github.com/freyhoe/ditzy22/blob/main/common.h
@@ -149,7 +156,7 @@ impl Piece {
     }
 
     #[allow(clippy::cast_sign_loss)]
-    pub fn get_occupancy(&self) -> Result<Vec<Cell>, Box<dyn Error>> {
+    pub fn get_occupancy(&self) -> Result<Vec<Cell>> {
         // only non-garbage pieces should have a shape
         let shape: &[[Dir; 4]; 4] = match self {
             Piece::I(_, _) => &I_SHAPE,
@@ -171,12 +178,12 @@ impl Piece {
         };
 
         let mut occupancy = Vec::new();
-        for dir in dirs {
+        for dir in &dirs {
             // check for cast sign loss manually
             let x = i32::try_from(self.get_cell().x)? + dir.x;
             let y = i32::try_from(self.get_cell().y)? + dir.y;
             if x < 0 || y < 0 {
-                return Err(format!("Cell({x}, {y}) contains negative values").into());
+                return Err(PieceError::NegativeOccupancy(Box::new(dirs)).into());
             }
             occupancy.push(Cell { x: x as usize, y: y as usize });
         }

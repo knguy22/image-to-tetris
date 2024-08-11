@@ -1,6 +1,8 @@
 use super::{audio_clip::{AudioClip, Channel, Sample}, windowing::rectangle_window};
 use std::fmt;
 use std::path::Path;
+
+use anyhow::Result;
 use itertools::Itertools;
 use rustfft::{FftPlanner, num_complex::Complex};
 
@@ -106,7 +108,7 @@ impl FFTResult {
     }
 
     #[allow(clippy::cast_precision_loss, dead_code)]
-    pub fn dump(&self, output: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn dump(&self, output: &Path) -> Result<()> {
         let mut wtr = csv::Writer::from_path(output)?;
         wtr.write_record(["channel", "frequency", "norm"])?;
         for (i, channel) in self.channels.iter().enumerate() {

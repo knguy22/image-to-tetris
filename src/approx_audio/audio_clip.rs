@@ -3,13 +3,16 @@ use std::fs;
 use std::io;
 use std::path::Path;
 
+use anyhow::Result;
 use fundsp::prelude::*;
 use hound::{WavWriter, WavSpec, SampleFormat};
+use thiserror::Error;
 
 use super::windowing::rectangle_window;
 
 pub type Channel = Vec<Sample>;
 pub type Sample = f32;
+
 // the fundamental structure of an audio clip in this project
 #[derive(Clone)]
 pub struct AudioClip {
@@ -22,9 +25,15 @@ pub struct AudioClip {
     pub num_samples: usize,
 }
 
+#[derive(Debug, Error)]
+pub enum WriteError {
+    #[error("Output not wav: {message}")]
+    OutputNotWavError{message: String},
+}
+
 impl AudioClip {
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-    pub fn new(source: &Path) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(source: &Path) -> Result<Self> {
         let wave = Wave::load(source)?;
         let sample_rate = wave.sample_rate();
         let duration = wave.duration();
@@ -69,12 +78,12 @@ impl AudioClip {
     }
 
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-    pub fn write(&self, path: Option<&Path>) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn write(&self, path: Option<&Path>) -> Result<()> {
         let path = path.unwrap_or(Path::new(&self.file_name));
 
         // output file must be wav
         if path.extension().unwrap() != "wav" {
-            return Err("output file must be wav".into());
+            return Err(WriteError::OutputNotWavError{message: format!("Output not wav: {}", path.display())})?;
         }
 
         // create the output file and initialize the writer
@@ -191,7 +200,7 @@ impl AudioClip {
     }
 
     #[allow(clippy::cast_precision_loss, dead_code)]
-    pub fn dump(&self, output: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn dump(&self, output: &Path) -> Result<()> {
         let mut wtr = csv::Writer::from_path(output)?;
         wtr.write_record(["channel", "index" ,"magnitude"])?;
         for (i, sample) in self.channels.iter().enumerate() {
