@@ -31,7 +31,7 @@ impl AudioClip {
 pub fn rectangle_window(_channel: &mut Channel) {
 }
 
-#[allow(unused)]
+#[allow(clippy::cast_precision_loss, unused)]
 pub fn hanning_window(channel: &mut Channel) {
     let big_n = channel.len() as Sample;
     for (n, sample) in channel.iter_mut().enumerate() {

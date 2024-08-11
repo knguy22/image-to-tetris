@@ -1,4 +1,4 @@
-use super::{audio_clip::{AudioClip, Channel, Sample}, windowing::*};
+use super::{audio_clip::{AudioClip, Channel, Sample}, windowing::rectangle_window};
 use std::fmt;
 use std::path::Path;
 use itertools::Itertools;
@@ -49,7 +49,7 @@ impl AudioClip {
             .collect_vec();
 
         // perform the FFT for each each channel
-        for channel in complex_channels.iter_mut() {
+        for channel in &mut complex_channels {
             fft.process(channel);
         }
 
@@ -72,9 +72,9 @@ impl FFTResult {
             .map(|channel| 
                 channel
                     .iter()
-                    .fold(0.0, |a, &b| f32::max(a, b))
+                    .fold(0.0, |a, &b| Sample::max(a, b))
             )
-            .fold(0.0, |a, b| f32::max(a, b));
+            .fold(0.0, Sample::max) ;
         assert!(!max_amplitude.is_nan());
 
         AudioClip {

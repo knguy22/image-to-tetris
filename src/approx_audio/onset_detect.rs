@@ -2,7 +2,7 @@ use itertools::Itertools;
 
 use super::audio_clip::{AudioClip, Sample, Channel};
 use super::fft::FFTResult;
-use super::windowing::*;
+use super::windowing::rectangle_window;
 
 pub type  Onsets = Vec<Onset>;
 #[derive(Debug)]
@@ -107,7 +107,7 @@ fn get_norms(stft: &[FFTResult]) -> STFTNorms {
 
     stft
         .iter()
-        .map(|fft_result| norms_fft_result(fft_result))
+        .map(norms_fft_result)
         .collect_vec()
 }
 
@@ -123,7 +123,7 @@ fn apply_gamma_log(stft: &STFTNorms, gamma: Sample) -> STFTNorms {
 
     stft
         .iter()
-        .map(|fft_norm| gamma_log_fft_norm(&fft_norm, gamma))
+        .map(|fft_norm| gamma_log_fft_norm(fft_norm, gamma))
         .collect_vec()
 }
 
@@ -152,7 +152,7 @@ fn find_diffs(stft: &STFTNorms) -> STFTDiffs {
 
     stft
         .iter()
-        .map(|fft_norm| diff_fft_norm(&fft_norm))
+        .map(diff_fft_norm)
         .collect_vec()
 }
 
@@ -166,7 +166,7 @@ fn normalize_diffs(diffs: &STFTDiffs) -> STFTDiffs {
         assert!(!max.is_nan());
 
         if *max == 0.0 {
-            return diff.to_vec();
+            return diff.clone();
         }
         diff
             .iter()
@@ -176,7 +176,7 @@ fn normalize_diffs(diffs: &STFTDiffs) -> STFTDiffs {
 
     diffs
         .iter()
-        .map(|diff| normalize_diff(&diff))
+        .map(normalize_diff)
         .collect_vec()
 }
 
