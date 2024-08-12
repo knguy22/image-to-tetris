@@ -65,6 +65,7 @@ impl AudioClip {
 }
 
 impl FFTResult {
+    #[allow(clippy::cast_precision_loss)]
     pub fn empty(sample_rate: f64, num_samples: usize, num_channels: usize) -> Self {
         FFTResult {
             channels: vec![vec![Complex::new(0.0, 0.0); num_samples]; num_channels],

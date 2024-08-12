@@ -14,12 +14,12 @@ pub struct Onset {
 /// a channel of norms; usually converted from a channel of complex samples
 type FFTChannelNorm = Vec<Sample>;
 
-/// multiple FFTChannelNorms over different channels
+/// multiple `FFTChannelNorms` over different channels
 /// 
 /// indexed by channel,sample
 type FFTNorms = Vec<FFTChannelNorm>;
 
-/// multiple FFTNorms over different timestamps
+/// multiple `FFTNorms` over different timestamps
 /// 
 /// indexed by timestamp,channel,sample
 type STFTNorms = Vec<FFTNorms>;
@@ -27,7 +27,7 @@ type STFTNorms = Vec<FFTNorms>;
 /// the difference between two fft timestamps, expressed as a single sample
 type FFTDiff = Sample;
 
-/// multiple FFTDiffs over different timestamps
+/// multiple `FFTDiffs` over different timestamps
 type STFTDiffs = Vec<FFTDiff>;
 
 impl AudioClip {

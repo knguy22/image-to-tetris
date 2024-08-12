@@ -12,7 +12,7 @@ pub struct Board {
 }
 
 #[derive(Debug, Error)]
-pub enum BoardError {
+pub enum CellError {
     #[error("Invalid cell: {0:?}")]
     InvalidCell(Cell),
 
@@ -60,7 +60,7 @@ impl Board {
         for cell in &to_occupy {
             let curr = self.get(cell)?;
             if curr != EMPTY_CELL {
-                return Err(BoardError::OccupiedCell(*cell))?;
+                Err(CellError::OccupiedCell(*cell))?;
             }
         }
 
@@ -96,14 +96,14 @@ impl Board {
 
     pub fn get(&self, cell: &Cell) -> Result<char> {
         if !(cell.x < self.width && cell.y < self.height) {
-            return Err(BoardError::InvalidCell(*cell))?;
+            Err(CellError::InvalidCell(*cell))?;
         }
         Ok(self.cells[cell.y * self.width + cell.x])
     }
 
     pub fn get_mut(&mut self, cell: &Cell) -> Result<&mut char> {
         if !(cell.x < self.width && cell.y < self.height) {
-            return Err(BoardError::InvalidCell(*cell))?;
+            Err(CellError::InvalidCell(*cell))?;
         }
         Ok(&mut self.cells[cell.y * self.width + cell.x])
     }

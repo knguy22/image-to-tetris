@@ -188,6 +188,7 @@ impl AudioClip {
         output
     }
 
+    #[allow(dead_code)]
     // zero pads the audio clip; this is useful for comparison of two audio clips
     pub fn zero_pad(&self, num_samples: usize) -> Self {
         assert!(num_samples >= self.num_samples);

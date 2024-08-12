@@ -110,7 +110,7 @@ pub fn resize_skins(skins: &mut Skins, image_width: u32, image_height: u32, boar
     let skin_width = image_width / u32::try_from(board_width)?;
     let skin_height = image_height / u32::try_from(board_height)?;
     if skin_width == 0 || skin_height == 0 {
-        return Err(ResizeError::ZeroDimensions { skin_width, skin_height })?;
+        Err(ResizeError::ZeroDimensions { skin_width, skin_height })?;
     }
     for skin in skins.iter_mut() {
         skin.resize(skin_width, skin_height);
@@ -278,7 +278,7 @@ pub fn draw(skin_board: &SkinnedBoard) -> Result<DynamicImage> {
                 'Z' => &skin.z_img,
                 'G' => &skin.gray_img,
                 'B' => &skin.black_img,
-                _ => panic!("Invalid cell value: {}", cell),
+                _ => panic!("Invalid cell value: {cell}"),
             };
             let pixel_x = u32::try_from(x)? * skin.width;
             let pixel_y = u32::try_from(y)? * skin.height;

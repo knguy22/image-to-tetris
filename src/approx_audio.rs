@@ -121,11 +121,12 @@ impl InputAudioClip {
         assert!(chunk.num_channels == output.num_channels);
 
         // choose a best tetris clip for the specific chunk
-        let mut best_clip: Option<&AudioClip> = None;
+        let mut best_clip: Option<AudioClip> = None;
         let mut best_multiplier: Option<Sample> = None;
         let mut best_diff: f64 = chunk.diff(&output, 0.0);
         for (multiplier, clip) in iproduct!(MULTIPLIERS, &tetris_clips.clips) {
-            let diff = chunk.diff(clip, multiplier);
+            let clip = clip.scale_amplitude(multiplier);
+            let diff = chunk.diff(&clip, multiplier);
 
             // tetris clips longer than the chunk are not considered to prevent early termination of sound clips
             if clip.num_samples > output.num_samples {
@@ -144,7 +145,7 @@ impl InputAudioClip {
         if best_clip.is_some() {
             let best_clip = best_clip.expect("No best clip found");
             let best_multiplier = best_multiplier.expect("No best multiplier found");
-            output.add_mut(best_clip, best_multiplier);
+            output.add_mut(&best_clip, best_multiplier);
         }
 
         output

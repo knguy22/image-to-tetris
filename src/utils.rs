@@ -3,15 +3,15 @@ use indicatif::{ProgressBar, ProgressStyle};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum UtilsError {
+pub enum CommandError {
     #[error("failed to execute command, command line: {0}")]
-    CommandError(String),
+    Default(String),
 }
 
 pub fn check_command_result(result: &std::process::Output) -> Result<()> {
     match result.status.code() {
         Some(0) => Ok(()),
-        _ => Err(UtilsError::CommandError(String::from_utf8_lossy(&result.stderr).to_string()).into()),
+        _ => Err(CommandError::Default(String::from_utf8_lossy(&result.stderr).to_string()).into()),
     }
 }
 

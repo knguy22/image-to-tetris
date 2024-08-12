@@ -34,6 +34,7 @@ pub enum Piece {
     Black(Cell),
 }
 
+#[allow(clippy::module_name_repetitions)]
 #[derive(Error, Debug)]
 pub enum PieceError {
     #[error("Invalid piece shape: {0:?}")]

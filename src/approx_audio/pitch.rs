@@ -1,10 +1,13 @@
-use itertools::Itertools;
-
 use super::audio_clip::Sample;
 use super::fft::{FFTResult, FFTSample};
 
+use itertools::Itertools;
+
 impl FFTResult {
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     pub fn pitch_shift(&self, multiplier: Sample) -> Self {
+        assert!(multiplier >= 0.0);
+
         let mut result = FFTResult::empty(self.sample_rate, self.num_samples, self.channels.len());
 
         // adjust each bin to a new frequency and bin
@@ -27,6 +30,7 @@ impl FFTResult {
 
     /// yields a tuple of (frequency, Vec[sample] = bin containing complex samples for each channel)
     /// yields up to the Nyquist frequency
+    #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
     fn iter_zip_bins(&self) -> impl Iterator<Item = (Sample, Vec<FFTSample>)> + '_ {
         let nyquist = self.nyquist_frequency() as Sample;
 
