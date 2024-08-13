@@ -2,6 +2,10 @@ use super::audio_clip::Sample;
 use super::fft::{FFTResult, FFTSample};
 
 use itertools::Itertools;
+use rustfft::num_complex::Complex;
+
+/// the frequency and magnitude of a bin
+type FreqBin = (Sample, Vec<FFTSample>);
 
 impl FFTResult {
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
@@ -28,10 +32,31 @@ impl FFTResult {
         result
     }
 
+    pub fn most_significant_frequency(&self) -> Sample {
+        // we take the bins with the higher norms/energy level
+        fn compare_bins(a: &FreqBin, b: &FreqBin) -> FreqBin {
+            let a_norms = a.1.iter().map(|s| s.norm()).fold(0.0, |a, b| a + b);
+            let b_norms = b.1.iter().map(|s| s.norm()).fold(0.0, |a, b| a + b);
+
+            if a_norms > b_norms {
+                a.clone()
+            } else {
+                b.clone()
+            }
+        }
+
+        let most_significant_freq_bin = self.iter_zip_bins()
+            .fold((-1.0, vec![Complex::new(0.0, 0.0); self.channels.len()]), 
+                |a, b| compare_bins(&a, &b)
+            );
+
+        most_significant_freq_bin.0
+    }
+
     /// yields a tuple of (frequency, Vec[sample] = bin containing complex samples for each channel)
     /// yields up to the Nyquist frequency
     #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
-    fn iter_zip_bins(&self) -> impl Iterator<Item = (Sample, Vec<FFTSample>)> + '_ {
+    fn iter_zip_bins(&self) -> impl Iterator<Item = FreqBin> + '_ {
         let nyquist = self.nyquist_frequency() as Sample;
 
         (0..self.num_samples).map(|i| {

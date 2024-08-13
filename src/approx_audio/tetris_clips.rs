@@ -95,4 +95,21 @@ mod tests {
         assert!(split_combotones.iter().all(|clip| clip.num_channels == clip.channels.len()));
         assert!(split_combotones.iter().all(|clip| clip.num_samples == clip.channels[0].len()));
     }
+
+    #[test]
+    fn test_combotones_sig_freq() {
+        let source = path::Path::new("test_audio_clips/comboTones.mp3");
+        let combotones = AudioClip::new(&source).expect("failed to create audio clip");
+        let split_combotones = TetrisClips::split_combotones(&combotones);
+
+        let mut prev = 1.0;
+        for clip in &split_combotones {
+            let curr = clip.fft().most_significant_frequency();
+            println!("{}: {:?}, multiplier: {}", clip.file_name, curr, curr / prev);
+            prev = curr;
+        }
+        split_combotones[0].fft().dump(Path::new("python/fft.csv")).unwrap();
+
+        panic!("stop");
+    }
 }

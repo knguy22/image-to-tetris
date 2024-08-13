@@ -108,4 +108,4 @@ def graph_fft():
         plt.savefig(f'fft_channel_{channel}.png')
 
 if __name__ == "__main__":
-    graph_audio_clip()
+    graph_fft()
