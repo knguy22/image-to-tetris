@@ -1,8 +1,12 @@
-use super::AudioClip;
+use super::audio_clip::{AudioClip, Sample};
 
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
+use itertools::Itertools;
+use rust_lapper::{Lapper, Interval};
+
+type IntervalType = Interval<usize, usize>;
 
 #[derive(Debug)]
 pub struct TetrisClips {
@@ -52,6 +56,30 @@ impl TetrisClips {
         combos.into_iter().take(NUM_COMBOS).collect()
     }
 
+    fn extrapolate_chromatic_notes(combotones: &Vec<AudioClip>) {
+        const MIN_FREQ: Sample = 50.0;
+        const MAX_FREQ: Sample = 2000.0;
+
+        let combotones_intervals: Vec<IntervalType> = combotones
+            .iter()
+            .map(|clip| Self::get_interval(clip.fft().most_significant_frequency()))
+            .collect();
+        let mut lapper = Lapper::new(combotones_intervals);
+    }
+
+    /// creates an interval based on the frequency that only overlaps with notes in the same chromatic note
+    fn get_interval(freq: Sample) -> IntervalType {
+        // chromatic notes differ in frequency by a multiple of 2^(1/12)
+        // to prevent two chromatic notes from overlapping in intervals, we take another square root of the multiplier
+        // and subtract by a small constant to account for precision errors
+        let coefficient: Sample = Sample::from(2.0).powf(1.0 / 12.0) - 0.005;
+
+        let start = (freq / coefficient) as usize;
+        let stop = (freq * coefficient) as usize;
+
+        Interval { start, stop, val: 0 }
+    }
+
     #[allow(dead_code)]
     pub fn dump(&self, output_dir: &Path) -> Result<()> {
         for clip in &self.clips {
@@ -97,19 +125,22 @@ mod tests {
     }
 
     #[test]
-    fn test_combotones_sig_freq() {
+    fn test_combotones_intervals() {
         let source = path::Path::new("test_audio_clips/comboTones.mp3");
-        let combotones = AudioClip::new(&source).expect("failed to create audio clip");
-        let split_combotones = TetrisClips::split_combotones(&combotones);
+        let clip = AudioClip::new(&source).expect("failed to create audio clip");
+        let combotones = TetrisClips::split_combotones(&clip);
+        let combotones_fft = combotones.iter().map(|clip| clip.fft()).collect_vec();
 
-        let mut prev = 1.0;
-        for clip in &split_combotones {
-            let curr = clip.fft().most_significant_frequency();
-            println!("{}: {:?}, multiplier: {}", clip.file_name, curr, curr / prev);
-            prev = curr;
+        let frequencies = combotones_fft.iter().map(|fft| fft.most_significant_frequency()).collect_vec();
+        let intervals = frequencies
+            .iter()
+            .map(|&f| TetrisClips::get_interval(f))
+            .collect_vec();
+
+        let lapper = Lapper::new(intervals);
+        for freq in frequencies.iter().map(|&f| f as usize) {
+            let find_result: Vec<_> = lapper.find(freq, freq).collect();
+            assert_eq!(find_result.len(), 1, "No two notes should overlap, each note should be unique");
         }
-        split_combotones[0].fft().dump(Path::new("python/fft.csv")).unwrap();
-
-        panic!("stop");
     }
 }
