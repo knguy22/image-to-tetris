@@ -78,6 +78,7 @@ impl FFTResult {
     #[allow(clippy::cast_precision_loss)]
     pub fn ifft_to_audio_clip(&self) -> AudioClip {
         let channels = self.ifft();
+        let num_channels = channels.len();
         let duration = self.num_samples as f64 / self.sample_rate;
         let max_amplitude = channels
             .iter()
@@ -95,13 +96,13 @@ impl FFTResult {
             duration,
             sample_rate: self.sample_rate,
             max_amplitude,
-            num_channels: 1,
+            num_channels,
             num_samples: self.num_samples,
         }
     }
 
     #[allow(clippy::cast_precision_loss)]
-    pub fn ifft(&self) -> Vec<Channel> {
+    fn ifft(&self) -> Vec<Channel> {
         let mut planner = FftPlanner::<Sample>::new();
         let fft = planner.plan_fft_inverse(self.num_samples);
 

@@ -1,12 +1,11 @@
 use super::audio_clip::{AudioClip, Sample};
+use super::fft::FFTResult;
 
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use itertools::Itertools;
 use rust_lapper::{Lapper, Interval};
-
-type IntervalType = Interval<usize, usize>;
 
 #[derive(Debug)]
 pub struct TetrisClips {
@@ -56,28 +55,73 @@ impl TetrisClips {
         combos.into_iter().take(NUM_COMBOS).collect()
     }
 
-    fn extrapolate_chromatic_notes(combotones: &Vec<AudioClip>) {
-        const MIN_FREQ: Sample = 50.0;
-        const MAX_FREQ: Sample = 2000.0;
+    fn extrapolate_chromatic_notes(combotones: &Vec<AudioClip>) -> Vec<AudioClip> {
+        // three lined bsharp/c
+        const MAX_FREQ: Sample = 1046.50;
 
-        let combotones_intervals: Vec<IntervalType> = combotones
+        const NOTES_IN_COMBOTONES_OCTAVE: usize = 6;
+        let chromatic_diff = Sample::from(2.0).powf(1.0 / 12.0);
+        assert_eq!(combotones.len(), 15);
+
+        // let the intervals contain the combotone indices as value so they can be looked up later
+        let combotones_intervals: Vec<Interval<usize, usize>> = combotones
             .iter()
-            .map(|clip| Self::get_interval(clip.fft().most_significant_frequency()))
+            .enumerate()
+            .map(|(i, clip)| Self::interval(clip.fft().most_significant_frequency(), i))
             .collect();
-        let mut lapper = Lapper::new(combotones_intervals);
+
+        let combotones_fft: Vec<FFTResult> = combotones
+            .iter()
+            .map(|clip| clip.fft())
+            .collect();
+        let combotones_freq = combotones_fft
+            .iter()
+            .map(|fft| fft.most_significant_frequency())
+            .collect_vec();
+        let freq_fft_iter = combotones_freq.iter().zip(combotones_fft.iter());
+
+        // we will use the lower octave in combotones in order to create the notes pitched downwards
+        let mut lower_notes_iter = freq_fft_iter.clone().take(NOTES_IN_COMBOTONES_OCTAVE).cycle();
+
+        let mut final_clips = Vec::new();
+        let lapper = Lapper::new(combotones_intervals);
+        let mut curr_freq = combotones_freq[0] / (Sample::from(2.0).powf(2.0));
+        loop {
+            let (&freq, fft) = lower_notes_iter.next().unwrap();
+
+            // limit check
+            curr_freq *= chromatic_diff;
+            if curr_freq > MAX_FREQ {
+                break;
+            }
+
+            // check for overlaps with existing notes
+            let find_result: Vec<_> = lapper.find(curr_freq as usize, curr_freq as usize).collect();
+            if !find_result.is_empty() {
+                assert!(find_result.len() == 1);
+                final_clips.push(combotones[find_result[0].val].clone());
+                continue;
+            }
+
+            // finally, create the pitch shifted note
+            let multiplier = curr_freq / freq;
+            final_clips.push(fft.pitch_shift(multiplier).ifft_to_audio_clip());
+        }
+
+        final_clips
     }
 
     /// creates an interval based on the frequency that only overlaps with notes in the same chromatic note
-    fn get_interval(freq: Sample) -> IntervalType {
+    fn interval(freq: Sample, val: usize) -> Interval<usize, usize> {
         // chromatic notes differ in frequency by a multiple of 2^(1/12)
         // to prevent two chromatic notes from overlapping in intervals, we take another square root of the multiplier
         // and subtract by a small constant to account for precision errors
-        let coefficient: Sample = Sample::from(2.0).powf(1.0 / 12.0) - 0.005;
+        let coefficient: Sample = Sample::from(2.0).powf(1.0 / 12.0).powf(0.5) - 0.005;
 
         let start = (freq / coefficient) as usize;
         let stop = (freq * coefficient) as usize;
 
-        Interval { start, stop, val: 0 }
+        Interval { start, stop, val }
     }
 
     #[allow(dead_code)]
@@ -134,7 +178,7 @@ mod tests {
         let frequencies = combotones_fft.iter().map(|fft| fft.most_significant_frequency()).collect_vec();
         let intervals = frequencies
             .iter()
-            .map(|&f| TetrisClips::get_interval(f))
+            .map(|&f| TetrisClips::interval(f, 0))
             .collect_vec();
 
         let lapper = Lapper::new(intervals);
@@ -142,5 +186,21 @@ mod tests {
             let find_result: Vec<_> = lapper.find(freq, freq).collect();
             assert_eq!(find_result.len(), 1, "No two notes should overlap, each note should be unique");
         }
+    }
+
+    #[test]
+    #[ignore]
+    fn test_combotones_chromatic() {
+        let source = path::Path::new("test_audio_clips/comboTones.mp3");
+        let output = path::Path::new("test_chromatic_tones.wav");
+        let clip = AudioClip::new(&source).expect("failed to create audio clip");
+        let combotones = TetrisClips::split_combotones(&clip);
+        let chromatic_notes = TetrisClips::extrapolate_chromatic_notes(&combotones);
+
+        let mut final_clip = chromatic_notes[0].clone();
+        for clip in chromatic_notes.iter().skip(1) {
+            final_clip.append_mut(clip);
+        }
+        final_clip.write(Some(&output)).expect("failed to write final clip");
     }
 }

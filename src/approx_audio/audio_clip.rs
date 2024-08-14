@@ -177,6 +177,18 @@ impl AudioClip {
         }
     }
 
+    pub fn append_mut(&mut self, rhs: &Self) {
+        assert!(self.num_channels == rhs.num_channels);
+        assert!((self.sample_rate - rhs.sample_rate).abs() < f64::EPSILON);
+
+        for channel_idx in 0..self.num_channels {
+            self.channels[channel_idx].extend(&rhs.channels[channel_idx]);
+        }
+        self.num_samples += rhs.num_samples;
+        self.max_amplitude = self.max_amplitude.max(rhs.max_amplitude);
+        self.duration += rhs.duration;
+    }
+
     pub fn scale_amplitude(&self, rhs: Sample) -> Self {
         let mut output = self.clone();
         for channel in &mut output.channels {
