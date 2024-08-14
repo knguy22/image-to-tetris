@@ -63,8 +63,8 @@ impl AudioClip {
     }
 
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, dead_code)]
-    pub fn new_monotone(sample_rate: f64, duration: f64, amplitude: Sample, num_channels: usize) -> Self {
-        let num_samples = (duration * sample_rate) as usize;
+    pub fn new_monoamplitude(sample_rate: f64, num_samples: usize, amplitude: Sample, num_channels: usize) -> Self {
+        let duration = num_samples as f64 / sample_rate;
         let channels: Vec<Channel> = vec![vec![amplitude; num_samples]; num_channels];
 
         AudioClip {
@@ -263,15 +263,15 @@ mod tests {
     }
 
     #[test]
-    fn test_monotone() {
+    fn test_monoamplitude() {
         let sample_rate = 44100.0;
-        let duration = 1.0;
+        let num_samples = 44100;
         let amplitude = 0.5;
 
-        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude, 1);
+        let clip = AudioClip::new_monoamplitude(sample_rate, num_samples, amplitude, 1);
 
         assert!(clip.num_channels > 0);
-        assert_eq!(clip.num_samples, sample_rate as usize * duration as usize);
+        assert_eq!(clip.num_samples, num_samples);
         assert!(clip.channels.iter().all(|v| v.len() == clip.num_samples));
         assert!(clip.channels[0].iter().all(|v| *v == amplitude));
     }
@@ -328,11 +328,12 @@ mod tests {
     #[test]
     fn test_scale_amplitude() {
         let sample_rate = 44100.0;
-        let duration = 1.0;
+        let num_samples = 44100;
+        let num_channels = 1;
         let amplitude = 0.5;
         let multiplier: Sample = 0.33;
 
-        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude, 1);
+        let clip = AudioClip::new_monoamplitude(sample_rate, num_samples, amplitude, num_channels);
         let new_clip = clip.scale_amplitude(multiplier);
 
         assert!(new_clip.num_channels > 0);
@@ -344,12 +345,12 @@ mod tests {
     #[test]
     fn test_add_mut() {
         let sample_rate = 44100.0;
-        let duration = 1.0;
+        let num_samples = 1000;
         let amplitude_0 = 0.25;
         let amplitude_1 = 0.5;
 
-        let mut clip_0 = AudioClip::new_monotone(sample_rate, duration, amplitude_0, 1);
-        let clip_1 = AudioClip::new_monotone(sample_rate, duration, amplitude_1, 1);
+        let mut clip_0 = AudioClip::new_monoamplitude(sample_rate, num_samples, amplitude_0, 1);
+        let clip_1 = AudioClip::new_monoamplitude(sample_rate, num_samples, amplitude_1, 1);
         clip_0.add_mut(&clip_1, 1.0);
 
         assert!(clip_0.channels[0].iter().all(|v| *v == amplitude_0 + amplitude_1));

@@ -46,14 +46,14 @@ mod tests {
     #[test]
     fn test_window() {
         let sample_rate = 44100.0;
-        let duration = 1.0;
+        let num_samples = 44100;
         let amplitude = 0.5;
 
         let start: usize = 1000;
         let end: usize = 8000;
         let window_len = end - start;
 
-        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude, 1);
+        let clip = AudioClip::new_monoamplitude(sample_rate, num_samples, amplitude, 1);
         let window_clip = clip.window(start, end, rectangle_window);
 
         assert!(window_clip.num_channels > 0);
@@ -65,15 +65,14 @@ mod tests {
     #[test]
     fn test_window_overflow() {
         let sample_rate = 44100.0;
-        let duration = 1.0;
+        let num_samples = 44100;
         let amplitude = 0.5;
-        let num_samples = sample_rate as usize * duration as usize;
 
         let start: usize = 44000;
         let end: usize = 46000;
         let window_len = end - start;
 
-        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude, 1);
+        let clip = AudioClip::new_monoamplitude(sample_rate, num_samples, amplitude, 1);
         let window_clip = clip.window(start, end, rectangle_window);
 
         assert!(window_clip.num_channels > 0);

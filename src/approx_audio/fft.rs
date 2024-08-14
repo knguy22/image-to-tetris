@@ -156,12 +156,12 @@ mod tests {
     }
 
     #[test]
-    fn test_fft_monotone() {
+    fn test_fft_monoamplitude() {
         let sample_rate = 44100.0;
-        let duration = 1.0;
+        let num_samples = 1000;
         let amplitude = 0.5;
 
-        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude, 1);
+        let clip = AudioClip::new_monoamplitude(sample_rate, num_samples, amplitude, 1);
         let fft = clip.fft();
         assert!(fft.channels.iter().all(|c| c.len() == clip.num_samples));
     }
@@ -169,12 +169,12 @@ mod tests {
     #[test]
     fn test_stft() {
         let sample_rate = 44100.0;
-        let duration = 1.0;
+        let num_samples = 1000;
         let amplitude = 0.5;
 
         let window = 1024;
         let hop = window / 4;
-        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude, 1);
+        let clip = AudioClip::new_monoamplitude(sample_rate, num_samples, amplitude, 1);
         let stft = clip.stft(window, hop);
 
         assert_eq!(stft.len(), clip.num_samples / hop + 1);
@@ -183,12 +183,12 @@ mod tests {
     #[test]
     fn test_stft_2() {
         let sample_rate = 24100.0;
-        let duration = 5.6;
+        let num_samples = 1000;
         let amplitude = 0.6;
 
         let window = 2048;
         let hop = window / 4;
-        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude, 1);
+        let clip = AudioClip::new_monoamplitude(sample_rate, num_samples, amplitude, 1);
         let stft = clip.stft(window, hop);
 
         assert_eq!(stft.len(), clip.num_samples / hop + 1);
