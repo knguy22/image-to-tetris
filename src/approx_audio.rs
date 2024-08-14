@@ -128,11 +128,6 @@ impl InputAudioClip {
             let clip = clip.scale_amplitude(multiplier);
             let diff = chunk.diff(&clip, multiplier);
 
-            // tetris clips longer than the chunk are not considered to prevent early termination of sound clips
-            if clip.num_samples > output.num_samples {
-                continue;
-            }
-
             // find the best clip
             if diff < best_diff {
                 best_multiplier = Some(multiplier);

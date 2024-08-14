@@ -22,24 +22,12 @@ impl TetrisClips {
             match path.file_name() {
                 // combotones are made of multiple clips, not just one
                 name if name == "comboTones.mp3" || name == "comboTones.wav" => {
-                    let combos = TetrisClips::split_combotones(&clip);
-                    clips.extend(combos);
+                    let combotones = TetrisClips::split_combotones(&clip);
+                    let chromatic_combos = TetrisClips::extrapolate_chromatic_notes(&combotones);
+                    clips.extend(chromatic_combos);
                 },
-                _ => clips.push(clip),
+                _ => (),
             }
-        }
-
-        // songs to split by onsets
-        let songs_to_split = Path::new("assets_sound_onset_split");
-        if songs_to_split.exists() {
-            for path in songs_to_split.read_dir()? {
-                let path = path?;
-                let clip = AudioClip::new(&path.path())?.split_by_onsets();
-                clips.extend(clip);
-            }
-        }
-        else {
-            println!("Warning: no songs to split by onsets found");
         }
 
         Ok(TetrisClips { clips })

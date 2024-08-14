@@ -164,19 +164,21 @@ impl AudioClip {
         self.num_channels = num_channels;
     }
 
+    /// add two audio clips up to the amount of samples `self` has
+    /// extra samples beyond `self` will be ignored
     pub fn add_mut(&mut self, rhs: &Self, multiplier: Sample) {
         assert!(self.num_channels == rhs.num_channels);
         assert!((self.sample_rate - rhs.sample_rate).abs() < f64::EPSILON);
-        assert!(self.num_samples >= rhs.num_samples);
 
         let limit = std::cmp::min(self.num_samples, rhs.num_samples);
         for channel_idx in 0..self.num_channels {
             for sample_idx in 0..limit {
-                self.channels[channel_idx][sample_idx] += rhs.channels[channel_idx][sample_idx] * multiplier;
+                self.channels[channel_idx][sample_idx] += rhs.channels[channel_idx].get(sample_idx).unwrap_or(&0.0) * multiplier;
             }
         }
     }
 
+    #[allow(unused)]
     pub fn append_mut(&mut self, rhs: &Self) {
         assert!(self.num_channels == rhs.num_channels);
         assert!((self.sample_rate - rhs.sample_rate).abs() < f64::EPSILON);
