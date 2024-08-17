@@ -4,12 +4,8 @@ use super::audio_clip::{AudioClip, Sample};
 use super::fft::FFTResult;
 use super::windowing::rectangle_window;
 
-pub type  Onsets = Vec<Onset>;
-#[derive(Debug)]
-pub struct Onset {
-    pub index: usize,
-    pub is_onset: bool,
-}
+/// a vector of sample indices that contain properly detected onsets
+pub type Onsets = Vec<usize>;
 
 /// a channel of norms; usually converted from a channel of complex samples
 type FFTChannelNorm = Vec<Sample>;
@@ -32,31 +28,20 @@ type STFTDiffs = Vec<FFTDiff>;
 
 impl AudioClip {
     pub fn split_by_onsets(&self) -> Vec<AudioClip> {
-        let onsets = self.detect_onsets();
-        let mut true_onsets = onsets.iter().filter(|o| o.is_onset).collect_vec();
+        let mut onsets = self.detect_onsets();
 
-        // we need to include 0 and the end in the true onsets
-        if true_onsets[0].index != 0 {
-            true_onsets.insert(0, &Onset {
-                index: 0,
-                is_onset: true
-            });
+        // we need to include the beginning and the end in the onsets to include the whole clip
+        if onsets[0] != 0 {
+            onsets.insert(0, 0);
+        }
+        if onsets[onsets.len() - 1] != self.num_samples {
+            onsets.push(self.num_samples);
         }
 
-        let end = Onset {
-            index: self.num_samples,
-            is_onset: true
-        };
-        if true_onsets[true_onsets.len() - 1].index != self.num_samples {
-            true_onsets.push(&end);
-        }
-
-        true_onsets
+        onsets
             .iter()
             .tuple_windows()
-            .map(|(a, b)| {
-                let start = a.index;
-                let end = b.index;
+            .map(|(&start, &end)| {
                 self.window(start, end, rectangle_window)
             })
             .collect_vec()
@@ -82,21 +67,27 @@ impl AudioClip {
         let mut diffs = normalize_diffs(&diffs);
 
         // use local averages to find extraordinary diffs
-        let window_size = (self.sample_rate as Sample / hop_size as Sample).ceil() as usize;
+        let window_sec = 1.0;
+        let window_size = (window_sec * self.sample_rate as Sample / hop_size as Sample).ceil() as usize;
         let local_avg_diffs = find_local_avgs(&diffs, window_size);
         for (diff, local_avg_diff) in diffs.iter_mut().zip(local_avg_diffs.iter()) {
             *diff = Sample::max(*diff - local_avg_diff, 0.0);
         }
 
         // perform onset detection using the derivative
-        // onsets will typically have higher derivative values
+        // onsets will typically have non-zero derivative values
         let mut onsets = Vec::new();
         let index_iter = (0..self.num_samples).step_by(hop_size);
-        for (&diff, index) in diffs.iter().zip(index_iter) {
-            onsets.push(Onset {
-                index,
-                is_onset: diff > 0.0
-            })
+        let mut in_onset = false;
+        for (&diff, index) in diffs.iter().zip_eq(index_iter) {
+            if diff == 0.0 {
+                in_onset = false;
+            }
+            // only push onset once the diff is non-zero
+            else if !in_onset {
+                onsets.push(index);
+                in_onset = true;
+            }
         }
 
         onsets
@@ -214,7 +205,6 @@ mod tests {
         let onsets = clip.detect_onsets();
         let onset_count = onsets
             .iter()
-            .filter(|&b| b.is_onset)
             .count();
 
         assert!(onset_count > 0);
@@ -225,10 +215,14 @@ mod tests {
     fn test_split_by_onsets() {
         let clip = AudioClip::new(&path::Path::new("test_audio_clips/comboTones.mp3")).unwrap();
         let onsets = clip.detect_onsets();
-        let true_onsets = onsets.iter().filter(|o| o.is_onset).collect_vec();
         let clips = clip.split_by_onsets();
+        let total_num_samples: usize = clips
+            .iter()
+            .map(|clip| clip.num_samples)
+            .sum();
 
         // should be 1 more than the number of onsets because clips are split by onsets
-        assert_eq!(clips.len() - 1, true_onsets.len());
+        assert_eq!(clips.len() - 1, onsets.len());
+        assert_eq!(total_num_samples, clip.num_samples);
     }
 }
