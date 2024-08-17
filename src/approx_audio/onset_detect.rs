@@ -44,6 +44,7 @@ impl AudioClip {
             .iter()
             .tuple_windows()
             .map(|(&start, &end)| {
+                // don't modify the original input through windowing because we're only splitting
                 self.window(start, end, rectangle_window)
             })
             .collect_vec()

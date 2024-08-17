@@ -1,4 +1,4 @@
-use super::{audio_clip::{AudioClip, Channel, Sample}, windowing::rectangle_window};
+use super::{audio_clip::{AudioClip, Channel, Sample}, windowing::hanning_window};
 use std::fmt;
 use std::path::Path;
 
@@ -25,7 +25,8 @@ impl AudioClip {
 
         let mut curr_index = 0;
         while curr_index < self.num_samples {
-            let window = self.window(curr_index, curr_index + window_size, rectangle_window);
+            // we want to use hanning window to avoid aliasing
+            let window = self.window(curr_index, curr_index + window_size, hanning_window);
             stft_res.push(window.fft());
             curr_index += hop_size;
         }
