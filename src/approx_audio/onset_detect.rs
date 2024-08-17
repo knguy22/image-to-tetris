@@ -69,7 +69,7 @@ impl AudioClip {
         let mut diffs = find_diffs(&stft);
 
         // use local averages to find extraordinary diffs
-        let window_sec = 1.0;
+        let window_sec = 0.1;
         let window_size = (window_sec * self.sample_rate as Sample / hop_size as Sample).ceil() as usize;
         let local_avg_diffs = find_local_avgs(&diffs, window_size);
         for (diff, local_avg_diff) in diffs.iter_mut().zip(local_avg_diffs.iter()) {
