@@ -4,6 +4,8 @@ use super::audio_clip::{AudioClip, Sample};
 use super::fft::FFTResult;
 use super::windowing::rectangle_window;
 
+use anyhow::Result;
+
 /// a vector of sample indices that contain properly detected onsets
 pub type Onsets = Vec<usize>;
 
@@ -193,6 +195,16 @@ fn find_local_avgs(diffs: &STFTDiffs, window_size: usize) -> STFTDiffs {
     local_diffs
 }
 
+#[allow(unused)]
+fn dump_diffs(diffs: &STFTDiffs, output: &str) -> Result<()> {
+    let mut wtr = csv::Writer::from_path(output)?;
+    wtr.write_record(["diff", "magnitude"])?;
+    for (i, diff) in diffs.iter().enumerate() {
+        wtr.write_record(&[i.to_string(), diff.to_string()])?;
+    }
+
+    Ok(())
+}
 
 #[cfg(test)]
 mod tests {

@@ -106,6 +106,26 @@ def graph_fft():
 
         plt.grid(True)
         plt.savefig(f'fft_channel_{channel}.png')
+    
+def graph_diffs(input: str):
+    df = pd.read_csv(input)
+
+    # expected structure: diff, magnitude
+    diffs = df['diff']
+    magnitudes = df['magnitude']
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(diffs, magnitudes, 'b-', label='Normalized value')
+
+    plt.xlabel('Diff')
+    plt.ylabel('Magnitude')
+    plt.title(f'Diffs')
+    plt.legend()
+
+    plt.grid(True)
+    plt.savefig(f'diff_{input}.png')
 
 if __name__ == "__main__":
-    graph_fft()
+    # graph_fft()
+    graph_diffs('onset_diffs.csv')
+    graph_diffs('local_onset_diffs.csv')
