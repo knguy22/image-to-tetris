@@ -79,21 +79,24 @@ impl AudioClip {
 
         // take the derivative
         let diffs = find_diffs(&stft);
-        let diffs = normalize_diffs(&diffs);
+        let mut diffs = normalize_diffs(&diffs);
+
+        // use local averages to find extraordinary diffs
+        let window_size = (self.sample_rate as Sample / hop_size as Sample).ceil() as usize;
+        let local_avg_diffs = find_local_avgs(&diffs, window_size);
+        for (diff, local_avg_diff) in diffs.iter_mut().zip(local_avg_diffs.iter()) {
+            *diff = Sample::max(*diff - local_avg_diff, 0.0);
+        }
 
         // perform onset detection using the derivative
         // onsets will typically have higher derivative values
         let mut onsets = Vec::new();
         let index_iter = (0..self.num_samples).step_by(hop_size);
-        let avg_diff = diffs
-            .iter()
-            .sum::<Sample>()
-            / diffs.len() as Sample;
-        for (diff, index) in diffs.iter().zip(index_iter) {
+        for (&diff, index) in diffs.iter().zip(index_iter) {
             onsets.push(Onset {
                 index,
-                is_onset: *diff > avg_diff
-            });
+                is_onset: diff > 0.0
+            })
         }
 
         onsets
@@ -174,6 +177,29 @@ fn normalize_diffs(diffs: &STFTDiffs) -> STFTDiffs {
         .iter()
         .map(|diff| diff / max)
         .collect_vec()
+}
+
+fn find_local_avgs(diffs: &STFTDiffs, window_size: usize) -> STFTDiffs {
+    let mut local_diffs = Vec::new();
+
+    // sliding window terms
+    let mut r = 0;
+    let mut window_sum: Sample = 0.0;
+
+    for l in 0..diffs.len() {
+        while r < diffs.len() && r - l < window_size {
+            window_sum += diffs[r];
+            r += 1;
+        }
+        assert!(r - l > 0, "r - l should never <= 0");
+
+        local_diffs.push(window_sum / (r - l) as Sample);
+        window_sum -= diffs[l];
+    }
+
+    assert!(local_diffs.len() == diffs.len(), "local_diffs.len() should == diffs.len()");
+
+    local_diffs
 }
 
 
