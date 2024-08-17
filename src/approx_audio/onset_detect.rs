@@ -66,8 +66,7 @@ impl AudioClip {
         let stft = apply_gamma_log(&stft, 100.0);
 
         // take the derivative
-        let diffs = find_diffs(&stft);
-        let mut diffs = normalize_diffs(&diffs);
+        let mut diffs = find_diffs(&stft);
 
         // use local averages to find extraordinary diffs
         let window_sec = 1.0;
@@ -77,19 +76,22 @@ impl AudioClip {
             *diff = Sample::max(*diff - local_avg_diff, 0.0);
         }
 
+        // normalize the diffs so we can use them for onset detection
+        let diffs = normalize_diffs(&diffs);
+
         // perform onset detection using the derivative
         // onsets will typically have non-zero derivative values
         let mut onsets = Vec::new();
         let index_iter = (0..self.num_samples).step_by(hop_size);
         let mut in_onset = false;
         for (&diff, index) in diffs.iter().zip_eq(index_iter) {
-            if diff == 0.0 {
-                in_onset = false;
-            }
-            // only push onset once the diff is non-zero
-            else if !in_onset {
+            // only push onset once the diff is non-zero to a certain degree
+            if !in_onset && diff > 0.2 {
                 onsets.push(index);
                 in_onset = true;
+            }
+            else {
+                in_onset = false;
             }
         }
 
