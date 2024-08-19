@@ -3,9 +3,49 @@ use super::fft::{FFTResult, FFTSample};
 
 use itertools::Itertools;
 use rustfft::num_complex::Complex;
+use rust_lapper::{Lapper, Interval};
 
 /// the frequency and magnitude of a bin
 type FreqBin = (Sample, Vec<FFTSample>);
+
+pub struct NoteTracker {
+    lapper: Lapper<usize, usize>,
+}
+
+impl NoteTracker {
+    pub fn new() -> Self {
+        Self {
+            lapper: Lapper::new(Vec::new()),
+        }
+    }
+
+    pub fn add_note(&mut self, freq: Sample) -> Option<()> {
+        // only add notes that aren't already found
+        if self.contains_note(freq) {
+            return None;
+        }
+
+        self.lapper.insert(Self::interval(freq, 0));
+        Some(())
+    }
+
+    pub fn contains_note(&self, freq: Sample) -> bool {
+        self.lapper.find(freq as usize, freq as usize).count() > 0
+    }
+
+    /// creates an interval based on the frequency that only overlaps with notes in the same chromatic note
+    fn interval(freq: Sample, val: usize) -> Interval<usize, usize> {
+        // chromatic notes differ in frequency by a multiple of 2^(1/12)
+        // to prevent two chromatic notes from overlapping in intervals, we take another square root of the multiplier
+        // and subtract by a small constant to account for precision errors
+        let coefficient: Sample = Sample::from(2.0).powf(1.0 / 12.0).powf(0.5) - 0.005;
+
+        let start = (freq / coefficient) as usize;
+        let stop = (freq * coefficient) as usize;
+
+        Interval { start, stop, val }
+    }
+}
 
 impl FFTResult {
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
@@ -76,6 +116,7 @@ impl FFTResult {
 mod tests {
     use crate::approx_audio::AudioClip;
     use std::path::Path;
+    use super::*;
 
     #[test]
     fn test_pitch_shift() {
@@ -97,5 +138,15 @@ mod tests {
 
         ifft_clip.write(Some(output)).unwrap();
 
+    }
+
+    #[test]
+    fn test_note_tracker() {
+        let mut note_tracker = NoteTracker::new();
+        note_tracker.add_note(440.0);
+
+        assert!(note_tracker.contains_note(440.0));
+        assert!(!note_tracker.contains_note(440.0 * 1.3));
+        assert!(!note_tracker.contains_note(440.0 / 1.3));
     }
 }
