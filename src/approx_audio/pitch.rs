@@ -8,6 +8,7 @@ use rust_lapper::{Lapper, Interval};
 /// the frequency and magnitude of a bin
 type FreqBin = (Sample, Vec<FFTSample>);
 
+#[derive(Debug)]
 pub struct NoteTracker {
     lapper: Lapper<usize, usize>,
 }
@@ -19,18 +20,19 @@ impl NoteTracker {
         }
     }
 
-    pub fn add_note(&mut self, freq: Sample) -> Option<()> {
+    pub fn add_note(&mut self, freq: Sample, val: usize) -> Option<()> {
         // only add notes that aren't already found
-        if self.contains_note(freq) {
+        if self.get_note(freq).is_some() {
             return None;
         }
 
-        self.lapper.insert(Self::interval(freq, 0));
+        self.lapper.insert(Self::interval(freq, val));
         Some(())
     }
-
-    pub fn contains_note(&self, freq: Sample) -> bool {
-        self.lapper.find(freq as usize, freq as usize).count() > 0
+    
+    pub fn get_note(&self, freq: Sample) -> Option<usize> {
+        let freq_interval = Self::interval(freq, 0);
+        self.lapper.find(freq_interval.start, freq_interval.stop).next().map(|i| i.val)
     }
 
     /// creates an interval based on the frequency that only overlaps with notes in the same chromatic note
@@ -96,7 +98,7 @@ impl FFTResult {
     /// yields a tuple of (frequency, Vec[sample] = bin containing complex samples for each channel)
     /// yields up to the Nyquist frequency
     #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
-    fn iter_zip_bins(&self) -> impl Iterator<Item = FreqBin> + '_ {
+    pub fn iter_zip_bins(&self) -> impl Iterator<Item = FreqBin> + '_ {
         let nyquist = self.nyquist_frequency() as Sample;
 
         (0..self.num_samples).map(|i| {
@@ -143,10 +145,10 @@ mod tests {
     #[test]
     fn test_note_tracker() {
         let mut note_tracker = NoteTracker::new();
-        note_tracker.add_note(440.0);
+        note_tracker.add_note(440.0, 0);
 
-        assert!(note_tracker.contains_note(440.0));
-        assert!(!note_tracker.contains_note(440.0 * 1.3));
-        assert!(!note_tracker.contains_note(440.0 / 1.3));
+        assert!(note_tracker.get_note(440.0).is_some());
+        assert!(note_tracker.get_note(440.0 * 1.3).is_none());
+        assert!(note_tracker.get_note(440.0 / 1.3).is_none());
     }
 }

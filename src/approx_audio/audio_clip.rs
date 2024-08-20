@@ -191,6 +191,7 @@ impl AudioClip {
         self.duration += rhs.duration;
     }
 
+    #[allow(dead_code)]
     pub fn scale_amplitude(&self, rhs: Sample) -> Self {
         let mut output = self.clone();
         for channel in &mut output.channels {

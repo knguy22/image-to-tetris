@@ -795,6 +795,7 @@ dependencies = [
  "imageproc",
  "indicatif",
  "itertools 0.13.0",
+ "ordered-float",
  "rand",
  "rayon",
  "rgb",
@@ -1278,6 +1279,15 @@ name = "ordered-channel"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4f0bc569ca0974cb90125f52cf76f7b6ad3a072301beba78eb0aa4174c4964ed"
+
+[[package]]
+name = "ordered-float"
+version = "4.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4a91171844676f8c7990ce64959210cd2eaef32c2612c50f9fae9f8aaa6065a6"
+dependencies = [
+ "num-traits",
+]
 
 [[package]]
 name = "owned_ttf_parser"

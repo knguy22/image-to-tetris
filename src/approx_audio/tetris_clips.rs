@@ -10,12 +10,14 @@ use itertools::Itertools;
 
 #[derive(Debug)]
 pub struct TetrisClips {
-    pub clips: Vec<AudioClip>
+    pub clips: Vec<AudioClip>,
+    pub note_tracker: NoteTracker,
 }
 
 impl TetrisClips {
     pub fn new(source: &Path) -> Result<TetrisClips> {
-        let mut clips = Vec::new();
+        let mut tetris_clips = TetrisClips { clips: Vec::new(), note_tracker: NoteTracker::new() };
+
         for path in source.read_dir()? {
             let path = path?;
             let clip = AudioClip::new(&path.path())?;
@@ -24,14 +26,21 @@ impl TetrisClips {
                 // combotones are made of multiple clips, not just one
                 name if name == "comboTones.mp3" || name == "comboTones.wav" => {
                     let combotones = TetrisClips::split_combotones(&clip);
-                    let chromatic_combos = TetrisClips::extrapolate_chromatic_notes(&combotones);
-                    clips.extend(chromatic_combos);
+                    tetris_clips.extrapolate_chromatic_notes(&combotones);
                 },
                 _ => (),
             }
         }
 
-        Ok(TetrisClips { clips })
+        Ok(tetris_clips)
+    }
+
+    pub fn get_combotone(&self, freq: Sample) -> Option<&AudioClip> {
+        let id = self.note_tracker.get_note(freq);
+        match id {
+            Some(id) => Some(&self.clips[id]),
+            None => None,
+        }
     }
 
     #[allow(clippy::cast_precision_loss)]
@@ -44,7 +53,7 @@ impl TetrisClips {
         combos.into_iter().take(NUM_COMBOS).collect()
     }
 
-    fn extrapolate_chromatic_notes(combotones: &Vec<AudioClip>) -> Vec<AudioClip> {
+    fn extrapolate_chromatic_notes(&mut self, combotones: &Vec<AudioClip>) {
         // three lined bsharp/c
         const MAX_FREQ: Sample = 1046.50;
         const NOTES_IN_COMBOTONES_OCTAVE: usize = 6;
@@ -64,13 +73,11 @@ impl TetrisClips {
         let mut lower_notes_iter = freq_fft_iter.clone().take(NOTES_IN_COMBOTONES_OCTAVE).cycle();
 
         // prevents new notes being created for notes that already exists
-        let mut note_tracker = NoteTracker::new();
-        for &freq in &combotones_freq {
-            note_tracker.add_note(freq).expect("failed to add note");
+        for (i, &freq) in combotones_freq.iter().enumerate() {
+            self.note_tracker.add_note(freq, i).expect("failed to add note");
         }
 
         let mut curr_freq = combotones_freq[0] / (Sample::from(2.0).powf(2.0));
-        let mut final_clips = Vec::new();
         loop {
             let (&freq, fft) = lower_notes_iter.next().unwrap();
 
@@ -79,16 +86,15 @@ impl TetrisClips {
             if curr_freq > MAX_FREQ {
                 break;
             }
-            if note_tracker.contains_note(curr_freq) {
+            if self.note_tracker.get_note(curr_freq).is_some() {
                 continue;
             }
 
             // finally, create the pitch shifted note
             let multiplier = curr_freq / freq;
-            final_clips.push(fft.pitch_shift(multiplier).ifft_to_audio_clip());
+            self.clips.push(fft.pitch_shift(multiplier).ifft_to_audio_clip());
+            self.note_tracker.add_note(curr_freq, self.clips.len() - 1).expect("failed to add note");
         }
-
-        final_clips
     }
 
     #[allow(dead_code)]
@@ -145,27 +151,11 @@ mod tests {
 
         let mut note_tracker = NoteTracker::new();
         for &freq in &frequencies {
-            note_tracker.add_note(freq).expect("failed to add note"); 
+            note_tracker.add_note(freq, 0).expect("failed to add note"); 
         }
 
         for &freq in &frequencies {
-            assert!(note_tracker.contains_note(freq), "note not found: {}", freq);
+            assert!(note_tracker.get_note(freq).is_some());
         }
-    }
-
-    #[test]
-    #[ignore]
-    fn test_combotones_chromatic() {
-        let source = path::Path::new("test_audio_clips/comboTones.mp3");
-        let output = path::Path::new("test_chromatic_tones.wav");
-        let clip = AudioClip::new(&source).expect("failed to create audio clip");
-        let combotones = TetrisClips::split_combotones(&clip);
-        let chromatic_notes = TetrisClips::extrapolate_chromatic_notes(&combotones);
-
-        let mut final_clip = chromatic_notes[0].clone();
-        for clip in chromatic_notes.iter().skip(1) {
-            final_clip.append_mut(clip);
-        }
-        final_clip.write(Some(&output)).expect("failed to write final clip");
     }
 }
