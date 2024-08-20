@@ -42,7 +42,7 @@ pub fn run(source: &Path, output: &Path) -> Result<()> {
     resample::run(source, source_resampled, max_sample_rate)?;
     let mut tetris_clips = TetrisClips::new(tetris_sounds_resampled)?;
     for clip in &mut tetris_clips.clips {
-        clip.add_new_channels_mut(max_channels);
+        clip.audio.add_new_channels_mut(max_channels);
     }
 
     // now split the input
@@ -68,7 +68,7 @@ fn init(source: &Path, tetris_sounds: &Path) -> Result<MetaData> {
     let orig_tetris_clips = TetrisClips::new(tetris_sounds)?;
     let mut max_sample_rate = clip.sample_rate;
     let mut max_channels = clip.num_channels;
-    for clip in orig_tetris_clips.clips {
+    for clip in orig_tetris_clips.clips.iter().map(|clip| &clip.audio) {
         // f64 doesn't support ord, only partial-ord which is why max is not used
         if clip.sample_rate > max_sample_rate {
             max_sample_rate = clip.sample_rate;
@@ -231,10 +231,10 @@ mod tests {
         let source = Path::new("test_audio_clips");
         let tetris_clips = TetrisClips::new(source).unwrap();
 
-        let first = &tetris_clips.clips[tone_ids[0]];
+        let first = &tetris_clips.clips[tone_ids[0]].audio;
         let mut chord = AudioClip::new_monoamplitude(first.sample_rate, first.num_samples, 0.0, first.num_channels);
         for &tone_id in tone_ids {
-            chord.add_mut(&tetris_clips.clips[tone_id], 1.0);
+            chord.add_mut(&tetris_clips.clips[tone_id].audio, 1.0);
         }
 
         let approx_chunk = InputAudioClip::approx_chunk(&chord, &tetris_clips);

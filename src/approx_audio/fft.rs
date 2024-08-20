@@ -9,6 +9,7 @@ use rustfft::{FftPlanner, num_complex::Complex};
 pub type FFTSample = Complex<Sample>;
 pub type FFTChannel = Vec<FFTSample>;
 
+#[derive(Clone)]
 pub struct FFTResult {
     pub channels: Vec<FFTChannel>,
     pub frequency_resolution: f64,
