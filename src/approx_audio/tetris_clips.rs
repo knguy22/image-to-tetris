@@ -180,10 +180,12 @@ mod tests {
         let frequencies = clips_fft.iter().map(|fft| fft.most_significant_frequency()).collect_vec();
 
         for &freq in &frequencies {
-            let combotone = tetris_clips.get_combotone(freq).unwrap();
-            let fundamental_freq = combotone.fft().most_significant_frequency() as usize;
             let expected_interval = NoteTracker::interval(freq, 0);
-            println!("freq: {freq}, fundamental_freq: {fundamental_freq}, expected_interval: {expected_interval:?}");
+            println!("freq: {freq}, expected_interval: {expected_interval:?}");
+
+            let combotone = tetris_clips.get_combotone(freq).expect(&format!("{:?}", tetris_clips.note_tracker));
+            let fundamental_freq = combotone.fft().most_significant_frequency() as usize;
+            println!("fundamental_freq: {fundamental_freq}");
 
             assert!(expected_interval.start <= fundamental_freq, "interval: {expected_interval:?}, fundamental_freq: {fundamental_freq}");
             assert!(expected_interval.stop >= fundamental_freq, "interval: {expected_interval:?}, fundamental_freq: {fundamental_freq}");

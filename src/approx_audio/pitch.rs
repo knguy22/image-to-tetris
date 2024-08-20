@@ -31,9 +31,10 @@ impl NoteTracker {
     }
     
     pub fn get_note(&self, freq: Sample) -> Option<usize> {
-        let freq_interval = Self::interval(freq, 0);
+        // let freq_interval = Self::interval(freq, 0);
+        let freq_interval = Interval {start: freq as usize, stop: freq as usize, val: 0};
         let res = self.lapper.find(freq_interval.start, freq_interval.stop).collect_vec();
-        assert!(res.len() <= 1, "found more than one note at frequency {}", freq);
+        assert!(res.len() <= 1, "found more than one note at frequency {freq}, intervals: {res:?}");
 
         res.into_iter().next().map(|i| i.val)
     }
@@ -45,8 +46,9 @@ impl NoteTracker {
         // and subtract by a small constant to account for precision errors
         let coefficient: Sample = Sample::from(2.0).powf(1.0 / 12.0).powf(0.5) - 0.01;
 
-        let start = (freq / coefficient) as usize;
-        let stop = (freq * coefficient) as usize;
+        // add 1 and subtract 1 to account for rounding errors
+        let start = (freq / coefficient) as usize - 1;
+        let stop = (freq * coefficient) as usize + 1;
 
         Interval { start, stop, val }
     }

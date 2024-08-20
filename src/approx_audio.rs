@@ -103,7 +103,7 @@ impl InputAudioClip {
         let pb = progress_bar(self.chunks.len())?;
         pb.set_message("Approximating audio chunks...");
         let output_clips = self.chunks
-            .par_iter()
+            .iter()
             .map(|chunk| {
                 let approx_chunk = Self::approx_chunk(chunk, tetris_clips);
                 pb.inc(1);
