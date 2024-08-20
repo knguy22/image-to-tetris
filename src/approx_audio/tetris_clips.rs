@@ -11,13 +11,12 @@ use rust_lapper::{Lapper, Interval};
 // using the frequencies here: https://en.wikipedia.org/wiki/Piano_key_frequencies
 const MIN_FREQ: Sample = 65.40639; // C great octave
 const MAX_FREQ: Sample = 1046.502; // C''' 3-line octave
-
-const INVALID_CLIP_ID: i32 = -1;
+const INVALID_CLIP_ID: usize = usize::MAX;
 
 #[derive(Debug)]
 pub struct TetrisClips {
     pub clips: Vec<TetrisClip>,
-    lapper: Lapper<usize, i32>,
+    lapper: Lapper<usize, usize>,
 }
 
 #[derive(Clone, Debug)]
@@ -58,7 +57,7 @@ impl TetrisClips {
 
     /// takes a list of clips and inserts their clips + intervals if appropriate
     /// chromatic notes skipped will have their estimated intervals returned for later use
-    fn push_raw_combotones(&mut self, clips: &Vec<AudioClip>) -> Vec<Interval<usize, i32>> {
+    fn push_raw_combotones(&mut self, clips: &Vec<AudioClip>) -> Vec<Interval<usize, usize>> {
         let mut skipped_intervals = Vec::new();
 
         for (curr, next) in clips.iter().tuple_windows() {
@@ -69,7 +68,7 @@ impl TetrisClips {
 
             // regardless of the result, we push the current combotone
             self.clips.push(TetrisClip { audio: curr.clone(), fft: curr_fft });
-            let curr_id = (self.clips.len() - 1) as i32;
+            let curr_id = self.clips.len() - 1;
 
             // combotones are guaranted to be in ascending pitch order
             // combotones are a major scale, so they do not guarantee having all chromatic notes
@@ -95,7 +94,7 @@ impl TetrisClips {
         let last_fft = last.fft();
         let last_fundamental = last_fft.most_significant_frequency();
         self.clips.push(TetrisClip { audio: last.clone(), fft: last_fft });
-        let last_id = (self.clips.len() - 1) as i32;
+        let last_id = self.clips.len() - 1;
 
         let expected_fundamental = last_fundamental * CHROMATIC_MULTIPLIER;
         let interval = Interval {start: last_fundamental as usize, stop: expected_fundamental as usize, val: last_id};
@@ -106,7 +105,7 @@ impl TetrisClips {
 
     /// this should be run after push_raw_combotones so there are some intervals in play
     /// this also returns intervals that will be pitch shifted for later use
-    fn init_pitch_shifted_intervals(&self) -> Vec<Interval<usize, i32>> {
+    fn compute_pitch_shifted_intervals(&self) -> Vec<Interval<usize, usize>> {
         assert!(self.lapper.len() > 0);
         let mut intervals = Vec::new();
 
@@ -138,6 +137,25 @@ impl TetrisClips {
         }
 
         intervals
+    }
+
+    /// creates corresponding pitch-shifted audio clips for skipped intervals and pushes them to self.clips
+    fn populate_skipped_intervals(&mut self, intervals: &Vec<Interval<usize, usize>>) {
+        // create iterators to loop through existing combotones so pitch shifted audio clips aren't all the same
+        let combotones: Vec<TetrisClip> = self.clips.iter().take(7).cloned().collect();
+        let combotones_iter = combotones.iter().cycle();
+
+        for (interval, combotone) in intervals.iter().zip(combotones_iter) {
+            let target_fundamental = interval.start as Sample;
+            let curr_fundamental = combotone.fft.most_significant_frequency();
+            let multiplier = target_fundamental / curr_fundamental;
+            let pitch_shifted = combotone.fft.pitch_shift(multiplier);
+            self.clips.push(TetrisClip { audio: pitch_shifted.ifft_to_audio_clip(), fft: pitch_shifted});
+
+            let clip_id = self.clips.len() - 1;
+            let new_interval = Interval {val: clip_id, ..*interval};
+            self.lapper.insert(new_interval);
+        }
     }
 
     #[allow(dead_code)]
@@ -211,7 +229,7 @@ mod tests {
     }
 
     #[test]
-    fn test_init_pitch_shifted_intervals() {
+    fn test_all_combotones() {
         let source = path::Path::new("test_audio_clips/comboTones.mp3");
         let combotones = AudioClip::new(&source).expect("failed to create audio clip");
         let split_combotones = TetrisClips::split_combotones(&combotones);
@@ -222,16 +240,18 @@ mod tests {
             lapper: Lapper::new(Vec::new()),
         };
         let mut skipped = tetris_clips.push_raw_combotones(&split_combotones);
-        skipped.extend(tetris_clips.init_pitch_shifted_intervals());
-        for interval in skipped {
-            tetris_clips.lapper.insert(interval);
-        }
+        skipped.extend(tetris_clips.compute_pitch_shifted_intervals());
+        tetris_clips.populate_skipped_intervals(&skipped);
 
         let min_freq = MIN_FREQ as usize;
         let max_freq = MAX_FREQ as usize;
         for freq in min_freq..max_freq {
             let lapper_res = tetris_clips.lapper.find(freq, freq + 1).collect_vec();
+
             assert!(lapper_res.len() == 1);
+            assert!(lapper_res[0].val != INVALID_CLIP_ID);
+            assert!(tetris_clips.clips[lapper_res[0].val as usize].audio.num_samples > 0);
         }
+
     }
 }
