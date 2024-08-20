@@ -15,12 +15,21 @@ impl AudioClip {
             channels.push(to_push);
         }
         let file_name = format!("{}_{}_{}.wav", self.file_name, start, end);
+        let max_amplitude = channels
+            .iter()
+            .map(|channel| 
+                channel
+                    .iter()
+                    .fold(0.0, |a, &b| Sample::max(a, b))
+            )
+            .fold(0.0, Sample::max);
+
         Self {
             channels,
             file_name,
             duration: (end - start) as f64 / self.sample_rate,
             sample_rate: self.sample_rate,
-            max_amplitude: self.max_amplitude,
+            max_amplitude,
             num_channels: self.num_channels,
             num_samples: end - start,
         }

@@ -126,7 +126,7 @@ impl AudioClip {
         chunks
     }
 
-    #[allow(clippy::cast_precision_loss)]
+    #[allow(clippy::cast_precision_loss, unused)]
     pub fn diff(&self, other: &Self, multiplier: Sample) -> f64 {
         self.mse(other, multiplier)
     }
@@ -191,7 +191,6 @@ impl AudioClip {
         self.duration += rhs.duration;
     }
 
-    #[allow(dead_code)]
     pub fn scale_amplitude(&self, rhs: Sample) -> Self {
         let mut output = self.clone();
         for channel in &mut output.channels {

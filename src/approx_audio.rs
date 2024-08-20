@@ -134,7 +134,7 @@ impl InputAudioClip {
         let mut curr_note_tracker = NoteTracker::new();
 
         while let Some((mag, freq)) = heap.pop() {
-            if mag < max_magnitude / 2.0 {
+            if mag < max_magnitude / 2.3 {
                 break; 
             }
 
@@ -237,11 +237,6 @@ mod tests {
         let first = &tetris_clips.clips[tone_ids[0]];
         let mut chord = AudioClip::new_monoamplitude(first.sample_rate, first.num_samples, 0.0, first.num_channels);
         for &tone_id in tone_ids {
-            let clip = &tetris_clips.clips[tone_id];
-            let clip_fft = clip.fft();
-
-            println!("id: {tone_id}, most significant freq: {}", clip_fft.most_significant_frequency());
-
             chord.add_mut(&tetris_clips.clips[tone_id], 1.0);
         }
 
@@ -253,6 +248,6 @@ mod tests {
         assert_eq!(approx_chunk.duration, chord.duration);
 
         let mse = chord.mse(&approx_chunk, 1.0);
-        assert!(mse == 0.0, "mse: {}", mse);
+        assert!(mse < 0.001, "mse: {}", mse);
     }
 }

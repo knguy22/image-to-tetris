@@ -78,6 +78,13 @@ impl TetrisClips {
             self.note_tracker.add_note(freq, i).expect("failed to add note");
         }
 
+        // set up a target audio magnitude to adjust for pitch shifting losing energy
+        let target_max_amplitude = combotones
+            .iter()
+            .map(|clip| clip.max_amplitude)
+            .fold(f32::from(0.0), |a, b| a.max(b))
+            / 2.0;
+
         let mut curr_freq = combotones_freq[0] / (Sample::from(2.0).powf(2.0));
         loop {
             let (&freq, fft) = lower_notes_iter.next().unwrap();
@@ -91,9 +98,13 @@ impl TetrisClips {
                 continue;
             }
 
-            // finally, create the pitch shifted note
-            let multiplier = curr_freq / freq;
-            self.clips.push(fft.pitch_shift(multiplier).ifft_to_audio_clip());
+            // finally, create the pitch shifted note; make sure to scale the amplitude
+            let pitch_multiplier = curr_freq / freq;
+            let to_push = fft.pitch_shift(pitch_multiplier).ifft_to_audio_clip();
+            let magnitude_multiplier = target_max_amplitude / to_push.max_amplitude;
+            let to_push = to_push.scale_amplitude(magnitude_multiplier);
+
+            self.clips.push(to_push);
             self.note_tracker.add_note(curr_freq, self.clips.len() - 1).expect("failed to add note");
         }
     }
