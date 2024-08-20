@@ -8,18 +8,15 @@ mod resample;
 mod windowing;
 
 use audio_clip::{AudioClip, Sample};
-use pitch::NoteTracker;
 use tetris_clips::TetrisClips;
 use crate::utils::progress_bar;
 
 use std::fs;
 use std::path::Path;
-use std::collections::BinaryHeap;
 use std::cmp;
 
 use anyhow::Result;
 use rayon::prelude::*;
-use ordered_float::OrderedFloat;
 
 #[derive(Clone, Debug)]
 struct InputAudioClip {
@@ -103,7 +100,7 @@ impl InputAudioClip {
         let pb = progress_bar(self.chunks.len())?;
         pb.set_message("Approximating audio chunks...");
         let output_clips = self.chunks
-            .iter()
+            .par_iter()
             .map(|chunk| {
                 let approx_chunk = Self::approx_chunk(chunk, tetris_clips);
                 pb.inc(1);
@@ -116,41 +113,41 @@ impl InputAudioClip {
     }
 
     fn approx_chunk(chunk: &AudioClip, tetris_clips: &TetrisClips) -> AudioClip {
-        let mut output = AudioClip::new_monoamplitude(chunk.sample_rate, chunk.num_samples, 0.0, chunk.num_channels);
+        let output = AudioClip::new_monoamplitude(chunk.sample_rate, chunk.num_samples, 0.0, chunk.num_channels);
 
-        // take magnitudes of different frequencies one by one
-        let chunk_fft = chunk.fft();
+        // // take magnitudes of different frequencies one by one
+        // let chunk_fft = chunk.fft();
 
-        // heap contains (magnitude, frequency)
-        let mut fft_samples: Vec<(OrderedFloat<Sample>, OrderedFloat<Sample>)> = Vec::new();
-        for (freq, samples) in chunk_fft.iter_zip_bins() {
-            let magnitude = samples.iter().fold(0.0, |a, &b| a + b.norm());
-            fft_samples.push((OrderedFloat(magnitude), OrderedFloat(freq)));
-        }
-        let mut heap = BinaryHeap::from(fft_samples);
-        let max_magnitude = heap.peek().unwrap_or(&(OrderedFloat(0.0), OrderedFloat(0.0))).0;
+        // // heap contains (magnitude, frequency)
+        // let mut fft_samples: Vec<(OrderedFloat<Sample>, OrderedFloat<Sample>)> = Vec::new();
+        // for (freq, samples) in chunk_fft.iter_zip_bins() {
+        //     let magnitude = samples.iter().fold(0.0, |a, &b| a + b.norm());
+        //     fft_samples.push((OrderedFloat(magnitude), OrderedFloat(freq)));
+        // }
+        // let mut heap = BinaryHeap::from(fft_samples);
+        // let max_magnitude = heap.peek().unwrap_or(&(OrderedFloat(0.0), OrderedFloat(0.0))).0;
 
-        // track added notes
-        let mut curr_note_tracker = NoteTracker::new();
+        // // track added notes
+        // let mut curr_note_tracker = NoteTracker::new();
 
-        while let Some((mag, freq)) = heap.pop() {
-            if mag < max_magnitude / 2.3 {
-                break; 
-            }
+        // while let Some((mag, freq)) = heap.pop() {
+        //     if mag < max_magnitude / 2.3 {
+        //         break; 
+        //     }
 
-            if curr_note_tracker.get_note(freq.0) != None {
-                continue;
-            }
+        //     if curr_note_tracker.get_note(freq.0) != None {
+        //         continue;
+        //     }
 
-            let note_clip = tetris_clips.get_combotone(freq.0);
-            match note_clip {
-                Some(note_clip) => {
-                    output.add_mut(note_clip, 1.0);
-                    curr_note_tracker.add_note(freq.0, 0);
-                },
-                None => (),
-            }
-        }
+        //     let note_clip = tetris_clips.get_combotone(freq.0);
+        //     match note_clip {
+        //         Some(note_clip) => {
+        //             output.add_mut(note_clip, 1.0);
+        //             curr_note_tracker.add_note(freq.0, 0);
+        //         },
+        //         None => (),
+        //     }
+        // }
 
         output
     }

@@ -5,54 +5,11 @@ use itertools::Itertools;
 use rustfft::num_complex::Complex;
 use rust_lapper::{Lapper, Interval};
 
+/// precomputed chromatic difference; 2.0^(1/12)
+static CHROMATIC_MULTIPLIER: Sample = 1.05946309436;
+
 /// the frequency and magnitude of a bin
 type FreqBin = (Sample, Vec<FFTSample>);
-
-#[derive(Debug)]
-pub struct NoteTracker {
-    lapper: Lapper<usize, usize>,
-}
-
-impl NoteTracker {
-    pub fn new() -> Self {
-        Self {
-            lapper: Lapper::new(Vec::new()),
-        }
-    }
-
-    pub fn add_note(&mut self, freq: Sample, val: usize) -> Option<()> {
-        // only add notes that aren't already found
-        if self.get_note(freq).is_some() {
-            return None;
-        }
-
-        self.lapper.insert(Self::interval(freq, val));
-        Some(())
-    }
-    
-    pub fn get_note(&self, freq: Sample) -> Option<usize> {
-        // let freq_interval = Self::interval(freq, 0);
-        let freq_interval = Interval {start: freq as usize, stop: freq as usize, val: 0};
-        let res = self.lapper.find(freq_interval.start, freq_interval.stop).collect_vec();
-        assert!(res.len() <= 1, "found more than one note at frequency {freq}, intervals: {res:?}");
-
-        res.into_iter().next().map(|i| i.val)
-    }
-
-    /// creates an interval based on the frequency that only overlaps with notes in the same chromatic note
-    pub fn interval(freq: Sample, val: usize) -> Interval<usize, usize> {
-        // chromatic notes differ in frequency by a multiple of 2^(1/12)
-        // to prevent two chromatic notes from overlapping in intervals, we take another square root of the multiplier
-        // and subtract by a small constant to account for precision errors
-        let coefficient: Sample = Sample::from(2.0).powf(1.0 / 12.0).powf(0.5) - 0.01;
-
-        // add 1 and subtract 1 to account for rounding errors
-        let start = (freq / coefficient) as usize - 1;
-        let stop = (freq * coefficient) as usize + 1;
-
-        Interval { start, stop, val }
-    }
-}
 
 impl FFTResult {
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
@@ -146,21 +103,11 @@ mod tests {
         // make sure the most important frequencies are the same
         let source_freq = clip.fft().most_significant_frequency();
         let expected_shifted_freq = source_freq * multiplier;
-        let expected_interval = NoteTracker::interval(expected_shifted_freq, 0);
+        let expected_interval = Interval { start: (expected_shifted_freq / CHROMATIC_MULTIPLIER) as usize, stop: (expected_shifted_freq * CHROMATIC_MULTIPLIER) as usize + 1, val: 0};
         let shifted_freq = pitch_shifted.most_significant_frequency() as usize;
         assert!(expected_interval.start <= shifted_freq);
         assert!(expected_interval.stop >= shifted_freq);
 
         ifft_clip.write(Some(output)).unwrap();
-    }
-
-    #[test]
-    fn test_note_tracker() {
-        let mut note_tracker = NoteTracker::new();
-        note_tracker.add_note(440.0, 0);
-
-        assert!(note_tracker.get_note(440.0).is_some());
-        assert!(note_tracker.get_note(440.0 * 1.3).is_none());
-        assert!(note_tracker.get_note(440.0 / 1.3).is_none());
     }
 }
