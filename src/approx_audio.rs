@@ -184,13 +184,13 @@ impl InputAudioClip {
 
 #[cfg(test)]
 mod tests {
-    use std::path;
+    use std::path::Path;
 
     use super::*;
 
     #[test]
     fn test_split_input_to_audio_clip() {
-        let source = path::Path::new("test_audio_clips/a6.mp3");
+        let source = Path::new("test_audio_clips/a6.mp3");
         let clip = AudioClip::new(&source).expect("failed to create audio clip");
         let input_clip = InputAudioClip::new(&source, clip.num_channels).expect("failed to create audio clip").to_audio_clip();
 
@@ -198,5 +198,61 @@ mod tests {
         assert_eq!(input_clip.sample_rate, clip.sample_rate);
         assert_eq!(input_clip.num_samples, clip.num_samples);
         assert_eq!(input_clip.duration, clip.duration);
+    }
+
+    #[test]
+    fn approx_chunk_tones_1() {
+        let tone_ids = vec![0, 1];
+        test_chunk_tones(&tone_ids);
+    }
+
+    #[test]
+    fn approx_chunk_tones_2() {
+        let tone_ids = vec![0, 5];
+        test_chunk_tones(&tone_ids);
+    }
+
+    #[test]
+    fn approx_chunk_tones_3() {
+        let tone_ids = vec![0, 8];
+        test_chunk_tones(&tone_ids);
+    }
+
+    #[test]
+    fn approx_chunk_tones_4() {
+        let tone_ids = vec![0, 10];
+        test_chunk_tones(&tone_ids);
+    }
+
+    #[test]
+    fn approx_chunk_tones_5() {
+        let tone_ids = vec![0, 10, 25];
+        test_chunk_tones(&tone_ids);
+    }
+
+    fn test_chunk_tones(tone_ids: &Vec<usize>) {
+        let source = Path::new("test_audio_clips");
+        let tetris_clips = TetrisClips::new(source).unwrap();
+
+        let first = &tetris_clips.clips[tone_ids[0]];
+        let mut chord = AudioClip::new_monoamplitude(first.sample_rate, first.num_samples, 0.0, first.num_channels);
+        for &tone_id in tone_ids {
+            let clip = &tetris_clips.clips[tone_id];
+            let clip_fft = clip.fft();
+
+            println!("id: {tone_id}, most significant freq: {}", clip_fft.most_significant_frequency());
+
+            chord.add_mut(&tetris_clips.clips[tone_id], 1.0);
+        }
+
+        let approx_chunk = InputAudioClip::approx_chunk(&chord, &tetris_clips);
+
+        assert_eq!(approx_chunk.num_channels, chord.num_channels);
+        assert_eq!(approx_chunk.sample_rate, chord.sample_rate);
+        assert_eq!(approx_chunk.num_samples, chord.num_samples);
+        assert_eq!(approx_chunk.duration, chord.duration);
+
+        let mse = chord.mse(&approx_chunk, 1.0);
+        assert!(mse == 0.0, "mse: {}", mse);
     }
 }

@@ -73,6 +73,7 @@ impl TetrisClips {
         let mut lower_notes_iter = freq_fft_iter.clone().take(NOTES_IN_COMBOTONES_OCTAVE).cycle();
 
         // prevents new notes being created for notes that already exists
+        self.clips.extend(combotones.clone());
         for (i, &freq) in combotones_freq.iter().enumerate() {
             self.note_tracker.add_note(freq, i).expect("failed to add note");
         }
@@ -156,6 +157,25 @@ mod tests {
 
         for &freq in &frequencies {
             assert!(note_tracker.get_note(freq).is_some());
+        }
+    }
+
+    #[test]
+    fn test_tetris_clips_pitch_shifted() {
+        let source = path::Path::new("test_audio_clips");
+        let tetris_clips = TetrisClips::new(&source).expect("failed to create tetris clips");
+
+        let clips_fft = tetris_clips.clips.iter().map(|clip| clip.fft()).collect_vec();
+        let frequencies = clips_fft.iter().map(|fft| fft.most_significant_frequency()).collect_vec();
+
+        for &freq in &frequencies {
+            let combotone = tetris_clips.get_combotone(freq).unwrap();
+            let fundamental_freq = combotone.fft().most_significant_frequency() as usize;
+            let expected_interval = NoteTracker::interval(freq, 0);
+            println!("freq: {freq}, fundamental_freq: {fundamental_freq}, expected_interval: {expected_interval:?}");
+
+            assert!(expected_interval.start <= fundamental_freq, "interval: {expected_interval:?}, fundamental_freq: {fundamental_freq}");
+            assert!(expected_interval.stop >= fundamental_freq, "interval: {expected_interval:?}, fundamental_freq: {fundamental_freq}");
         }
     }
 }

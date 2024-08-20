@@ -32,15 +32,18 @@ impl NoteTracker {
     
     pub fn get_note(&self, freq: Sample) -> Option<usize> {
         let freq_interval = Self::interval(freq, 0);
-        self.lapper.find(freq_interval.start, freq_interval.stop).next().map(|i| i.val)
+        let res = self.lapper.find(freq_interval.start, freq_interval.stop).collect_vec();
+        assert!(res.len() <= 1, "found more than one note at frequency {}", freq);
+
+        res.into_iter().next().map(|i| i.val)
     }
 
     /// creates an interval based on the frequency that only overlaps with notes in the same chromatic note
-    fn interval(freq: Sample, val: usize) -> Interval<usize, usize> {
+    pub fn interval(freq: Sample, val: usize) -> Interval<usize, usize> {
         // chromatic notes differ in frequency by a multiple of 2^(1/12)
         // to prevent two chromatic notes from overlapping in intervals, we take another square root of the multiplier
         // and subtract by a small constant to account for precision errors
-        let coefficient: Sample = Sample::from(2.0).powf(1.0 / 12.0).powf(0.5) - 0.005;
+        let coefficient: Sample = Sample::from(2.0).powf(1.0 / 12.0).powf(0.5) - 0.01;
 
         let start = (freq / coefficient) as usize;
         let stop = (freq * coefficient) as usize;
@@ -138,8 +141,15 @@ mod tests {
         // amplitudes are averaged out
         assert!(ifft_clip.max_amplitude <= clip.max_amplitude);
 
-        ifft_clip.write(Some(output)).unwrap();
+        // make sure the most important frequencies are the same
+        let source_freq = clip.fft().most_significant_frequency();
+        let expected_shifted_freq = source_freq * multiplier;
+        let expected_interval = NoteTracker::interval(expected_shifted_freq, 0);
+        let shifted_freq = pitch_shifted.most_significant_frequency() as usize;
+        assert!(expected_interval.start <= shifted_freq);
+        assert!(expected_interval.stop >= shifted_freq);
 
+        ifft_clip.write(Some(output)).unwrap();
     }
 
     #[test]
