@@ -8,6 +8,10 @@ use anyhow::Result;
 use itertools::Itertools;
 use rust_lapper::{Lapper, Interval};
 
+// using the frequencies here: https://en.wikipedia.org/wiki/Piano_key_frequencies
+const MIN_FREQ: Sample = 65.40639; // C great octave
+const MAX_FREQ: Sample = 1046.502; // C''' 3-line octave
+
 const INVALID_CLIP_ID: i32 = -1;
 
 #[derive(Debug)]
@@ -85,6 +89,39 @@ impl TetrisClips {
         self.lapper.insert(interval);
     }
 
+    /// this should be run after push_raw_combotones so there are some intervals in play
+    fn init_pitch_shifted_intervals(&mut self) {
+        assert!(self.lapper.len() > 0);
+
+        // the min freq can be obtained from the lowest fundamental
+        // however, the max freq must be obtained from the highest freq included from the last combotone's fundamental
+        let mut curr_min_freq = self.clips.first().unwrap().fft().most_significant_frequency();
+        let mut curr_max_freq = self.clips.last().unwrap().fft().most_significant_frequency() * CHROMATIC_MULTIPLIER;
+
+        // extrapolate intervals downward first
+        while curr_min_freq > MIN_FREQ {
+            let next_min_freq = (curr_min_freq / CHROMATIC_MULTIPLIER) as usize;
+
+            let interval = Interval {start: next_min_freq, stop: curr_min_freq as usize, val: INVALID_CLIP_ID};
+            self.lapper.insert(interval);
+
+            // account for rounding errors
+            curr_min_freq = next_min_freq as Sample;
+            assert!(curr_min_freq as usize == next_min_freq);
+        }
+
+        // then extrapolate intervals upward
+        while curr_max_freq < MAX_FREQ {
+            let next_max_freq = (curr_max_freq * CHROMATIC_MULTIPLIER) as usize;
+            let interval = Interval {start: curr_max_freq as usize, stop: next_max_freq, val: INVALID_CLIP_ID};
+            self.lapper.insert(interval);
+
+            // account for rounding errors
+            curr_max_freq = next_max_freq as Sample;
+            assert!(curr_max_freq as usize == next_max_freq);
+        }
+    }
+
     #[allow(dead_code)]
     pub fn dump(&self, output_dir: &Path) -> Result<()> {
         for clip in &self.clips {
@@ -147,6 +184,28 @@ mod tests {
         let last_fundamental = split_combotones.last().unwrap().fft().most_significant_frequency();
         let last_valid_freq = (last_fundamental * CHROMATIC_MULTIPLIER) as usize;
         for freq in first_fundamental..last_valid_freq {
+            let lapper_res = tetris_clips.lapper.find(freq, freq + 1).collect_vec();
+            assert!(lapper_res.len() == 1);
+        }
+    }
+
+    #[test]
+    fn test_init_intervals() {
+        let source = path::Path::new("test_audio_clips/comboTones.mp3");
+        let combotones = AudioClip::new(&source).expect("failed to create audio clip");
+        let split_combotones = TetrisClips::split_combotones(&combotones);
+
+        // create an empty tetris clips with no initialization
+        let mut tetris_clips = TetrisClips {
+            clips: Vec::new(),
+            lapper: Lapper::new(Vec::new()),
+        };
+        tetris_clips.push_raw_combotones(&split_combotones);
+        tetris_clips.init_pitch_shifted_intervals();
+
+        let min_freq = MIN_FREQ as usize;
+        let max_freq = MAX_FREQ as usize;
+        for freq in min_freq..max_freq {
             let lapper_res = tetris_clips.lapper.find(freq, freq + 1).collect_vec();
             assert!(lapper_res.len() == 1);
         }
