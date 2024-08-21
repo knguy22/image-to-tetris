@@ -52,7 +52,7 @@ impl AudioClip {
 
     // gives a vector of sample indices that are onsets
     // this currently uses spectrum onset detection
-    #[allow(clippy::cast_precision_loss)]
+    #[allow(clippy::cast_precision_loss, clippy::cast_sign_loss, clippy::cast_possible_truncation)]
     fn detect_onsets(&self) -> Onsets {
         // perform short time fourier transform
         let window_size = 2048;
@@ -175,6 +175,7 @@ fn normalize_diffs(diffs: &STFTDiffs) -> STFTDiffs {
         .collect_vec()
 }
 
+#[allow(clippy::cast_precision_loss)]
 fn find_local_avgs(diffs: &STFTDiffs, window_size: usize) -> STFTDiffs {
     let mut local_diffs = Vec::new();
 

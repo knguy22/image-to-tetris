@@ -116,6 +116,7 @@ impl InputAudioClip {
         Ok(Self { chunks: output_clips })
     }
 
+    #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss, clippy::cast_sign_loss)]
     fn approx_chunk(chunk: &AudioClip, tetris_clips: &TetrisClips) -> AudioClip {
         let mut output = AudioClip::new_monoamplitude(chunk.sample_rate, chunk.num_samples, 0.0, chunk.num_channels);
 
@@ -140,23 +141,18 @@ impl InputAudioClip {
 
             let freq = freq.0 as usize;
             let curr_note_res: Vec<_> = curr_note_tracker.find(freq, freq + 1).collect();
-            if curr_note_res.len() != 0 {
+            if !curr_note_res.is_empty() {
                 continue;
             }
 
             let note_clip = tetris_clips.get_combotone(freq);
-            match note_clip {
-                Some((note_clip, _)) => {
-                    // let start = interval.start.min((freq as Sample / CHROMATIC_MULTIPLIER) as usize);
-                    // let stop = interval.stop.max((freq as Sample * CHROMATIC_MULTIPLIER) as usize);
-                    let start = (freq as Sample / CHROMATIC_MULTIPLIER) as usize;
-                    let stop = (freq as Sample * CHROMATIC_MULTIPLIER) as usize;
-                    let interval = Interval { start, stop, val: 0 };
+            if let Some((note_clip, _)) = note_clip {
+                let start = (freq as Sample / CHROMATIC_MULTIPLIER) as usize;
+                let stop = (freq as Sample * CHROMATIC_MULTIPLIER) as usize;
+                let interval = Interval { start, stop, val: 0 };
 
-                    output.add_mut(&note_clip.audio, 1.0);
-                    curr_note_tracker.insert(interval);
-                },
-                None => (),
+                output.add_mut(&note_clip.audio, 1.0);
+                curr_note_tracker.insert(interval);
             }
         }
 

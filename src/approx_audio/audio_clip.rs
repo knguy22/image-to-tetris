@@ -62,7 +62,7 @@ impl AudioClip {
         })
     }
 
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, dead_code)]
+    #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss, clippy::cast_sign_loss, dead_code)]
     pub fn new_monoamplitude(sample_rate: f64, num_samples: usize, amplitude: Sample, num_channels: usize) -> Self {
         let duration = num_samples as f64 / sample_rate;
         let channels: Vec<Channel> = vec![vec![amplitude; num_samples]; num_channels];
@@ -191,6 +191,7 @@ impl AudioClip {
         self.duration += rhs.duration;
     }
 
+    #[allow(dead_code)]
     pub fn scale_amplitude(&self, rhs: Sample) -> Self {
         let mut output = self.clone();
         for channel in &mut output.channels {

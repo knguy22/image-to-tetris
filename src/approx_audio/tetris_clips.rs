@@ -71,7 +71,8 @@ impl TetrisClips {
 
     /// takes a list of clips and inserts their clips + intervals if appropriate
     /// chromatic notes skipped will have their estimated intervals returned for later use
-    fn push_raw_combotones(&mut self, clips: &Vec<AudioClip>) -> Vec<Interval<usize, usize>> {
+    #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss, clippy::cast_sign_loss)]
+    fn push_raw_combotones(&mut self, clips: &[AudioClip]) -> Vec<Interval<usize, usize>> {
         let mut skipped_intervals = Vec::new();
 
         for (curr, next) in clips.iter().tuple_windows() {
@@ -117,10 +118,11 @@ impl TetrisClips {
         skipped_intervals
     }
 
-    /// this should be run after push_raw_combotones so there are some intervals in play
+    /// this should be run after `push_raw_combotones` so there are some intervals in play
     /// this also returns intervals that will be pitch shifted for later use
+    #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss, clippy::cast_sign_loss)]
     fn compute_pitch_shifted_intervals(&self) -> Vec<Interval<usize, usize>> {
-        assert!(self.lapper.len() > 0);
+        assert!(!self.lapper.is_empty());
         let mut intervals = Vec::new();
 
         // the min freq can be obtained from the lowest fundamental
@@ -154,7 +156,8 @@ impl TetrisClips {
     }
 
     /// creates corresponding pitch-shifted audio clips for skipped intervals and pushes them to self.clips
-    fn populate_skipped_intervals(&mut self, intervals: &Vec<Interval<usize, usize>>) {
+    #[allow(clippy::cast_precision_loss)]
+    fn populate_skipped_intervals(&mut self, intervals: &[Interval<usize, usize>]) {
         // create iterators to loop through existing combotones so pitch shifted audio clips aren't all the same
         let combotones: Vec<TetrisClip> = self.clips.iter().take(7).cloned().collect();
         let combotones_iter = combotones.iter().cycle();

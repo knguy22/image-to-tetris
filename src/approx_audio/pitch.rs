@@ -5,7 +5,7 @@ use itertools::Itertools;
 use rustfft::num_complex::Complex;
 
 /// precomputed chromatic difference; 2.0^(1/12)
-pub static CHROMATIC_MULTIPLIER: Sample = 1.05946309436;
+pub static CHROMATIC_MULTIPLIER: Sample = 1.059_463_1;
 
 /// the frequency and magnitude of a bin
 type FreqBin = (Sample, Vec<FFTSample>);
