@@ -4,8 +4,10 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
+use anyhow::Result;
+
 // resamples the audio to the specified sample rate using ffmpeg
-pub fn run(source: &Path, output: &Path, sample_rate: f64) -> Result<(), Box<dyn std::error::Error>> {
+pub fn run(source: &Path, output: &Path, sample_rate: f64) -> Result<()> {
     // replace the file
     if output.exists() {
         fs::remove_file(output)?;
@@ -24,7 +26,7 @@ pub fn run(source: &Path, output: &Path, sample_rate: f64) -> Result<(), Box<dyn
 
 // the same as run but for an entire directory
 // note: all output files will have their extension changed to .wav
-pub fn run_dir(source: &Path, output: &Path, sample_rate: f64) -> Result<(), Box<dyn std::error::Error>> {
+pub fn run_dir(source: &Path, output: &Path, sample_rate: f64) -> Result<()> {
     // makes sure the output directory exists and is empty
     if output.exists() {
         fs::remove_dir_all(output)?;

@@ -1,8 +1,10 @@
 use super::board::{Board, EMPTY_CELL, BLOCKED_CELL};
 use super::piece::{Cell, Piece};
 
+use anyhow::Result;
 use image::Rgba;
 use imageproc::{image, image::GenericImageView, image::DynamicImage, image::imageops::resize};
+use thiserror::Error;
 
 const INVALID_SKIN_ID: usize = usize::MAX;
 
@@ -36,6 +38,12 @@ pub struct BlockSkin {
 pub struct BlockImage {
     img: image::DynamicImage,
     avg_pixel: Rgba<u8>,
+}
+
+#[derive(Debug, Error)]
+pub enum ResizeError {
+    #[error("Dimensions must be positive: skin_width: {skin_width}, skin_height: {skin_height}")]
+    ZeroDimensions{ skin_width: u32, skin_height: u32 },
 }
 
 impl<'a> SkinnedBoard<'a> {
@@ -78,10 +86,10 @@ impl<'a> SkinnedBoard<'a> {
     }
 
     pub fn empty_at(&self, cell: &Cell) -> bool {
-        *self.board.get(cell).unwrap_or(&BLOCKED_CELL) == EMPTY_CELL
+        self.board.get(cell).unwrap_or(BLOCKED_CELL) == EMPTY_CELL
     }
 
-    pub fn place(&mut self, piece: &Piece, skin_id: usize) -> Result<(), Box<dyn std::error::Error>>{
+    pub fn place(&mut self, piece: &Piece, skin_id: usize) -> Result<()>{
         let board_width = self.board_width();
 
         // place the piece for both the skin and the boardj
@@ -98,11 +106,11 @@ impl<'a> SkinnedBoard<'a> {
     }
 }
 
-pub fn resize_skins(skins: &mut Skins, image_width: u32, image_height: u32, board_width: usize, board_height: usize) -> Result<(), Box<dyn std::error::Error>> {
+pub fn resize_skins(skins: &mut Skins, image_width: u32, image_height: u32, board_width: usize, board_height: usize) -> Result<()> {
     let skin_width = image_width / u32::try_from(board_width)?;
     let skin_height = image_height / u32::try_from(board_height)?;
     if skin_width == 0 || skin_height == 0 {
-        return Err("Skin dimensions must be greater than 0".into());
+        Err(ResizeError::ZeroDimensions { skin_width, skin_height })?;
     }
     for skin in skins.iter_mut() {
         skin.resize(skin_width, skin_height);
@@ -111,7 +119,7 @@ pub fn resize_skins(skins: &mut Skins, image_width: u32, image_height: u32, boar
 }
 
 impl BlockSkin {
-    pub fn new(skin_path: &str, id: usize) -> Result<BlockSkin, Box<dyn std::error::Error>> {
+    pub fn new(skin_path: &str, id: usize) -> Result<BlockSkin> {
         const NUM_SECTIONS: u32 = 9;
 
         let img = imageproc::image::open(skin_path)?;
@@ -246,7 +254,7 @@ impl BlockImage {
     }
 }
 
-pub fn draw(skin_board: &SkinnedBoard) -> Result<DynamicImage, Box<dyn std::error::Error>> {
+pub fn draw(skin_board: &SkinnedBoard) -> Result<DynamicImage> {
     let board = &skin_board.board;
     let skins = skin_board.skins;
     let cells_skin = &skin_board.cells_skin;
@@ -259,7 +267,7 @@ pub fn draw(skin_board: &SkinnedBoard) -> Result<DynamicImage, Box<dyn std::erro
         for x in 0..board.width {
             let skin_id = cells_skin[y * board.width + x];
             let skin = skin_board.get_skin(skin_id);
-            let Some(cell) = board.cells.get(y * board.width + x) else {return Err("Invalid cell value".into());};
+            let cell = board.get(&Cell { x, y })?;
             let block = match cell {
                 'I' => &skin.i_img,
                 'O' => &skin.o_img,
@@ -270,7 +278,7 @@ pub fn draw(skin_board: &SkinnedBoard) -> Result<DynamicImage, Box<dyn std::erro
                 'Z' => &skin.z_img,
                 'G' => &skin.gray_img,
                 'B' => &skin.black_img,
-                _ => panic!("Invalid cell value: {}", board.cells[y * board.width + x]),
+                _ => panic!("Invalid cell value: {cell}"),
             };
             let pixel_x = u32::try_from(x)? * skin.width;
             let pixel_y = u32::try_from(y)? * skin.height;

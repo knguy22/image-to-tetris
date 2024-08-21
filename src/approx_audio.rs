@@ -1,20 +1,26 @@
 mod audio_clip;
 mod fft;
 mod onset_detect;
+mod pitch;
 mod score;
 mod tetris_clips;
 mod resample;
+mod windowing;
 
 use audio_clip::{AudioClip, Sample};
+use pitch::CHROMATIC_MULTIPLIER;
 use tetris_clips::TetrisClips;
 use crate::utils::progress_bar;
 
 use std::fs;
 use std::path::Path;
 use std::cmp;
+use std::collections::BinaryHeap;
 
+use anyhow::Result;
+use ordered_float::OrderedFloat;
 use rayon::prelude::*;
-use itertools::iproduct;
+use rust_lapper::{Lapper, Interval};
 
 #[derive(Clone, Debug)]
 struct InputAudioClip {
@@ -26,7 +32,7 @@ struct MetaData {
     max_channels: usize,
 }
 
-pub fn run(source: &Path, output: &Path) -> Result<(), Box<dyn std::error::Error>> {
+pub fn run(source: &Path, output: &Path) -> Result<()> {
     let tetris_sounds_orig = Path::new("assets_sound");
     let tetris_sounds_resampled = Path::new("tmp_tetris_sounds_assets");
     let source_resampled = Path::new("tmp_source.wav");
@@ -40,7 +46,7 @@ pub fn run(source: &Path, output: &Path) -> Result<(), Box<dyn std::error::Error
     resample::run(source, source_resampled, max_sample_rate)?;
     let mut tetris_clips = TetrisClips::new(tetris_sounds_resampled)?;
     for clip in &mut tetris_clips.clips {
-        clip.add_new_channels_mut(max_channels);
+        clip.audio.add_new_channels_mut(max_channels);
     }
 
     // now split the input
@@ -59,14 +65,14 @@ pub fn run(source: &Path, output: &Path) -> Result<(), Box<dyn std::error::Error
     Ok(())
 }
 
-fn init(source: &Path, tetris_sounds: &Path) -> Result<MetaData, Box<dyn std::error::Error>> {
+fn init(source: &Path, tetris_sounds: &Path) -> Result<MetaData> {
     let clip = AudioClip::new(source)?;
 
     // find important metadata
     let orig_tetris_clips = TetrisClips::new(tetris_sounds)?;
     let mut max_sample_rate = clip.sample_rate;
     let mut max_channels = clip.num_channels;
-    for clip in orig_tetris_clips.clips {
+    for clip in orig_tetris_clips.clips.iter().map(|clip| &clip.audio) {
         // f64 doesn't support ord, only partial-ord which is why max is not used
         if clip.sample_rate > max_sample_rate {
             max_sample_rate = clip.sample_rate;
@@ -80,21 +86,21 @@ fn init(source: &Path, tetris_sounds: &Path) -> Result<MetaData, Box<dyn std::er
     })
 }
 
-fn cleanup(tetris_sounds_resampled: &Path, input_resampled: &Path) -> Result<(), Box<dyn std::error::Error>> {
+fn cleanup(tetris_sounds_resampled: &Path, input_resampled: &Path) -> Result<()> {
     fs::remove_dir_all(tetris_sounds_resampled)?;
     fs::remove_file(input_resampled)?;
     Ok(())
 }
 
 impl InputAudioClip {
-    pub fn new(source: &Path, num_channels: usize) -> Result<InputAudioClip, Box<dyn std::error::Error>> {
+    pub fn new(source: &Path, num_channels: usize) -> Result<InputAudioClip> {
         let mut clip = AudioClip::new(source)?;
         clip.add_new_channels_mut(num_channels);
         let chunks = clip.split_by_onsets();
         Ok(InputAudioClip{chunks})
     }
 
-    pub fn approx(&self, tetris_clips: &TetrisClips) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn approx(&self, tetris_clips: &TetrisClips) -> Result<Self> {
         let pb = progress_bar(self.chunks.len())?;
         pb.set_message("Approximating audio chunks...");
         let output_clips = self.chunks
@@ -110,38 +116,44 @@ impl InputAudioClip {
         Ok(Self { chunks: output_clips })
     }
 
+    #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss, clippy::cast_sign_loss)]
     fn approx_chunk(chunk: &AudioClip, tetris_clips: &TetrisClips) -> AudioClip {
-        const MULTIPLIERS: [Sample; 4] = [0.33, 0.66, 1.0, 1.33];
+        let mut output = AudioClip::new_monoamplitude(chunk.sample_rate, chunk.num_samples, 0.0, chunk.num_channels);
 
-        let mut output = AudioClip::new_monotone(chunk.sample_rate, chunk.duration, 0.0, chunk.num_channels);
-        assert!(chunk.num_samples == output.num_samples);
-        assert!(chunk.num_channels == output.num_channels);
+        // take magnitudes of different frequencies one by one
+        let chunk_fft = chunk.fft();
 
-        // choose a best tetris clip for the specific chunk
-        let mut best_clip: Option<&AudioClip> = None;
-        let mut best_multiplier: Option<Sample> = None;
-        let mut best_diff: f64 = chunk.diff(&output, 0.0);
-        for (multiplier, clip) in iproduct!(MULTIPLIERS, &tetris_clips.clips) {
-            let diff = chunk.diff(clip, multiplier);
+        // heap contains (magnitude, frequency)
+        let mut fft_samples: Vec<(OrderedFloat<Sample>, OrderedFloat<Sample>)> = Vec::new();
+        for (freq, samples) in chunk_fft.iter_zip_bins() {
+            let magnitude = samples.iter().fold(0.0, |a, &b| a + b.norm());
+            fft_samples.push((OrderedFloat(magnitude), OrderedFloat(freq)));
+        }
+        let mut heap = BinaryHeap::from(fft_samples);
+        let max_magnitude = heap.peek().unwrap_or(&(OrderedFloat(0.0), OrderedFloat(0.0))).0;
 
-            // tetris clips longer than the chunk are not considered to prevent early termination of sound clips
-            if clip.num_samples > output.num_samples {
+        // track added notes
+        let mut curr_note_tracker: Lapper<usize, usize> = Lapper::new(Vec::new());
+        while let Some((mag, freq)) = heap.pop() {
+            if mag < max_magnitude / 2.5 {
+                break; 
+            }
+
+            let freq = freq.0 as usize;
+            let curr_note_res: Vec<_> = curr_note_tracker.find(freq, freq + 1).collect();
+            if !curr_note_res.is_empty() {
                 continue;
             }
 
-            // find the best clip
-            if diff < best_diff {
-                best_multiplier = Some(multiplier);
-                best_clip = Some(clip);
-                best_diff = diff;
-            }
-        }
+            let note_clip = tetris_clips.get_combotone(freq);
+            if let Some((note_clip, _)) = note_clip {
+                let start = (freq as Sample / CHROMATIC_MULTIPLIER) as usize;
+                let stop = (freq as Sample * CHROMATIC_MULTIPLIER) as usize;
+                let interval = Interval { start, stop, val: 0 };
 
-        // if a best clip is found, write it to the output
-        if best_clip.is_some() {
-            let best_clip = best_clip.expect("No best clip found");
-            let best_multiplier = best_multiplier.expect("No best multiplier found");
-            output.add_mut(&best_clip, best_multiplier);
+                output.add_mut(&note_clip.audio, 1.0);
+                curr_note_tracker.insert(interval);
+            }
         }
 
         output
@@ -176,13 +188,13 @@ impl InputAudioClip {
 
 #[cfg(test)]
 mod tests {
-    use std::path;
+    use std::path::Path;
 
     use super::*;
 
     #[test]
     fn test_split_input_to_audio_clip() {
-        let source = path::Path::new("test_audio_clips/a6.mp3");
+        let source = Path::new("test_audio_clips/a6.mp3");
         let clip = AudioClip::new(&source).expect("failed to create audio clip");
         let input_clip = InputAudioClip::new(&source, clip.num_channels).expect("failed to create audio clip").to_audio_clip();
 
@@ -190,5 +202,58 @@ mod tests {
         assert_eq!(input_clip.sample_rate, clip.sample_rate);
         assert_eq!(input_clip.num_samples, clip.num_samples);
         assert_eq!(input_clip.duration, clip.duration);
+    }
+
+    #[test]
+    fn approx_chunk_tones_1() {
+        let tone_ids = vec![0, 1];
+        test_chunk_tones(&tone_ids);
+    }
+
+    #[test]
+    fn approx_chunk_tones_2() {
+        let tone_ids = vec![0, 5];
+        test_chunk_tones(&tone_ids);
+    }
+
+    #[test]
+    fn approx_chunk_tones_3() {
+        let tone_ids = vec![0, 8];
+        test_chunk_tones(&tone_ids);
+    }
+
+    #[test]
+    fn approx_chunk_tones_4() {
+        let tone_ids = vec![0, 10];
+        test_chunk_tones(&tone_ids);
+    }
+
+    #[test]
+    #[ignore]
+    fn approx_chunk_tones_5() {
+        let tone_ids = vec![0, 10, 25];
+        test_chunk_tones(&tone_ids);
+    }
+
+    fn test_chunk_tones(tone_ids: &Vec<usize>) {
+        let source = Path::new("test_audio_clips");
+        let tetris_clips = TetrisClips::new(source).unwrap();
+
+        let first = &tetris_clips.clips[tone_ids[0]].audio;
+        let mut chord = AudioClip::new_monoamplitude(first.sample_rate, first.num_samples, 0.0, first.num_channels);
+        for &tone_id in tone_ids {
+            chord.add_mut(&tetris_clips.clips[tone_id].audio, 1.0);
+            println!("fundamental: {}", tetris_clips.clips[tone_id].fft.most_significant_frequency());
+        }
+
+        let approx_chunk = InputAudioClip::approx_chunk(&chord, &tetris_clips);
+
+        assert_eq!(approx_chunk.num_channels, chord.num_channels);
+        assert_eq!(approx_chunk.sample_rate, chord.sample_rate);
+        assert_eq!(approx_chunk.num_samples, chord.num_samples);
+        assert_eq!(approx_chunk.duration, chord.duration);
+
+        let mse = chord.mse(&approx_chunk, 1.0);
+        assert!(mse < 0.001, "mse: {}", mse);
     }
 }

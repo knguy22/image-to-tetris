@@ -4,6 +4,7 @@ use std::fs;
 use std::path::Path;
 use std::time;
 
+use anyhow::Result;
 use image::GenericImageView;
 use imageproc::image::DynamicImage;
 use dssim::Dssim;
@@ -11,7 +12,7 @@ use rayon::prelude::*;
 
 // tests all image in the directory
 #[allow(clippy::cast_precision_loss)]
-pub fn run(dir: &str, config: &Config, glob: &GlobalData) -> Result<(), Box<dyn std::error::Error>> {
+pub fn run(dir: &str, config: &Config, glob: &GlobalData) -> Result<()> {
     println!("Running integration test on {dir}");
 
     let start = time::Instant::now();
@@ -38,7 +39,7 @@ pub fn run(dir: &str, config: &Config, glob: &GlobalData) -> Result<(), Box<dyn 
     Ok(())
 }
 
-fn score_image(path: &Path, old_config: &Config, glob: &GlobalData) -> Result<f64, Box<dyn std::error::Error>> {
+fn score_image(path: &Path, old_config: &Config, glob: &GlobalData) -> Result<f64> {
     let mut total_diff = 0.0;
     let mut source_img = image::open(path)?;
     

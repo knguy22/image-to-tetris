@@ -3,11 +3,17 @@ use std::fs;
 use std::io;
 use std::path::Path;
 
+use anyhow::Result;
 use fundsp::prelude::*;
 use hound::{WavWriter, WavSpec, SampleFormat};
+use thiserror::Error;
 
+use super::windowing::rectangle_window;
+
+/// not limited to direct samples but also coefficients applied onto samples
+pub type Sample = f32; 
 pub type Channel = Vec<Sample>;
-pub type Sample = f32;
+
 // the fundamental structure of an audio clip in this project
 #[derive(Clone)]
 pub struct AudioClip {
@@ -15,18 +21,24 @@ pub struct AudioClip {
     pub file_name: String,
     pub duration: f64,
     pub sample_rate: f64,
-    pub max_amplitude: f32,
+    pub max_amplitude: Sample,
     pub num_channels: usize,
     pub num_samples: usize,
 }
 
+#[derive(Debug, Error)]
+pub enum WriteError {
+    #[error("Output not wav: {message}")]
+    OutputNotWavError{message: String},
+}
+
 impl AudioClip {
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-    pub fn new(source: &Path) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(source: &Path) -> Result<Self> {
         let wave = Wave::load(source)?;
         let sample_rate = wave.sample_rate();
         let duration = wave.duration();
-        let max_amplitude = wave.amplitude();
+        let max_amplitude = Sample::from(wave.amplitude());
         let num_channels = wave.channels();
         let num_samples: usize = (duration * sample_rate) as usize;
         let mut channels: Vec<Channel> = Vec::new();
@@ -34,7 +46,7 @@ impl AudioClip {
         for channel_idx in 0..num_channels {
             let mut channel = Channel::new();
             for sample_idx in 0..num_samples {
-                channel.push(wave.at(channel_idx, sample_idx));
+                channel.push(Sample::from(wave.at(channel_idx, sample_idx)));
             }
             channels.push(channel);
         }
@@ -50,9 +62,9 @@ impl AudioClip {
         })
     }
 
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, dead_code)]
-    pub fn new_monotone(sample_rate: f64, duration: f64, amplitude: Sample, num_channels: usize) -> Self {
-        let num_samples = (duration * sample_rate) as usize;
+    #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss, clippy::cast_sign_loss, dead_code)]
+    pub fn new_monoamplitude(sample_rate: f64, num_samples: usize, amplitude: Sample, num_channels: usize) -> Self {
+        let duration = num_samples as f64 / sample_rate;
         let channels: Vec<Channel> = vec![vec![amplitude; num_samples]; num_channels];
 
         AudioClip {
@@ -67,12 +79,12 @@ impl AudioClip {
     }
 
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-    pub fn write(&self, path: Option<&Path>) -> Result<(), Box<dyn std::error::Error>> {
-        let path = path.unwrap();
+    pub fn write(&self, path: Option<&Path>) -> Result<()> {
+        let path = path.unwrap_or(Path::new(&self.file_name));
 
         // output file must be wav
         if path.extension().unwrap() != "wav" {
-            return Err("output file must be wav".into());
+            return Err(WriteError::OutputNotWavError{message: format!("Output not wav: {}", path.display())})?;
         }
 
         // create the output file and initialize the writer
@@ -99,29 +111,6 @@ impl AudioClip {
         Ok(())
     }
 
-    // takes a window of the audio clip
-    // pads the window with 0s if the window extends out of bounds
-    #[allow(clippy::cast_precision_loss)]
-    pub fn window(&self, start: usize, end: usize) -> Self {
-        let mut channels = Vec::new();
-        for channel in &self.channels {
-            let end_in_range = std::cmp::min(end, channel.len());
-            let mut to_push = channel[start..end_in_range].to_vec();
-            to_push.resize(end - start, 0.0);
-            channels.push(to_push);
-        }
-        let file_name = format!("{}_{}_{}.wav", self.file_name, start, end);
-        Self {
-            channels,
-            file_name,
-            duration: (end - start) as f64 / self.sample_rate,
-            sample_rate: self.sample_rate,
-            max_amplitude: self.max_amplitude,
-            num_channels: self.num_channels,
-            num_samples: end - start,
-        }
-    }
-
     // splits the audio clip into chunks the length of max_duration; if the last chunk is shorter than 
     // max_duration, it will still be included but will be smaller than max_duration
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
@@ -131,13 +120,13 @@ impl AudioClip {
         let chunk_num_samples = (max_duration * self.sample_rate) as usize;
         for begin in (0..self.num_samples).step_by(chunk_num_samples) {
             let end = std::cmp::min(begin + chunk_num_samples, self.num_samples);
-            let chunk = self.window(begin, end);
+            let chunk = self.window(begin, end, rectangle_window);
             chunks.push(chunk);
         }
         chunks
     }
 
-    #[allow(clippy::cast_precision_loss)]
+    #[allow(clippy::cast_precision_loss, unused)]
     pub fn diff(&self, other: &Self, multiplier: Sample) -> f64 {
         self.mse(other, multiplier)
     }
@@ -175,19 +164,34 @@ impl AudioClip {
         self.num_channels = num_channels;
     }
 
+    /// add two audio clips up to the amount of samples `self` has
+    /// extra samples beyond `self` will be ignored
     pub fn add_mut(&mut self, rhs: &Self, multiplier: Sample) {
         assert!(self.num_channels == rhs.num_channels);
         assert!((self.sample_rate - rhs.sample_rate).abs() < f64::EPSILON);
-        assert!(self.num_samples >= rhs.num_samples);
 
         let limit = std::cmp::min(self.num_samples, rhs.num_samples);
         for channel_idx in 0..self.num_channels {
             for sample_idx in 0..limit {
-                self.channels[channel_idx][sample_idx] += rhs.channels[channel_idx][sample_idx] * multiplier;
+                self.channels[channel_idx][sample_idx] += rhs.channels[channel_idx].get(sample_idx).unwrap_or(&0.0) * multiplier;
             }
         }
     }
 
+    #[allow(unused)]
+    pub fn append_mut(&mut self, rhs: &Self) {
+        assert!(self.num_channels == rhs.num_channels);
+        assert!((self.sample_rate - rhs.sample_rate).abs() < f64::EPSILON);
+
+        for channel_idx in 0..self.num_channels {
+            self.channels[channel_idx].extend(&rhs.channels[channel_idx]);
+        }
+        self.num_samples += rhs.num_samples;
+        self.max_amplitude = self.max_amplitude.max(rhs.max_amplitude);
+        self.duration += rhs.duration;
+    }
+
+    #[allow(dead_code)]
     pub fn scale_amplitude(&self, rhs: Sample) -> Self {
         let mut output = self.clone();
         for channel in &mut output.channels {
@@ -199,6 +203,7 @@ impl AudioClip {
         output
     }
 
+    #[allow(dead_code)]
     // zero pads the audio clip; this is useful for comparison of two audio clips
     pub fn zero_pad(&self, num_samples: usize) -> Self {
         assert!(num_samples >= self.num_samples);
@@ -209,6 +214,19 @@ impl AudioClip {
         }
         clip.num_samples = num_samples;
         clip
+    }
+
+    #[allow(clippy::cast_precision_loss, dead_code)]
+    pub fn dump(&self, output: &Path) -> Result<()> {
+        let mut wtr = csv::Writer::from_path(output)?;
+        wtr.write_record(["channel", "index" ,"magnitude"])?;
+        for (i, sample) in self.channels.iter().enumerate() {
+            for (j, magnitude) in sample.iter().enumerate() {
+                wtr.write_record(&[i.to_string(), j.to_string(), magnitude.to_string()])?;
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -246,15 +264,15 @@ mod tests {
     }
 
     #[test]
-    fn test_monotone() {
+    fn test_monoamplitude() {
         let sample_rate = 44100.0;
-        let duration = 1.0;
+        let num_samples = 44100;
         let amplitude = 0.5;
 
-        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude, 1);
+        let clip = AudioClip::new_monoamplitude(sample_rate, num_samples, amplitude, 1);
 
         assert!(clip.num_channels > 0);
-        assert_eq!(clip.num_samples, sample_rate as usize * duration as usize);
+        assert_eq!(clip.num_samples, num_samples);
         assert!(clip.channels.iter().all(|v| v.len() == clip.num_samples));
         assert!(clip.channels[0].iter().all(|v| *v == amplitude));
     }
@@ -298,50 +316,6 @@ mod tests {
     }
 
     #[test]
-    fn test_window() {
-        let sample_rate = 44100.0;
-        let duration = 1.0;
-        let amplitude = 0.5;
-
-        let start: usize = 1000;
-        let end: usize = 8000;
-        let window_len = end - start;
-
-        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude, 1);
-        let window_clip = clip.window(start, end);
-
-        assert!(window_clip.num_channels > 0);
-        assert_eq!(window_clip.num_samples, window_len);
-        assert_eq!(window_clip.channels[0].len(), window_len);
-        assert!(window_clip.channels[0].iter().all(|v| *v == amplitude));
-    }
-
-    #[test]
-    fn test_window_overflow() {
-        let sample_rate = 44100.0;
-        let duration = 1.0;
-        let amplitude = 0.5;
-        let num_samples = sample_rate as usize * duration as usize;
-
-        let start: usize = 44000;
-        let end: usize = 46000;
-        let window_len = end - start;
-
-        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude, 1);
-        let window_clip = clip.window(start, end);
-
-        assert!(window_clip.num_channels > 0);
-        assert_eq!(window_clip.num_samples, window_len);
-        assert_eq!(window_clip.channels[0].len(), window_len);
-
-        // these samples should still be in range
-        assert!(window_clip.channels[0].iter().take(num_samples - start).all(|v| *v == amplitude));
-
-        // these samples should be out of range
-        assert!(window_clip.channels[0].iter().skip(num_samples - start).all(|v| *v == 0.0));
-    }
-
-    #[test]
     fn test_zero_padding() {
         let num_samples = 1000000;
         let source = path::Path::new("test_audio_clips/a6.mp3");
@@ -355,11 +329,12 @@ mod tests {
     #[test]
     fn test_scale_amplitude() {
         let sample_rate = 44100.0;
-        let duration = 1.0;
+        let num_samples = 44100;
+        let num_channels = 1;
         let amplitude = 0.5;
-        let multiplier: f32 = 0.33;
+        let multiplier: Sample = 0.33;
 
-        let clip = AudioClip::new_monotone(sample_rate, duration, amplitude, 1);
+        let clip = AudioClip::new_monoamplitude(sample_rate, num_samples, amplitude, num_channels);
         let new_clip = clip.scale_amplitude(multiplier);
 
         assert!(new_clip.num_channels > 0);
@@ -371,12 +346,12 @@ mod tests {
     #[test]
     fn test_add_mut() {
         let sample_rate = 44100.0;
-        let duration = 1.0;
+        let num_samples = 1000;
         let amplitude_0 = 0.25;
         let amplitude_1 = 0.5;
 
-        let mut clip_0 = AudioClip::new_monotone(sample_rate, duration, amplitude_0, 1);
-        let clip_1 = AudioClip::new_monotone(sample_rate, duration, amplitude_1, 1);
+        let mut clip_0 = AudioClip::new_monoamplitude(sample_rate, num_samples, amplitude_0, 1);
+        let clip_1 = AudioClip::new_monoamplitude(sample_rate, num_samples, amplitude_1, 1);
         clip_0.add_mut(&clip_1, 1.0);
 
         assert!(clip_0.channels[0].iter().all(|v| *v == amplitude_0 + amplitude_1));

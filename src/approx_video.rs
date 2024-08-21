@@ -7,6 +7,7 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
+use anyhow::Result;
 use ffmpeg_next::format;
 use rayon::prelude::*;
 
@@ -14,7 +15,7 @@ const SOURCE_IMG_DIR: &str = "video_sources";
 const APPROX_IMG_DIR: &str = "video_approx";
 const AUDIO_PATH: &str = "video_approx/audio.wav";
 
-pub fn run(source: &Path, output: &Path, config: &Config, glob: &GlobalData, video_config: &VideoConfig) -> Result<(), Box<dyn std::error::Error>> {
+pub fn run(source: &Path, output: &Path, config: &Config, glob: &GlobalData, video_config: &VideoConfig) -> Result<()> {
     let source_path = source.to_str().expect("failed to convert source path to string");
     let output_path = output.to_str().expect("failed to convert output path to string");
 
@@ -102,7 +103,7 @@ pub fn run(source: &Path, output: &Path, config: &Config, glob: &GlobalData, vid
     Ok(())
 }
 
-pub fn init(source: &Path, output: &Path, config: &Config, glob: &mut GlobalData) -> Result<VideoConfig, Box<dyn std::error::Error>> {
+pub fn init(source: &Path, output: &Path, config: &Config, glob: &mut GlobalData) -> Result<VideoConfig> {
     ffmpeg_next::init()?;
 
     // make sure the prerequisite directories exist and are empty
@@ -116,9 +117,7 @@ pub fn init(source: &Path, output: &Path, config: &Config, glob: &mut GlobalData
     fs::create_dir(APPROX_IMG_DIR)?;
 
     // make sure the output file is not there
-    if output.exists() {
-        return Err("output file already exists".into());
-    }
+    assert!(!output.exists(), "output file already exists");
 
     // load config
     let mut video_config = VideoConfig::new(source, config)?;
@@ -131,7 +130,7 @@ pub fn init(source: &Path, output: &Path, config: &Config, glob: &mut GlobalData
     Ok(video_config)
 }
 
-fn cleanup() -> Result<(), Box<dyn std::error::Error>> {
+fn cleanup() -> Result<()> {
     fs::remove_dir_all(SOURCE_IMG_DIR)?;
     fs::remove_dir_all(APPROX_IMG_DIR)?;
     Ok(())
@@ -148,9 +147,9 @@ pub struct VideoConfig {
 
 impl VideoConfig {
     // loads video metadata
-    fn new(path: &Path, config: &Config) -> Result<VideoConfig, Box<dyn std::error::Error>> {
+    fn new(path: &Path, config: &Config) -> Result<VideoConfig> {
         let source = format::input(path)?;
-        let input = source.streams().best(ffmpeg_next::media::Type::Video).ok_or("failed to find video stream")?;
+        let input = source.streams().best(ffmpeg_next::media::Type::Video).expect("failed to find video stream");
         let fps = input.avg_frame_rate();
         let decoder = input.codec().decoder().video()?;
 

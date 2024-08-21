@@ -66,7 +66,27 @@ def test_spectral_onset():
     plt.title('Input Signal')
     plt.savefig('input_signal.png')
 
-def main():
+def graph_audio_clip():
+    df = pd.read_csv('audio.csv')
+
+    # expected structure: channel, index, normalized value
+    channels = df.groupby('channel')
+    for channel, group in channels:
+        index = group['index']
+        magnitude = group['magnitude']
+
+        plt.figure(figsize=(10, 6))
+        plt.plot(index, magnitude, 'b-', label='Magnitude')
+
+        plt.xlabel('Index')
+        plt.ylabel('Magnitude')
+        plt.title(f'Channel {channel}')
+        plt.legend()
+
+        plt.grid(True)
+        plt.savefig(f'audio_channel_{channel}.png')
+
+def graph_fft():
     df = pd.read_csv('fft.csv')
 
     # expected structure: channel, index, normalized value
@@ -86,7 +106,26 @@ def main():
 
         plt.grid(True)
         plt.savefig(f'fft_channel_{channel}.png')
+    
+def graph_diffs(input: str):
+    df = pd.read_csv(input)
+
+    # expected structure: diff, magnitude
+    diffs = df['diff']
+    magnitudes = df['magnitude']
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(diffs, magnitudes, 'b-', label='Normalized value')
+
+    plt.xlabel('Diff')
+    plt.ylabel('Magnitude')
+    plt.title(f'Diffs')
+    plt.legend()
+
+    plt.grid(True)
+    plt.savefig(f'diff_{input}.png')
 
 if __name__ == "__main__":
-    test_spectral_onset()
-    # main()
+    # graph_fft()
+    graph_diffs('onset_diffs.csv')
+    graph_diffs('local_onset_diffs.csv')
