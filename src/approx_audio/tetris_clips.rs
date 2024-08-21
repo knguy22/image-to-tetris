@@ -27,7 +27,7 @@ pub struct TetrisClip {
 
 impl TetrisClips {
     pub fn new(source: &Path) -> Result<TetrisClips> {
-        let tetris_clips = TetrisClips { clips: Vec::new(), lapper: Lapper::new(Vec::new()) };
+        let mut tetris_clips = TetrisClips { clips: Vec::new(), lapper: Lapper::new(Vec::new()) };
 
         for path in source.read_dir()? {
             let path = path?;
@@ -37,12 +37,26 @@ impl TetrisClips {
                 // combotones are made of multiple clips, not just one
                 name if name == "comboTones.mp3" || name == "comboTones.wav" => {
                     let combotones = TetrisClips::split_combotones(&clip);
+                    let mut skipped = tetris_clips.push_raw_combotones(&combotones);
+                    skipped.extend(tetris_clips.compute_pitch_shifted_intervals());
+                    tetris_clips.populate_skipped_intervals(&skipped);
                 },
                 _ => (),
             }
         }
 
         Ok(tetris_clips)
+    }
+
+    pub fn get_combotone(&self, freq: usize) -> Option<(&TetrisClip, Interval<usize, usize>)> {
+        let freq_interval = Interval {start: freq, stop: freq + 1, val: 0};
+        let res = self.lapper.find(freq_interval.start, freq_interval.stop).collect_vec();
+        assert!(res.len() <= 1, "found more than one note at frequency {freq}, intervals: {res:?}");
+
+        if res.len() == 1 {
+            return Some((&self.clips[res[0].val], res[0].clone()))
+        }
+        None
     }
 
     #[allow(clippy::cast_precision_loss)]

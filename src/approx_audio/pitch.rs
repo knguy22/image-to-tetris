@@ -3,7 +3,6 @@ use super::fft::{FFTResult, FFTSample};
 
 use itertools::Itertools;
 use rustfft::num_complex::Complex;
-use rust_lapper::{Lapper, Interval};
 
 /// precomputed chromatic difference; 2.0^(1/12)
 pub static CHROMATIC_MULTIPLIER: Sample = 1.05946309436;
@@ -78,9 +77,10 @@ impl FFTResult {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::approx_audio::AudioClip;
     use std::path::Path;
-    use super::*;
+    use rust_lapper::Interval;
 
     #[test]
     fn test_pitch_shift() {
