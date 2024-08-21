@@ -147,6 +147,7 @@ impl InputAudioClip {
             let note_clip = tetris_clips.get_combotone(freq);
             match note_clip {
                 Some((note_clip, interval)) => {
+                    println!("adding note at frequency {} with magnitude {} with interval {:?}", interval.start, mag.0, interval);
                     output.add_mut(&note_clip.audio, 1.0);
                     curr_note_tracker.insert(interval);
                 },
@@ -240,6 +241,7 @@ mod tests {
         let mut chord = AudioClip::new_monoamplitude(first.sample_rate, first.num_samples, 0.0, first.num_channels);
         for &tone_id in tone_ids {
             chord.add_mut(&tetris_clips.clips[tone_id].audio, 1.0);
+            println!("fundamental: {}", tetris_clips.clips[tone_id].fft.most_significant_frequency());
         }
 
         let approx_chunk = InputAudioClip::approx_chunk(&chord, &tetris_clips);

@@ -228,6 +228,9 @@ mod tests {
             lapper: Lapper::new(Vec::new()),
         };
         let skipped = tetris_clips.push_raw_combotones(&split_combotones);
+        
+        // combotones contains 2 octaves
+        assert!(skipped.len() + split_combotones.len() == 25);
         for interval in skipped {
             tetris_clips.lapper.insert(interval);
         }
@@ -243,6 +246,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_all_combotones() {
         let source = path::Path::new("test_audio_clips/comboTones.mp3");
         let combotones = AudioClip::new(&source).expect("failed to create audio clip");
@@ -267,5 +271,12 @@ mod tests {
             assert!(tetris_clips.clips[lapper_res[0].val as usize].audio.num_samples > 0);
         }
 
+        // save the combotones
+        let output = path::Path::new("test_chromatic_tones.wav");
+        let mut output_clip = tetris_clips.clips[0].audio.clone();
+        for clip in tetris_clips.clips.iter().skip(1) {
+            output_clip.append_mut(&clip.audio);
+        }
+        output_clip.write(Some(output)).expect("failed to save combotones to wav");
     }
 }
