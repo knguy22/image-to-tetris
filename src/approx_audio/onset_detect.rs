@@ -140,12 +140,12 @@ fn find_diffs(stft: &STFTNorms) -> STFTDiffs {
         let mut total_diff = 0.0;
         for (curr_channel, next_channel) in curr.iter().zip_eq(next.iter()) {
             for (curr_norm, next_norm) in curr_channel.iter().zip_eq(next_channel.iter()) {
-                total_diff += next_norm - curr_norm;
+                // ignore a negative derivative
+                total_diff += Sample::max(next_norm - curr_norm, 0.0);
             }
         }
 
-        // ignore a negative derivative
-        FFTDiff::max(total_diff, 0.0)
+        total_diff
     }
 
     let mut diffs = stft
