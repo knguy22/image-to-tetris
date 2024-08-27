@@ -154,6 +154,14 @@ impl InputAudioClip {
             }
         }
 
+        // scale output to the volume of the input chunk
+        let multiplier = chunk.rms_magnitude() / output.rms_magnitude();
+        let output = if !multiplier.is_nan() {
+            output.scale_amplitude(multiplier as Sample)
+        } else {
+            output
+        };
+
         output
     }
 
