@@ -83,15 +83,15 @@ impl AudioClip {
         // onsets will typically have non-zero derivative values
         let mut onsets = Vec::new();
         let index_iter = (0..self.num_samples).step_by(hop_size);
-        let mut in_onset = false;
+        let mut last_onset = None;
         for (&diff, index) in diffs.iter().zip_eq(index_iter) {
             // only push onset once the diff is non-zero to a certain degree
-            if !in_onset && diff > 0.2 {
+            if last_onset.is_none() && diff > 0.2 {
                 onsets.push(index);
-                in_onset = true;
+                last_onset = Some(index);
             }
-            else {
-                in_onset = false;
+            else if index - last_onset.unwrap_or(0) > (0.2 * self.sample_rate) as usize {
+                last_onset = None;
             }
         }
 
@@ -140,12 +140,12 @@ fn find_diffs(stft: &STFTNorms) -> STFTDiffs {
         let mut total_diff = 0.0;
         for (curr_channel, next_channel) in curr.iter().zip_eq(next.iter()) {
             for (curr_norm, next_norm) in curr_channel.iter().zip_eq(next_channel.iter()) {
-                total_diff += next_norm - curr_norm;
+                // ignore a negative derivative
+                total_diff += Sample::max(next_norm - curr_norm, 0.0);
             }
         }
 
-        // ignore a negative derivative
-        FFTDiff::max(total_diff, 0.0)
+        total_diff
     }
 
     let mut diffs = stft
