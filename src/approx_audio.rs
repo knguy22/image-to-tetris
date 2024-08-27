@@ -120,10 +120,8 @@ impl InputAudioClip {
     fn approx_chunk(chunk: &AudioClip, tetris_clips: &TetrisClips) -> AudioClip {
         let mut output = AudioClip::new_monoamplitude(chunk.sample_rate, chunk.num_samples, 0.0, chunk.num_channels);
 
-        // take magnitudes of different frequencies one by one
-        let chunk_fft = chunk.fft();
-
         // heap contains (magnitude, frequency)
+        let chunk_fft = chunk.fft();
         let mut fft_samples: Vec<(OrderedFloat<Sample>, OrderedFloat<Sample>)> = Vec::new();
         for (freq, samples) in chunk_fft.iter_zip_bins() {
             let magnitude = samples.iter().fold(0.0, |a, &b| a + b.norm());
@@ -150,8 +148,7 @@ impl InputAudioClip {
                 let start = (freq as Sample / CHROMATIC_MULTIPLIER) as usize;
                 let stop = (freq as Sample * CHROMATIC_MULTIPLIER) as usize;
                 let interval = Interval { start, stop, val: 0 };
-                let multiplier = 1.0;
-
+                let multiplier = *(mag / max_magnitude);
                 output.add_mut(&note_clip.audio, multiplier);
                 curr_note_tracker.insert(interval);
             }
