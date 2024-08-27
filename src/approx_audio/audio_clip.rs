@@ -206,6 +206,24 @@ impl AudioClip {
     }
 
     #[allow(dead_code)]
+    pub fn rms_magnitude(&self) -> f64 {
+        fn rms_channel(channel: &[Sample]) -> f64 {
+            let sum: f64 = channel
+                .iter()
+                .map(|&sample| f64::from(sample * sample))
+                .sum();
+
+            (sum / channel.len() as f64).sqrt()
+        }
+
+        let rms_sum: f64 = self.channels
+            .iter()
+            .map(|channel| rms_channel(channel))
+            .sum();
+        rms_sum / self.num_channels as f64
+    }
+
+    #[allow(dead_code)]
     // zero pads the audio clip; this is useful for comparison of two audio clips
     pub fn zero_pad(&self, num_samples: usize) -> Self {
         assert!(num_samples >= self.num_samples);

@@ -161,6 +161,10 @@ impl TetrisClips {
         // create iterators to loop through existing combotones so pitch shifted audio clips aren't all the same
         let combotones: Vec<TetrisClip> = self.clips.iter().take(7).cloned().collect();
         let combotones_iter = combotones.iter().cycle();
+        let avg_rms_mag = self.clips
+            .iter()
+            .map(|clip| clip.audio.rms_magnitude())
+            .sum::<f64>() / self.clips.len() as f64;
 
         for (interval, combotone) in intervals.iter().zip(combotones_iter) {
             // compute pitch shifted audio
@@ -169,6 +173,10 @@ impl TetrisClips {
             let multiplier = target_fundamental / curr_fundamental;
             let fft = combotone.fft.pitch_shift(multiplier);
             let audio = fft.ifft_to_audio_clip();
+
+            // normalize audio
+            let curr_rms_mag = audio.rms_magnitude();
+            let audio = audio.scale_amplitude((avg_rms_mag / curr_rms_mag) as Sample);
             self.clips.push(TetrisClip {audio, fft});
 
             let clip_id = self.clips.len() - 1;
