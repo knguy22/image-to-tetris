@@ -163,11 +163,13 @@ impl TetrisClips {
         let combotones_iter = combotones.iter().cycle();
 
         for (interval, combotone) in intervals.iter().zip(combotones_iter) {
+            // compute pitch shifted audio
             let target_fundamental = interval.start as Sample;
             let curr_fundamental = combotone.fft.most_significant_frequency();
             let multiplier = target_fundamental / curr_fundamental;
-            let pitch_shifted = combotone.fft.pitch_shift(multiplier);
-            self.clips.push(TetrisClip { audio: pitch_shifted.ifft_to_audio_clip(), fft: pitch_shifted});
+            let fft = combotone.fft.pitch_shift(multiplier);
+            let audio = fft.ifft_to_audio_clip();
+            self.clips.push(TetrisClip {audio, fft});
 
             let clip_id = self.clips.len() - 1;
             let new_interval = Interval {val: clip_id, ..*interval};

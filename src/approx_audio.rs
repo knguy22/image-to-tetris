@@ -135,7 +135,7 @@ impl InputAudioClip {
         // track added notes
         let mut curr_note_tracker: Lapper<usize, usize> = Lapper::new(Vec::new());
         while let Some((mag, freq)) = heap.pop() {
-            if mag < max_magnitude / 2.5 {
+            if mag < max_magnitude / 2.5 || mag == 0.0 {
                 break; 
             }
 
@@ -150,8 +150,9 @@ impl InputAudioClip {
                 let start = (freq as Sample / CHROMATIC_MULTIPLIER) as usize;
                 let stop = (freq as Sample * CHROMATIC_MULTIPLIER) as usize;
                 let interval = Interval { start, stop, val: 0 };
+                let multiplier = 1.0;
 
-                output.add_mut(&note_clip.audio, 1.0);
+                output.add_mut(&note_clip.audio, multiplier);
                 curr_note_tracker.insert(interval);
             }
         }
