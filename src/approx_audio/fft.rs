@@ -4,10 +4,25 @@ use std::path::Path;
 
 use anyhow::Result;
 use itertools::Itertools;
+use median::Filter;
 use rustfft::{FftPlanner, num_complex::Complex};
 
 pub type FFTSample = Complex<Sample>;
 pub type FFTChannel = Vec<FFTSample>;
+pub type STFT = Vec<FFTResult>;
+
+/// a channel of norms; usually converted from a channel of complex samples
+pub type FFTChannelNorm = Vec<Sample>;
+
+/// multiple `FFTChannelNorms` over different channels
+/// 
+/// indexed by channel,sample
+pub type FFTNorms = Vec<FFTChannelNorm>;
+
+/// multiple `FFTNorms` over different timestamps
+/// 
+/// indexed by timestamp,channel,sample
+pub type STFTNorms = Vec<FFTNorms>;
 
 #[derive(Clone)]
 pub struct FFTResult {
@@ -21,7 +36,7 @@ impl AudioClip {
     /// performs a short time fourier transform on the audio clip
     /// `window_size` is the number of samples in the window; defaults to 2048
     /// `hop_size` is the number of samples between each window; defaults to `window_size` // 4
-    pub fn stft(&self, window_size: usize, hop_size: usize) -> Vec<FFTResult> {
+    pub fn stft(&self, window_size: usize, hop_size: usize) -> STFT {
         let mut stft_res = Vec::new();
 
         let mut curr_index = 0;
@@ -64,6 +79,51 @@ impl AudioClip {
             num_samples: self.num_samples,
         }
     }
+}
+
+pub fn get_norms(stft: &[FFTResult]) -> STFTNorms {
+    fn norms_fft_result(fft_result: &FFTResult) -> FFTNorms {
+        fft_result
+            .channels
+            .iter()
+            .map(|channel| channel.iter().map(|&sample| sample.norm()).collect_vec())
+            .collect_vec()
+    }
+
+    stft
+        .iter()
+        .map(norms_fft_result)
+        .collect_vec()
+}
+
+/// performs a median filter across the vertical axis, which is the frequency axis
+pub fn medfilt_v(stft: &STFTNorms, window_size: usize) -> STFTNorms {
+    assert!(window_size % 2 == 1, "window_size must be odd");
+
+    stft
+        .iter()
+        .map(|fft_result| {
+            fft_result
+                .iter()
+                .map(|channel| medfilt_slice(channel, window_size))
+                .collect_vec()
+        })
+        .collect_vec()
+}
+
+/// performs a median filter across the horizontal axis, which is the time axis
+pub fn medfilt_h(stft: &STFTNorms, window_size: usize) -> STFTNorms {
+    assert!(window_size % 2 == 1, "window_size must be odd");
+    todo!()
+}
+
+fn medfilt_slice<T>(slice: &[T], window_size: usize) -> Vec<T> 
+    where T: Copy + Clone + PartialOrd
+{
+    slice
+        .iter()
+        .scan(Filter::new(window_size), |filter, &val| Some(filter.consume(val)))
+        .collect_vec()
 }
 
 impl FFTResult {

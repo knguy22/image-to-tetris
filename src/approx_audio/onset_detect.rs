@@ -1,26 +1,13 @@
 use itertools::Itertools;
 
 use super::audio_clip::{AudioClip, Sample};
-use super::fft::FFTResult;
+use super::fft::{get_norms, FFTNorms, STFTNorms};
 use super::windowing::rectangle_window;
 
 use anyhow::Result;
 
 /// a vector of sample indices that contain properly detected onsets
 pub type Onsets = Vec<usize>;
-
-/// a channel of norms; usually converted from a channel of complex samples
-type FFTChannelNorm = Vec<Sample>;
-
-/// multiple `FFTChannelNorms` over different channels
-/// 
-/// indexed by channel,sample
-type FFTNorms = Vec<FFTChannelNorm>;
-
-/// multiple `FFTNorms` over different timestamps
-/// 
-/// indexed by timestamp,channel,sample
-type STFTNorms = Vec<FFTNorms>;
 
 /// the difference between two fft timestamps, expressed as a single sample
 type FFTDiff = Sample;
@@ -97,21 +84,6 @@ impl AudioClip {
 
         onsets
     }
-}
-
-fn get_norms(stft: &[FFTResult]) -> STFTNorms {
-    fn norms_fft_result(fft_result: &FFTResult) -> FFTNorms {
-        fft_result
-            .channels
-            .iter()
-            .map(|channel| channel.iter().map(|&sample| sample.norm()).collect_vec())
-            .collect_vec()
-    }
-
-    stft
-        .iter()
-        .map(norms_fft_result)
-        .collect_vec()
 }
 
 // effects: increases prominence of higher frequencies
