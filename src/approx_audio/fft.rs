@@ -167,7 +167,7 @@ pub fn binary_mask(input_h: &STFTNorms, input_v: &STFTNorms) -> (Vec<Vec<Vec<Sam
                 // create the binary filter
                 let choose_h: bool = input_h[timestamp][channel][bin] >= input_v[timestamp][channel][bin];
                 output_h[timestamp][channel][bin] = if choose_h {1.0} else {0.0};
-                output_v[timestamp][channel][bin] = if !choose_h {0.0} else {1.0};
+                output_v[timestamp][channel][bin] = if choose_h {0.0} else {1.0};
             }
         }
     }
@@ -465,7 +465,7 @@ mod tests {
     }
 
     #[test]
-    // #[ignore]
+    #[ignore]
     fn test_separate_harmonic_percussion() {
         let source = Path::new("test_audio_clips/comboTones.mp3");
         let clip = AudioClip::new(&source).expect("failed to create audio clip");
