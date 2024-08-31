@@ -96,6 +96,33 @@ pub fn get_norms(stft: &[FFTResult]) -> STFTNorms {
         .collect_vec()
 }
 
+pub fn binary_mask(input_h: &STFTNorms, input_v: &STFTNorms) -> (Vec<Vec<Vec<Sample>>>, Vec<Vec<Vec<Sample>>>) {
+    assert_eq!(input_v.len(), input_h.len(), "dimensions not the same");
+    assert_eq!(input_v[0].len(), input_h[0].len(), "dimensions not the same");
+    assert_eq!(input_v[0][0].len(), input_h[0][0].len(), "dimensions not the same");
+
+    let num_timestamps = input_h.len();
+    let num_channels = input_h[0].len();
+    let num_bins = input_h[0][0].len();
+
+    let mut output_h = vec![vec![vec![0.0; num_bins]; num_channels]; num_timestamps];
+    let mut output_v = vec![vec![vec![0.0; num_bins]; num_channels]; num_timestamps];
+
+    // iterate through each combination
+    for timestamp in 0..num_timestamps {
+        for channel in 0..num_channels {
+            for bin in 0..num_bins {
+                // apply the binary filter
+                let choose_h: bool = input_h[timestamp][channel][bin] >= input_v[timestamp][channel][bin];
+                output_h[timestamp][channel][bin] = if choose_h {1.0} else {0.0};
+                output_v[timestamp][channel][bin] = if !choose_h {0.0} else {1.0};
+            }
+        }
+    }
+
+    (output_h, output_v)
+}
+
 /// performs a median filter across the vertical axis, which is the frequency axis
 pub fn medfilt_v(stft_norms: &STFTNorms, window_size: usize) -> STFTNorms {
     assert!(window_size % 2 == 1, "window_size must be odd");
@@ -116,7 +143,7 @@ pub fn medfilt_h(stft_norms: &STFTNorms, window_size: usize) -> STFTNorms {
     assert!(window_size % 2 == 1, "window_size must be odd");
 
     // STFTNorms indexed time, channel, bin
-    let num_ffts = stft_norms.len();
+    let num_timestamps = stft_norms.len();
     let num_channels = stft_norms[0].len();
     let num_bins = stft_norms[0][0].len();
 
@@ -126,7 +153,7 @@ pub fn medfilt_h(stft_norms: &STFTNorms, window_size: usize) -> STFTNorms {
     for channel in 0..num_channels {
         let mut channel_results = Vec::new();
         for bin in 0..num_bins {
-            let orig_vec = (0..num_ffts)
+            let orig_vec = (0..num_timestamps)
                 .map(|timestamp| stft_norms[timestamp][channel][bin])
                 .collect_vec();
             let filtered_vec = medfilt_slice(&orig_vec, window_size);
@@ -139,7 +166,7 @@ pub fn medfilt_h(stft_norms: &STFTNorms, window_size: usize) -> STFTNorms {
     let mut final_stft = stft_norms.clone();
     for channel in 0..num_channels {
         for bin in 0..num_bins {
-            for timestamp in 0..num_ffts {
+            for timestamp in 0..num_timestamps {
                 final_stft[timestamp][channel][bin] = med_filtered[channel][bin][timestamp];
             }
         }
@@ -342,6 +369,26 @@ mod tests {
         assert_eq!(filt_v.len(), filt_h.len());
         assert_eq!(filt_v[0].len(), filt_h[0].len());
         assert_eq!(filt_v[0][0].len(), filt_h[0][0].len());
+    }
+    
+    #[test]
+    fn test_binary_mask() {
+        let window_size = 101;
+        let hop_size = window_size / 4;
+        let source = path::Path::new("test_audio_clips/a6.mp3");
+        let clip = AudioClip::new(&source).expect("failed to create audio clip");
+
+        let stft = clip.stft(window_size, hop_size);
+        let norms = get_norms(&stft);
+
+        let filt_v = medfilt_v(&norms, window_size);
+        let filt_h = medfilt_h(&norms, window_size);
+
+        let (binary_h, binary_v) = binary_mask(&filt_h, &filt_v);
+
+        assert_eq!(binary_v.len(), binary_h.len());
+        assert_eq!(binary_v[0].len(), binary_h[0].len());
+        assert_eq!(binary_v[0][0].len(), binary_h[0][0].len());
     }
 
 }
