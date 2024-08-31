@@ -37,6 +37,8 @@ impl AudioClip {
     /// `window_size` is the number of samples in the window; defaults to 2048
     /// `hop_size` is the number of samples between each window; defaults to `window_size` // 4
     pub fn stft(&self, window_size: usize, hop_size: usize) -> STFT {
+        assert!(hop_size > 0, "hop size must be positive");
+
         let mut stft_res = Vec::new();
 
         let mut curr_index = 0;
@@ -96,6 +98,56 @@ pub fn get_norms(stft: &[FFTResult]) -> STFTNorms {
         .collect_vec()
 }
 
+pub fn separate_harmonic_percussion(clip: &AudioClip, window_size: usize) -> (AudioClip, AudioClip) {
+    // Step 1: Use STFT, but don't use any overlapping
+    let stft = clip.stft(window_size, window_size);
+
+    // Step 2: Use Norms to transpose from complex values
+    let norms = get_norms(&stft);
+
+    // Step 3: Apply median filterings horizontally and vertically to distinguish harmonics and percussion respectively
+    let filt_v = medfilt_v(&norms, window_size);
+    let filt_h = medfilt_h(&norms, window_size);
+
+    // Step 4: Transform the filters into masks
+    let (mask_h, mask_v) = binary_mask(&filt_h, &filt_v);
+
+    // Step 5: Apply the masks to the original STFT to create two final STFTS
+    let num_timestamps = mask_h.len();
+    let num_channels = mask_h[0].len();
+    let num_bins = mask_h[0][0].len();
+    let mut stft_h = stft.clone();
+    let mut stft_v = stft.clone();
+
+    for timestamp in 0..num_timestamps {
+        for channel in 0..num_channels {
+            for bin in 0..num_bins {
+                // apply the binary filter
+                stft_h[timestamp].channels[channel][bin] *= mask_h[timestamp][channel][bin];
+                stft_v[timestamp].channels[channel][bin] *= mask_v[timestamp][channel][bin];
+            }
+        }
+    }
+
+    // Step 6: Use ISTFT to create two new audio clips
+    (inverse_stft(&stft_h), inverse_stft(&stft_v))
+}
+
+pub fn inverse_stft(stft: &STFT) -> AudioClip {
+    let clips = stft
+        .iter()
+        .skip(1)
+        .map(|fftres| fftres.ifft_to_audio_clip())
+        .collect_vec();
+
+    let mut first_clip = stft[0].ifft_to_audio_clip();
+    for clip in &clips {
+        first_clip.append_mut(clip);
+    }
+
+    first_clip
+}
+
 pub fn binary_mask(input_h: &STFTNorms, input_v: &STFTNorms) -> (Vec<Vec<Vec<Sample>>>, Vec<Vec<Vec<Sample>>>) {
     assert_eq!(input_v.len(), input_h.len(), "dimensions not the same");
     assert_eq!(input_v[0].len(), input_h[0].len(), "dimensions not the same");
@@ -112,7 +164,7 @@ pub fn binary_mask(input_h: &STFTNorms, input_v: &STFTNorms) -> (Vec<Vec<Vec<Sam
     for timestamp in 0..num_timestamps {
         for channel in 0..num_channels {
             for bin in 0..num_bins {
-                // apply the binary filter
+                // create the binary filter
                 let choose_h: bool = input_h[timestamp][channel][bin] >= input_v[timestamp][channel][bin];
                 output_h[timestamp][channel][bin] = if choose_h {1.0} else {0.0};
                 output_v[timestamp][channel][bin] = if !choose_h {0.0} else {1.0};
@@ -264,11 +316,11 @@ impl fmt::Debug for FFTResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path;
+    use std::path::Path;
 
     #[test]
     fn test_fft() {
-        let source = path::Path::new("test_audio_clips/a6.mp3");
+        let source = Path::new("test_audio_clips/a6.mp3");
         let clip = AudioClip::new(&source).expect("failed to create audio clip");
         let fft = clip.fft();
         assert!(fft.channels.iter().all(|c| c.len() == clip.num_samples));
@@ -315,8 +367,8 @@ mod tests {
 
     #[test]
     fn test_dump() {
-        let source = path::Path::new("test_audio_clips/a6.mp3");
-        let output = path::Path::new("test_fft.csv");
+        let source = Path::new("test_audio_clips/a6.mp3");
+        let output = Path::new("test_fft.csv");
         let clip = AudioClip::new(&source).expect("failed to create audio clip");
         let fft = clip.fft();
         fft.dump(output).unwrap();
@@ -327,7 +379,7 @@ mod tests {
 
     #[test]
     fn test_ifft() {
-        let source = path::Path::new("test_audio_clips/a6.mp3");
+        let source = Path::new("test_audio_clips/a6.mp3");
         let clip = AudioClip::new(&source).expect("failed to create audio clip");
         let fft = clip.fft();
         let ifft = fft.ifft();
@@ -337,8 +389,8 @@ mod tests {
 
     #[test]
     fn test_ifft_clip() {
-        let source = path::Path::new("test_audio_clips/a6.mp3");
-        let output = path::Path::new("test_ifft_clip.wav");
+        let source = Path::new("test_audio_clips/a6.mp3");
+        let output = Path::new("test_ifft_clip.wav");
         let clip = AudioClip::new(&source).expect("failed to create audio clip");
         let fft = clip.fft();
         let ifft_clip = fft.ifft_to_audio_clip();
@@ -354,10 +406,31 @@ mod tests {
     }
 
     #[test]
+    fn test_istft(){
+        let sample_rate = 24100.0;
+        let num_samples = 1000;
+        let amplitude = 0.6;
+
+        let window = 200;
+        let clip = AudioClip::new_monoamplitude(sample_rate, num_samples, amplitude, 1);
+
+        // hop = window since we want no overlapping
+        let stft = clip.stft(window, window);
+        let istft = inverse_stft(&stft);
+
+        assert!((clip.duration - istft.duration).abs() < 0.001, "Duration: {} {}", clip.duration, istft.duration);
+        assert!(clip.sample_rate == istft.sample_rate, "Sample Rate: {} {}", clip.sample_rate, istft.sample_rate);
+
+        // there is no need to check max amplitude for exact correctness because the channels have been merged with the ifft, which means
+        // amplitudes are averaged out
+        assert!(istft.max_amplitude <= clip.max_amplitude, "Max Amp: {} {}", clip.max_amplitude, istft.max_amplitude);
+    }
+
+    #[test]
     fn test_medfilt() {
         let window_size = 101;
         let hop_size = window_size / 4;
-        let source = path::Path::new("test_audio_clips/a6.mp3");
+        let source = Path::new("test_audio_clips/a6.mp3");
         let clip = AudioClip::new(&source).expect("failed to create audio clip");
 
         let stft = clip.stft(window_size, hop_size);
@@ -375,7 +448,7 @@ mod tests {
     fn test_binary_mask() {
         let window_size = 101;
         let hop_size = window_size / 4;
-        let source = path::Path::new("test_audio_clips/a6.mp3");
+        let source = Path::new("test_audio_clips/a6.mp3");
         let clip = AudioClip::new(&source).expect("failed to create audio clip");
 
         let stft = clip.stft(window_size, hop_size);
@@ -391,4 +464,17 @@ mod tests {
         assert_eq!(binary_v[0][0].len(), binary_h[0][0].len());
     }
 
+    #[test]
+    // #[ignore]
+    fn test_separate_harmonic_percussion() {
+        let source = Path::new("test_audio_clips/comboTones.mp3");
+        let clip = AudioClip::new(&source).expect("failed to create audio clip");
+
+        let window_size = 1025;
+        let (harmonic, percussion) = separate_harmonic_percussion(&clip, window_size);
+        let harmonic_path = Path::new("test_harmonic.wav");
+        let percussion_path = Path::new("test_percussion.wav");
+        harmonic.write(Some(harmonic_path)).unwrap();
+        percussion.write(Some(percussion_path)).unwrap();
+    }
 }
