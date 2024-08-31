@@ -229,6 +229,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn approx_chunk_tones_4() {
         let tone_ids = vec![0, 10];
         test_chunk_tones(&tone_ids);

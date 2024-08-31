@@ -97,10 +97,10 @@ pub fn get_norms(stft: &[FFTResult]) -> STFTNorms {
 }
 
 /// performs a median filter across the vertical axis, which is the frequency axis
-pub fn medfilt_v(stft: &STFTNorms, window_size: usize) -> STFTNorms {
+pub fn medfilt_v(stft_norms: &STFTNorms, window_size: usize) -> STFTNorms {
     assert!(window_size % 2 == 1, "window_size must be odd");
 
-    stft
+    stft_norms
         .iter()
         .map(|fft_result| {
             fft_result
@@ -112,9 +112,39 @@ pub fn medfilt_v(stft: &STFTNorms, window_size: usize) -> STFTNorms {
 }
 
 /// performs a median filter across the horizontal axis, which is the time axis
-pub fn medfilt_h(stft: &STFTNorms, window_size: usize) -> STFTNorms {
+pub fn medfilt_h(stft_norms: &STFTNorms, window_size: usize) -> STFTNorms {
     assert!(window_size % 2 == 1, "window_size must be odd");
-    todo!()
+
+    // STFTNorms indexed time, channel, bin
+    let num_ffts = stft_norms.len();
+    let num_channels = stft_norms[0].len();
+    let num_bins = stft_norms[0][0].len();
+
+    // create the filtered vectors
+    // indexed by channel, bin, time
+    let mut med_filtered = Vec::new();
+    for channel in 0..num_channels {
+        let mut channel_results = Vec::new();
+        for bin in 0..num_bins {
+            let orig_vec = (0..num_ffts)
+                .map(|timestamp| stft_norms[timestamp][channel][bin])
+                .collect_vec();
+            let filtered_vec = medfilt_slice(&orig_vec, window_size);
+            channel_results.push(filtered_vec);
+        }
+        med_filtered.push(channel_results);
+    }
+
+    // reassemble the filtered vectors into an STFTNorm
+    let mut final_stft = stft_norms.clone();
+    for channel in 0..num_channels {
+        for bin in 0..num_bins {
+            for timestamp in 0..num_ffts {
+                final_stft[timestamp][channel][bin] = med_filtered[channel][bin][timestamp];
+            }
+        }
+    }
+    final_stft
 }
 
 fn medfilt_slice<T>(slice: &[T], window_size: usize) -> Vec<T> 
@@ -295,4 +325,23 @@ mod tests {
 
         ifft_clip.write(Some(output)).unwrap();
     }
+
+    #[test]
+    fn test_medfilt() {
+        let window_size = 101;
+        let hop_size = window_size / 4;
+        let source = path::Path::new("test_audio_clips/a6.mp3");
+        let clip = AudioClip::new(&source).expect("failed to create audio clip");
+
+        let stft = clip.stft(window_size, hop_size);
+        let norms = get_norms(&stft);
+
+        let filt_v = medfilt_v(&norms, window_size);
+        let filt_h = medfilt_h(&norms, window_size);
+
+        assert_eq!(filt_v.len(), filt_h.len());
+        assert_eq!(filt_v[0].len(), filt_h[0].len());
+        assert_eq!(filt_v[0][0].len(), filt_h[0][0].len());
+    }
+
 }
