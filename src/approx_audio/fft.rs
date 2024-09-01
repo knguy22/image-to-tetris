@@ -1,4 +1,4 @@
-use super::{audio_clip::{AudioClip, Channel, Sample}, windowing::hanning_window};
+use super::{audio_clip::{AudioClip, Channel, Sample}, windowing::rectangle_window};
 use std::fmt;
 use std::path::Path;
 
@@ -36,7 +36,7 @@ impl AudioClip {
     /// performs a short time fourier transform on the audio clip
     /// `window_size` is the number of samples in the window; defaults to 2048
     /// `hop_size` is the number of samples between each window; defaults to `window_size` // 4
-    pub fn stft(&self, window_size: usize, hop_size: usize) -> STFT {
+    pub fn stft(&self, window_size: usize, hop_size: usize, windowing_fn: fn(&mut Channel)) -> STFT {
         assert!(hop_size > 0, "hop size must be positive");
 
         let mut stft_res = Vec::new();
@@ -44,7 +44,7 @@ impl AudioClip {
         let mut curr_index = 0;
         while curr_index < self.num_samples {
             // we want to use hanning window to avoid aliasing
-            let window = self.window(curr_index, curr_index + window_size, hanning_window);
+            let window = self.window(curr_index, curr_index + window_size, windowing_fn);
             stft_res.push(window.fft());
             curr_index += hop_size;
         }
@@ -98,9 +98,9 @@ pub fn get_norms(stft: &[FFTResult]) -> STFTNorms {
         .collect_vec()
 }
 
-pub fn separate_harmonic_percussion(clip: &AudioClip, window_size: usize) -> (AudioClip, AudioClip) {
+pub fn separate_harmonic_percussion(clip: &AudioClip, window_size: usize, hop_size: usize) -> (AudioClip, AudioClip) {
     // Step 1: Use STFT, but don't use any overlapping
-    let stft = clip.stft(window_size, window_size);
+    let stft = clip.stft(window_size, hop_size, rectangle_window);
 
     // Step 2: Use Norms to transpose from complex values
     let norms = get_norms(&stft);
@@ -130,10 +130,10 @@ pub fn separate_harmonic_percussion(clip: &AudioClip, window_size: usize) -> (Au
     }
 
     // Step 6: Use ISTFT to create two new audio clips
-    (inverse_stft(&stft_h), inverse_stft(&stft_v))
+    (inverse_stft(&stft_h, window_size, hop_size, rectangle_window), inverse_stft(&stft_v, window_size, hop_size, rectangle_window))
 }
 
-pub fn inverse_stft(stft: &STFT) -> AudioClip {
+pub fn inverse_stft(stft: &STFT, window_size: usize, hop_size: usize, windowing_fn: fn(&mut Channel)) -> AudioClip {
     let clips = stft
         .iter()
         .skip(1)
@@ -346,7 +346,7 @@ mod tests {
         let window = 1024;
         let hop = window / 4;
         let clip = AudioClip::new_monoamplitude(sample_rate, num_samples, amplitude, 1);
-        let stft = clip.stft(window, hop);
+        let stft = clip.stft(window, hop, rectangle_window);
 
         assert_eq!(stft.len(), clip.num_samples / hop + 1);
     }
@@ -360,7 +360,7 @@ mod tests {
         let window = 2048;
         let hop = window / 4;
         let clip = AudioClip::new_monoamplitude(sample_rate, num_samples, amplitude, 1);
-        let stft = clip.stft(window, hop);
+        let stft = clip.stft(window, hop, rectangle_window);
 
         assert_eq!(stft.len(), clip.num_samples / hop + 1);
     }
@@ -408,15 +408,16 @@ mod tests {
     #[test]
     fn test_istft(){
         let sample_rate = 24100.0;
-        let num_samples = 1000;
+        let num_samples = 4000;
         let amplitude = 0.6;
 
-        let window = 200;
+        let hop = 1000;
+        let window = 1000;
         let clip = AudioClip::new_monoamplitude(sample_rate, num_samples, amplitude, 1);
 
         // hop = window since we want no overlapping
-        let stft = clip.stft(window, window);
-        let istft = inverse_stft(&stft);
+        let stft = clip.stft(window, hop, rectangle_window);
+        let istft = inverse_stft(&stft, window, hop, rectangle_window);
 
         assert!((clip.duration - istft.duration).abs() < 0.001, "Duration: {} {}", clip.duration, istft.duration);
         assert!(clip.sample_rate == istft.sample_rate, "Sample Rate: {} {}", clip.sample_rate, istft.sample_rate);
@@ -433,7 +434,7 @@ mod tests {
         let source = Path::new("test_audio_clips/a6.mp3");
         let clip = AudioClip::new(&source).expect("failed to create audio clip");
 
-        let stft = clip.stft(window_size, hop_size);
+        let stft = clip.stft(window_size, hop_size, rectangle_window);
         let norms = get_norms(&stft);
 
         let filt_v = medfilt_v(&norms, window_size);
@@ -451,7 +452,7 @@ mod tests {
         let source = Path::new("test_audio_clips/a6.mp3");
         let clip = AudioClip::new(&source).expect("failed to create audio clip");
 
-        let stft = clip.stft(window_size, hop_size);
+        let stft = clip.stft(window_size, hop_size, rectangle_window);
         let norms = get_norms(&stft);
 
         let filt_v = medfilt_v(&norms, window_size);
@@ -470,8 +471,9 @@ mod tests {
         let source = Path::new("test_audio_clips/comboTones.mp3");
         let clip = AudioClip::new(&source).expect("failed to create audio clip");
 
+        let hop = 1025;
         let window_size = 1025;
-        let (harmonic, percussion) = separate_harmonic_percussion(&clip, window_size);
+        let (harmonic, percussion) = separate_harmonic_percussion(&clip, window_size, hop);
         let harmonic_path = Path::new("test_harmonic.wav");
         let percussion_path = Path::new("test_percussion.wav");
         harmonic.write(Some(harmonic_path)).unwrap();

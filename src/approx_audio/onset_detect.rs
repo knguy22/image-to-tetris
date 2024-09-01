@@ -2,7 +2,7 @@ use itertools::Itertools;
 
 use super::audio_clip::{AudioClip, Sample};
 use super::fft::{get_norms, FFTNorms, STFTNorms};
-use super::windowing::rectangle_window;
+use super::windowing::{hanning_window, rectangle_window};
 
 use anyhow::Result;
 
@@ -44,7 +44,7 @@ impl AudioClip {
         // perform short time fourier transform
         let window_size = 2048;
         let hop_size = window_size / 4;
-        let stft = self.stft(window_size, hop_size);
+        let stft = self.stft(window_size, hop_size, hanning_window);
 
         // transform the stft from complex into norms
         let stft = get_norms(&stft);
