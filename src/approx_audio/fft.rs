@@ -130,22 +130,36 @@ pub fn separate_harmonic_percussion(clip: &AudioClip, window_size: usize, hop_si
     }
 
     // Step 6: Use ISTFT to create two new audio clips
-    (inverse_stft(&stft_h, window_size, hop_size, rectangle_window), inverse_stft(&stft_v, window_size, hop_size, rectangle_window))
+    (inverse_stft(&stft_h, hop_size, rectangle_window), inverse_stft(&stft_v, hop_size, rectangle_window))
 }
 
-pub fn inverse_stft(stft: &STFT, window_size: usize, hop_size: usize, windowing_fn: fn(&mut Channel)) -> AudioClip {
+/// inverse short time fourier transform
+/// window size is implicitly given by the stft
+pub fn inverse_stft(stft: &STFT, hop_size: usize, windowing_fn: fn(&mut Channel)) -> AudioClip {
+    // get all audio clips and perform the windowing function
     let clips = stft
         .iter()
-        .skip(1)
         .map(|fftres| fftres.ifft_to_audio_clip())
+        .map(|clip| clip.window(0, clip.num_samples, windowing_fn))
         .collect_vec();
 
-    let mut first_clip = stft[0].ifft_to_audio_clip();
-    for clip in &clips {
-        first_clip.append_mut(clip);
+    // gather important information
+    let first = &clips[0];
+    let window_size = first.num_samples;
+    let num_samples = hop_size * clips.len();
+
+    // then perform the overlapping using the hop size as a guide
+    let mut final_clip = AudioClip::new_monoamplitude(first.sample_rate, num_samples, 0.0, first.num_channels);
+    for (clip, start) in clips.iter().zip((0..num_samples).step_by(hop_size)) {
+        println!("{} {}", start, num_samples);
+        for channel in 0..first.num_channels {
+            for sample in start..start + window_size {
+                final_clip.channels[channel][sample] += clip.channels[channel][sample - start];
+            }
+        }
     }
 
-    first_clip
+    final_clip
 }
 
 pub fn binary_mask(input_h: &STFTNorms, input_v: &STFTNorms) -> (Vec<Vec<Vec<Sample>>>, Vec<Vec<Vec<Sample>>>) {
@@ -315,6 +329,8 @@ impl fmt::Debug for FFTResult {
 
 #[cfg(test)]
 mod tests {
+    use fundsp::Num;
+
     use super::*;
     use std::path::Path;
 
@@ -417,8 +433,9 @@ mod tests {
 
         // hop = window since we want no overlapping
         let stft = clip.stft(window, hop, rectangle_window);
-        let istft = inverse_stft(&stft, window, hop, rectangle_window);
+        assert!(stft.len() == (num_samples / hop).ceil());
 
+        let istft = inverse_stft(&stft, hop, rectangle_window);
         assert!((clip.duration - istft.duration).abs() < 0.001, "Duration: {} {}", clip.duration, istft.duration);
         assert!(clip.sample_rate == istft.sample_rate, "Sample Rate: {} {}", clip.sample_rate, istft.sample_rate);
 
