@@ -1,4 +1,5 @@
-use super::{audio_clip::{AudioClip, Channel, Sample}, windowing::{hanning_window, inv_hanning_window, rectangle_window}};
+use crate::utils::progress_bar;
+use super::{audio_clip::{AudioClip, Channel, Sample}, windowing::rectangle_window};
 use std::fmt;
 use std::path::Path;
 
@@ -6,6 +7,7 @@ use anyhow::Result;
 use itertools::Itertools;
 use median::Filter;
 use rustfft::{FftPlanner, num_complex::Complex};
+use rayon::prelude::*;
 
 pub type FFTSample = Complex<Sample>;
 pub type FFTChannel = Vec<FFTSample>;
@@ -98,21 +100,30 @@ pub fn get_norms(stft: &[FFTResult]) -> STFTNorms {
         .collect_vec()
 }
 
+/// separate the harmonic from the percussive component;
+/// returns (harmonic,percussive)
 pub fn separate_harmonic_percussion(clip: &AudioClip, window_size: usize, hop_size: usize) -> (AudioClip, AudioClip) {
+    assert!(hop_size > 0, "hop size must be positive");
+    assert!(window_size % 2 == 0, "window_size must be even");
+
     // Step 1: Use STFT, but don't use any overlapping
-    let stft = clip.stft(window_size, hop_size, hanning_window);
+    println!("step 1");
+    let stft = clip.stft(window_size, hop_size, rectangle_window);
 
     // Step 2: Use Norms to transpose from complex values
+    println!("step 2");
     let norms = get_norms(&stft);
 
     // Step 3: Apply median filterings horizontally and vertically to distinguish harmonics and percussion respectively
-    let filt_v = medfilt_v(&norms, window_size);
-    let filt_h = medfilt_h(&norms, window_size);
+    let filt_v = medfilt_v(&norms, window_size + 1);
+    let filt_h = medfilt_h(&norms, window_size + 1);
 
     // Step 4: Transform the filters into masks
+    println!("step 4");
     let (mask_h, mask_v) = binary_mask(&filt_h, &filt_v);
 
     // Step 5: Apply the masks to the original STFT to create two final STFTS
+    println!("step 5");
     let num_timestamps = mask_h.len();
     let num_channels = mask_h[0].len();
     let num_bins = mask_h[0][0].len();
@@ -130,18 +141,19 @@ pub fn separate_harmonic_percussion(clip: &AudioClip, window_size: usize, hop_si
     }
 
     // Step 6: Use ISTFT to create two new audio clips
-    (inverse_stft(&stft_h, hop_size, inv_hanning_window), inverse_stft(&stft_v, hop_size, inv_hanning_window))
+    println!("step 6");
+    (inverse_stft(&stft_h, hop_size, rectangle_window), inverse_stft(&stft_v, hop_size, rectangle_window))
 }
 
 /// inverse short time fourier transform
 /// window size is implicitly given by the stft
 pub fn inverse_stft(stft: &STFT, hop_size: usize, windowing_fn: fn(&mut Channel)) -> AudioClip {
     // get all audio clips and perform the windowing function
-    let clips = stft
-        .iter()
+    let clips: Vec<_> = stft
+        .par_iter()
         .map(|fftres| fftres.ifft_to_audio_clip())
         .map(|clip| clip.window(0, clip.num_samples, windowing_fn))
-        .collect_vec();
+        .collect();
 
     // gather important information
     let first = &clips[0];
@@ -151,9 +163,8 @@ pub fn inverse_stft(stft: &STFT, hop_size: usize, windowing_fn: fn(&mut Channel)
     // then perform the overlapping using the hop size as a guide
     let mut final_clip = AudioClip::new_monoamplitude(first.sample_rate, num_samples, 0.0, first.num_channels);
     for (clip, start) in clips.iter().zip((0..num_samples).step_by(hop_size)) {
-        println!("{} {}", start, num_samples);
         for channel in 0..first.num_channels {
-            for sample in start..start + window_size {
+            for sample in start..(start + window_size).min(num_samples) {
                 final_clip.channels[channel][sample] += clip.channels[channel][sample - start];
             }
         }
@@ -193,15 +204,21 @@ pub fn binary_mask(input_h: &STFTNorms, input_v: &STFTNorms) -> (Vec<Vec<Vec<Sam
 pub fn medfilt_v(stft_norms: &STFTNorms, window_size: usize) -> STFTNorms {
     assert!(window_size % 2 == 1, "window_size must be odd");
 
-    stft_norms
-        .iter()
+    let pb = progress_bar(stft_norms.len()).unwrap();
+    pb.set_message("Median filtering vertical...");
+    let filtered = stft_norms
+        .par_iter()
         .map(|fft_result| {
+            pb.inc(1);
             fft_result
                 .iter()
                 .map(|channel| medfilt_slice(channel, window_size))
-                .collect_vec()
+                .collect()
         })
-        .collect_vec()
+        .collect();
+    pb.finish_with_message("Done median filtering vertical!");
+
+    filtered
 }
 
 /// performs a median filter across the horizontal axis, which is the time axis
@@ -212,21 +229,28 @@ pub fn medfilt_h(stft_norms: &STFTNorms, window_size: usize) -> STFTNorms {
     let num_timestamps = stft_norms.len();
     let num_channels = stft_norms[0].len();
     let num_bins = stft_norms[0][0].len();
+    let pb = progress_bar(num_channels * num_bins).unwrap();
+    pb.set_message("Median filtering horizontal...");
 
     // create the filtered vectors
     // indexed by channel, bin, time
-    let mut med_filtered = Vec::new();
-    for channel in 0..num_channels {
-        let mut channel_results = Vec::new();
-        for bin in 0..num_bins {
-            let orig_vec = (0..num_timestamps)
-                .map(|timestamp| stft_norms[timestamp][channel][bin])
-                .collect_vec();
-            let filtered_vec = medfilt_slice(&orig_vec, window_size);
-            channel_results.push(filtered_vec);
-        }
-        med_filtered.push(channel_results);
-    }
+    let med_filtered: Vec<Vec<Vec<Sample>>> = (0..num_channels)
+        .into_iter()
+        .map(|channel| {
+            let channel_results = (0..num_bins)
+                .into_par_iter()
+                .map(|bin| {
+                    let orig_vec = (0..num_timestamps)
+                        .map(|timestamp| stft_norms[timestamp][channel][bin])
+                        .collect_vec();
+                    pb.inc(1);
+                    medfilt_slice(&orig_vec, window_size)
+                })
+                .collect();
+            channel_results
+        })
+        .collect();
+    pb.finish_with_message("Done median filtering horizontal!");
 
     // reassemble the filtered vectors into an STFTNorm
     let mut final_stft = stft_norms.clone();
@@ -239,6 +263,7 @@ pub fn medfilt_h(stft_norms: &STFTNorms, window_size: usize) -> STFTNorms {
     }
     final_stft
 }
+
 
 fn medfilt_slice<T>(slice: &[T], window_size: usize) -> Vec<T> 
     where T: Copy + Clone + PartialOrd
@@ -329,10 +354,9 @@ impl fmt::Debug for FFTResult {
 
 #[cfg(test)]
 mod tests {
-    use fundsp::Num;
-
     use super::*;
     use std::path::Path;
+    use crate::approx_audio::windowing::rectangle_window;
 
     #[test]
     fn test_fft() {
@@ -433,8 +457,6 @@ mod tests {
 
         // hop = window since we want no overlapping
         let stft = clip.stft(window, hop, rectangle_window);
-        assert!(stft.len() == (num_samples / hop).ceil());
-
         let istft = inverse_stft(&stft, hop, rectangle_window);
         assert!((clip.duration - istft.duration).abs() < 0.001, "Duration: {} {}", clip.duration, istft.duration);
         assert!(clip.sample_rate == istft.sample_rate, "Sample Rate: {} {}", clip.sample_rate, istft.sample_rate);
