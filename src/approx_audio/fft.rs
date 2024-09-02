@@ -1,4 +1,4 @@
-use super::{audio_clip::{AudioClip, Channel, Sample}, windowing::rectangle_window};
+use super::{audio_clip::{AudioClip, Channel, Sample}, windowing::{hanning_window, inv_hanning_window, rectangle_window}};
 use std::fmt;
 use std::path::Path;
 
@@ -100,7 +100,7 @@ pub fn get_norms(stft: &[FFTResult]) -> STFTNorms {
 
 pub fn separate_harmonic_percussion(clip: &AudioClip, window_size: usize, hop_size: usize) -> (AudioClip, AudioClip) {
     // Step 1: Use STFT, but don't use any overlapping
-    let stft = clip.stft(window_size, hop_size, rectangle_window);
+    let stft = clip.stft(window_size, hop_size, hanning_window);
 
     // Step 2: Use Norms to transpose from complex values
     let norms = get_norms(&stft);
@@ -130,7 +130,7 @@ pub fn separate_harmonic_percussion(clip: &AudioClip, window_size: usize, hop_si
     }
 
     // Step 6: Use ISTFT to create two new audio clips
-    (inverse_stft(&stft_h, hop_size, rectangle_window), inverse_stft(&stft_v, hop_size, rectangle_window))
+    (inverse_stft(&stft_h, hop_size, inv_hanning_window), inverse_stft(&stft_v, hop_size, inv_hanning_window))
 }
 
 /// inverse short time fourier transform
