@@ -55,9 +55,9 @@ pub fn run(source: &Path, output: &Path) -> Result<()> {
     let approx_clip = clip.approx(&tetris_clips)?;
     let source_clip = AudioClip::new(source_resampled)?;
     let final_clip = approx_clip.to_audio_clip();
+    final_clip.write(Some(output))?;
     println!("Final MSE: {}", final_clip.mse(&source_clip, 1.0));
     println!("Final Dot: {}", final_clip.dot_product(&source_clip, 1.0));
-    final_clip.write(Some(output))?;
 
     // cleanup
     println!("Cleaning up...");
@@ -95,13 +95,17 @@ fn cleanup(tetris_sounds_resampled: &Path, input_resampled: &Path) -> Result<()>
 
 impl InputAudioClip {
     pub fn new(source: &Path, num_channels: usize) -> Result<InputAudioClip> {
+        let clip = AudioClip::new(source)?;
+
+        println!("Separating harmonic and percussive components...");
         let window_size = 1024;
         let hop_size = window_size / 4;
+        let (harmonic_clip, _percussion_clip) = separate_harmonic_percussion(&clip, window_size, hop_size);
 
-        let clip = AudioClip::new(source)?;
-        println!("Separating harmonic and percussive components...");
-        let (mut harmonic_clip, _percussion_clip) = separate_harmonic_percussion(&clip, window_size, hop_size);
+        // standardizing for original clip
+        let mut harmonic_clip = harmonic_clip.resize(clip.num_samples);
         harmonic_clip.add_new_channels_mut(num_channels);
+
         let chunks = harmonic_clip.split_by_onsets();
         Ok(InputAudioClip{chunks})
     }
@@ -212,10 +216,8 @@ mod tests {
 
         assert_eq!(input_clip.num_channels, clip.num_channels);
         assert_eq!(input_clip.sample_rate, clip.sample_rate);
-
-        // TODO: fix inv stft not returning the exact length
-        // assert_eq!(input_clip.num_samples, clip.num_samples);
-        // assert_eq!(input_clip.duration, clip.duration);
+        assert_eq!(input_clip.num_samples, clip.num_samples);
+        assert_eq!(input_clip.duration, clip.duration);
     }
 
     #[test]

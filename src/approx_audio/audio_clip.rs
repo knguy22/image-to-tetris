@@ -224,15 +224,19 @@ impl AudioClip {
     }
 
     #[allow(dead_code)]
-    // zero pads the audio clip; this is useful for comparison of two audio clips
-    pub fn zero_pad(&self, num_samples: usize) -> Self {
-        assert!(num_samples >= self.num_samples);
-
+    // zero pads or truncates the audio clip to the specified number of samples; this is useful for comparison of two audio clips
+    pub fn resize(&self, num_samples: usize) -> Self {
         let mut clip = self.clone();
         for channel in &mut clip.channels {
-            channel.resize(num_samples, 0.0);
+            if channel.len() > num_samples {
+                channel.truncate(num_samples);
+            }
+            else if channel.len() < num_samples {
+                channel.resize(num_samples, 0.0);
+            }
         }
         clip.num_samples = num_samples;
+        clip.duration = num_samples as f64 / clip.sample_rate;
         clip
     }
 
@@ -340,7 +344,7 @@ mod tests {
         let num_samples = 1000000;
         let source = path::Path::new("test_audio_clips/a6.mp3");
         let clip = AudioClip::new(&source).expect("failed to create audio clip");
-        let output = clip.zero_pad(num_samples);
+        let output = clip.resize(num_samples);
 
         assert_eq!(output.num_samples, num_samples);
         assert!(output.channels.iter().all(|channel| channel.len() == num_samples));

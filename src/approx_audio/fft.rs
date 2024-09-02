@@ -36,19 +36,15 @@ pub struct FFTResult {
 
 impl AudioClip {
     /// performs a short time fourier transform on the audio clip
-    /// `window_size` is the number of samples in the window; defaults to 2048
-    /// `hop_size` is the number of samples between each window; defaults to `window_size` // 4
+    /// `window_size` is the number of samples in the window
+    /// `hop_size` is the number of samples between each window
     pub fn stft(&self, window_size: usize, hop_size: usize, windowing_fn: fn(&mut Channel)) -> STFT {
         assert!(hop_size > 0, "hop size must be positive");
 
         let mut stft_res = Vec::new();
-
-        let mut curr_index = 0;
-        while curr_index < self.num_samples {
-            // we want to use hanning window to avoid aliasing
+        for curr_index in (0..self.num_samples).step_by(hop_size) {
             let window = self.window(curr_index, curr_index + window_size, windowing_fn);
             stft_res.push(window.fft());
-            curr_index += hop_size;
         }
 
         stft_res
@@ -107,11 +103,9 @@ pub fn separate_harmonic_percussion(clip: &AudioClip, window_size: usize, hop_si
     assert!(window_size % 2 == 0, "window_size must be even");
 
     // Step 1: Use STFT, but don't use any overlapping
-    println!("step 1");
     let stft = clip.stft(window_size, hop_size, rectangle_window);
 
     // Step 2: Use Norms to transpose from complex values
-    println!("step 2");
     let norms = get_norms(&stft);
 
     // Step 3: Apply median filterings horizontally and vertically to distinguish harmonics and percussion respectively
@@ -119,11 +113,9 @@ pub fn separate_harmonic_percussion(clip: &AudioClip, window_size: usize, hop_si
     let filt_h = medfilt_h(&norms, window_size + 1);
 
     // Step 4: Transform the filters into masks
-    println!("step 4");
     let (mask_h, mask_v) = binary_mask(&filt_h, &filt_v);
 
     // Step 5: Apply the masks to the original STFT to create two final STFTS
-    println!("step 5");
     let num_timestamps = mask_h.len();
     let num_channels = mask_h[0].len();
     let num_bins = mask_h[0][0].len();
@@ -141,7 +133,6 @@ pub fn separate_harmonic_percussion(clip: &AudioClip, window_size: usize, hop_si
     }
 
     // Step 6: Use ISTFT to create two new audio clips
-    println!("step 6");
     (inverse_stft(&stft_h, hop_size, rectangle_window), inverse_stft(&stft_v, hop_size, rectangle_window))
 }
 
