@@ -53,9 +53,10 @@ pub fn run(source: &Path, output: &Path) -> Result<()> {
     // now split the input
     let clip = InputAudioClip::new(source_resampled, max_channels)?;
     let approx_clip = clip.approx(&tetris_clips)?;
-    let source_clip = AudioClip::new(source_resampled)?;
     let final_clip = approx_clip.to_audio_clip();
     final_clip.write(Some(output))?;
+
+    let source_clip = AudioClip::new(source_resampled)?;
     println!("Final MSE: {}", final_clip.mse(&source_clip, 1.0));
     println!("Final Dot: {}", final_clip.dot_product(&source_clip, 1.0));
 
@@ -113,7 +114,7 @@ impl InputAudioClip {
     pub fn approx(&self, tetris_clips: &TetrisClips) -> Result<Self> {
         let pb = progress_bar(self.chunks.len())?;
         pb.set_message("Approximating audio chunks...");
-        let output_clips = self.chunks
+        let output_clips: Vec<AudioClip> = self.chunks
             .par_iter()
             .map(|chunk| {
                 let approx_chunk = Self::approx_chunk(chunk, tetris_clips);
@@ -166,7 +167,7 @@ impl InputAudioClip {
 
         // scale output to the volume of the input chunk
         let multiplier = chunk.rms_magnitude() / output.rms_magnitude();
-        let output = if !multiplier.is_nan() {
+        let output = if multiplier.is_finite() {
             output.scale_amplitude(multiplier as Sample)
         } else {
             output

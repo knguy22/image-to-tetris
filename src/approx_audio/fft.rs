@@ -289,7 +289,7 @@ impl FFTResult {
                     .fold(0.0, |a, &b| Sample::max(a, b))
             )
             .fold(0.0, Sample::max) ;
-        assert!(!max_amplitude.is_nan());
+        assert!(max_amplitude.is_finite());
 
         AudioClip {
             channels,

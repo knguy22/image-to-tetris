@@ -138,7 +138,7 @@ fn normalize_diffs(diffs: &STFTDiffs) -> STFTDiffs {
         .iter()
         .reduce(|a, b| if a > b { a } else { b })
         .unwrap();
-    assert!(!max.is_nan());
+    assert!(max.is_finite());
     assert!(*max > 0.0);
 
     diffs

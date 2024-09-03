@@ -169,7 +169,7 @@ impl AudioClip {
     pub fn add_mut(&mut self, rhs: &Self, multiplier: Sample) {
         assert!(self.num_channels == rhs.num_channels);
         assert!((self.sample_rate - rhs.sample_rate).abs() < f64::EPSILON);
-        assert!(!multiplier.is_nan());
+        assert!(multiplier.is_finite());
 
         let limit = std::cmp::min(self.num_samples, rhs.num_samples);
         for channel_idx in 0..self.num_channels {
@@ -194,7 +194,7 @@ impl AudioClip {
 
     #[allow(dead_code)]
     pub fn scale_amplitude(&self, rhs: Sample) -> Self {
-        assert!(!rhs.is_nan());
+        assert!(rhs.is_finite());
         let mut output = self.clone();
         for channel in &mut output.channels {
             for sample in channel {
