@@ -43,8 +43,29 @@ pub fn rectangle_window(_channel: &mut Channel) {
 #[allow(clippy::cast_precision_loss, unused)]
 pub fn hanning_window(channel: &mut Channel) {
     let big_n = channel.len() as Sample;
+
+    // prevent divisions by zero
+    if big_n <= 1.0 {
+        return;
+    }
+
     for (n, sample) in channel.iter_mut().enumerate() {
         *sample *= 0.5 * (1.0 - (2.0 * PI * n as Sample / (big_n - 1.0)).cos());
+    }
+}
+
+#[allow(clippy::cast_precision_loss, unused)]
+pub fn inv_hanning_window(channel: &mut Channel) {
+    let big_n = channel.len() as Sample;
+
+    // prevent divisions by zero
+    if big_n <= 1.0 {
+        return;
+    }
+
+    for (n, sample) in channel.iter_mut().enumerate() {
+        let constant = 0.5 * (1.0 - (2.0 * PI * n as Sample / (big_n - 1.0)).cos());
+        *sample /= 0.5 * (1.0 - (2.0 * PI * n as Sample / (big_n - 1.0)).cos());
     }
 }
 

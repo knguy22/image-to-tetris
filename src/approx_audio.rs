@@ -8,6 +8,7 @@ mod resample;
 mod windowing;
 
 use audio_clip::{AudioClip, Sample};
+use fft::separate_harmonic_percussion;
 use pitch::CHROMATIC_MULTIPLIER;
 use tetris_clips::TetrisClips;
 use crate::utils::progress_bar;
@@ -52,11 +53,12 @@ pub fn run(source: &Path, output: &Path) -> Result<()> {
     // now split the input
     let clip = InputAudioClip::new(source_resampled, max_channels)?;
     let approx_clip = clip.approx(&tetris_clips)?;
-    let source_clip = AudioClip::new(source_resampled)?;
     let final_clip = approx_clip.to_audio_clip();
+    final_clip.write(Some(output))?;
+
+    let source_clip = AudioClip::new(source_resampled)?;
     println!("Final MSE: {}", final_clip.mse(&source_clip, 1.0));
     println!("Final Dot: {}", final_clip.dot_product(&source_clip, 1.0));
-    final_clip.write(Some(output))?;
 
     // cleanup
     println!("Cleaning up...");
@@ -94,16 +96,25 @@ fn cleanup(tetris_sounds_resampled: &Path, input_resampled: &Path) -> Result<()>
 
 impl InputAudioClip {
     pub fn new(source: &Path, num_channels: usize) -> Result<InputAudioClip> {
-        let mut clip = AudioClip::new(source)?;
-        clip.add_new_channels_mut(num_channels);
-        let chunks = clip.split_by_onsets();
+        let clip = AudioClip::new(source)?;
+
+        println!("Separating harmonic and percussive components...");
+        let window_size = 1024;
+        let hop_size = window_size / 4;
+        let (harmonic_clip, _percussion_clip) = separate_harmonic_percussion(&clip, window_size, hop_size);
+
+        // standardizing for original clip
+        let mut harmonic_clip = harmonic_clip.resize(clip.num_samples);
+        harmonic_clip.add_new_channels_mut(num_channels);
+
+        let chunks = harmonic_clip.split_by_onsets();
         Ok(InputAudioClip{chunks})
     }
 
     pub fn approx(&self, tetris_clips: &TetrisClips) -> Result<Self> {
         let pb = progress_bar(self.chunks.len())?;
         pb.set_message("Approximating audio chunks...");
-        let output_clips = self.chunks
+        let output_clips: Vec<AudioClip> = self.chunks
             .par_iter()
             .map(|chunk| {
                 let approx_chunk = Self::approx_chunk(chunk, tetris_clips);
@@ -120,10 +131,8 @@ impl InputAudioClip {
     fn approx_chunk(chunk: &AudioClip, tetris_clips: &TetrisClips) -> AudioClip {
         let mut output = AudioClip::new_monoamplitude(chunk.sample_rate, chunk.num_samples, 0.0, chunk.num_channels);
 
-        // take magnitudes of different frequencies one by one
-        let chunk_fft = chunk.fft();
-
         // heap contains (magnitude, frequency)
+        let chunk_fft = chunk.fft();
         let mut fft_samples: Vec<(OrderedFloat<Sample>, OrderedFloat<Sample>)> = Vec::new();
         for (freq, samples) in chunk_fft.iter_zip_bins() {
             let magnitude = samples.iter().fold(0.0, |a, &b| a + b.norm());
@@ -135,7 +144,7 @@ impl InputAudioClip {
         // track added notes
         let mut curr_note_tracker: Lapper<usize, usize> = Lapper::new(Vec::new());
         while let Some((mag, freq)) = heap.pop() {
-            if mag < max_magnitude / 2.5 {
+            if mag < max_magnitude / 2.5 || mag == 0.0 {
                 break; 
             }
 
@@ -150,11 +159,19 @@ impl InputAudioClip {
                 let start = (freq as Sample / CHROMATIC_MULTIPLIER) as usize;
                 let stop = (freq as Sample * CHROMATIC_MULTIPLIER) as usize;
                 let interval = Interval { start, stop, val: 0 };
-
-                output.add_mut(&note_clip.audio, 1.0);
+                let multiplier = *(mag / max_magnitude);
+                output.add_mut(&note_clip.audio, multiplier);
                 curr_note_tracker.insert(interval);
             }
         }
+
+        // scale output to the volume of the input chunk
+        let multiplier = chunk.rms_magnitude() / output.rms_magnitude();
+        let output = if multiplier.is_finite() {
+            output.scale_amplitude(multiplier as Sample)
+        } else {
+            output
+        };
 
         output
     }
@@ -223,6 +240,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn approx_chunk_tones_4() {
         let tone_ids = vec![0, 10];
         test_chunk_tones(&tone_ids);

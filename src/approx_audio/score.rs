@@ -8,7 +8,7 @@ impl AudioClip {
         let diff = self.zip_samples(other)
             .map(|(s1, s2)| (f64::from(s1) - f64::from(s2) * f64::from(multiplier)).powf(2.0))
             .sum::<f64>();
-        assert!(!diff.is_nan());
+        assert!(diff.is_finite());
         diff / ((self.num_samples * self.num_channels) as f64)
     }
 
@@ -17,7 +17,7 @@ impl AudioClip {
         let diff = self.zip_samples(other)
             .map(|(s1, s2)| f64::from(s1) * f64::from(s2) * f64::from(multiplier))
             .sum::<f64>();
-        assert!(!diff.is_nan());
+        assert!(diff.is_finite());
         diff / ((self.num_samples * self.num_channels) as f64)
     }
 

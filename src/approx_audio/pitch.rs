@@ -56,7 +56,7 @@ impl FFTResult {
         most_significant_freq_bin.0
     }
 
-    /// yields a tuple of (frequency, Vec[sample] = bin containing complex samples for each channel)
+    /// yields a tuple of (frequency, Vec(sample) = bin containing complex samples for each channel)
     /// yields up to the Nyquist frequency
     #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
     pub fn iter_zip_bins(&self) -> impl Iterator<Item = FreqBin> + '_ {
