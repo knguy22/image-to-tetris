@@ -105,6 +105,10 @@ impl InputAudioClip {
 
         // standardizing for original clip
         let mut harmonic_clip = harmonic_clip.resize(clip.num_samples);
+        let multiplier = clip.rms_magnitude() / harmonic_clip.rms_magnitude();
+        if multiplier.is_finite() {
+            harmonic_clip = harmonic_clip.scale_amplitude(multiplier as Sample);
+        }
         harmonic_clip.add_new_channels_mut(num_channels);
 
         let chunks = harmonic_clip.split_by_onsets();
