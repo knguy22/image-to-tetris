@@ -151,7 +151,7 @@ impl InputAudioClip {
         // track added notes
         let mut curr_note_tracker: Lapper<usize, usize> = Lapper::new(Vec::new());
         while let Some((mag, freq)) = heap.pop() {
-            if mag < max_magnitude / 2.5 || mag == 0.0 {
+            if mag < max_magnitude / 3.0 || mag == 0.0 {
                 break; 
             }
 
