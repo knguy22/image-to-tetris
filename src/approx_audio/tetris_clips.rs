@@ -158,18 +158,35 @@ impl TetrisClips {
     /// creates corresponding pitch-shifted audio clips for skipped intervals and pushes them to self.clips
     #[allow(clippy::cast_precision_loss)]
     fn populate_skipped_intervals(&mut self, intervals: &[Interval<usize, usize>]) {
-        // create iterators to loop through existing combotones so pitch shifted audio clips aren't all the same
-        let combotones: Vec<TetrisClip> = self.clips.iter().take(7).cloned().collect();
-        let combotones_iter = combotones.iter().cycle();
+        // used for scaling
         let avg_rms_mag = self.clips
             .iter()
             .map(|clip| clip.audio.rms_magnitude())
             .sum::<f64>() / self.clips.len() as f64;
 
-        for (interval, combotone) in intervals.iter().zip(combotones_iter) {
-            // compute pitch shifted audio
+        // candidate combotones to pitch shift with
+        let clips_and_fundamentals = self.clips
+            .iter()
+            .map(|clip| (clip.clone(), clip.fft.most_significant_frequency()))
+            .collect_vec();
+
+        for interval in intervals {
+            // select which combotone to use
             let target_fundamental = interval.start as Sample;
-            let curr_fundamental = combotone.fft.most_significant_frequency();
+            let mut interval_distance = std::f32::MAX;
+            let mut curr_fundamental = target_fundamental;
+            let mut combotone: Option<&TetrisClip> = None;
+            for (candidate, candidate_fundamental) in &clips_and_fundamentals {
+                let candidate_distance = (candidate_fundamental - target_fundamental).abs();
+                if candidate_distance < interval_distance {
+                    interval_distance = candidate_distance;
+                    curr_fundamental = *candidate_fundamental;
+                    combotone = Some(&candidate);
+                }
+            }
+            let combotone = combotone.expect("no combotone found in skipped interval");
+
+            // compute pitch shifted audio
             let multiplier = target_fundamental / curr_fundamental;
             let fft = combotone.fft.pitch_shift(multiplier);
             let audio = fft.ifft_to_audio_clip();
