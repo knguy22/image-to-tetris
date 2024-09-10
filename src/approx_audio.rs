@@ -103,6 +103,9 @@ impl InputAudioClip {
         let hop_size = window_size / 4;
         let (harmonic_clip, _percussion_clip) = separate_harmonic_percussion(&clip, window_size, hop_size);
 
+        // harmonic_clip.write(Some(Path::new("tmp_harmonic.wav")))?;
+        // percussion_clip.write(Some(Path::new("tmp_percussion.wav")))?;
+
         // standardizing for original clip
         let mut harmonic_clip = harmonic_clip.resize(clip.num_samples);
         let multiplier = clip.rms_magnitude() / harmonic_clip.rms_magnitude();
@@ -148,7 +151,7 @@ impl InputAudioClip {
         // track added notes
         let mut curr_note_tracker: Lapper<usize, usize> = Lapper::new(Vec::new());
         while let Some((mag, freq)) = heap.pop() {
-            if mag < max_magnitude / 2.5 || mag == 0.0 {
+            if mag < max_magnitude / 3.0 || mag == 0.0 {
                 break; 
             }
 

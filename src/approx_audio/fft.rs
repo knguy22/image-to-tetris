@@ -98,9 +98,9 @@ pub fn get_norms(stft: &[FFTResult]) -> STFTNorms {
 
 /// separate the harmonic from the percussive component;
 /// returns (harmonic,percussive)
+/// this whole procedure was implemented using https://www.audiolabs-erlangen.de/resources/MIR/FMP/C8/C8S1_HPS.html as a reference
 pub fn separate_harmonic_percussion(clip: &AudioClip, window_size: usize, hop_size: usize) -> (AudioClip, AudioClip) {
     assert!(hop_size > 0, "hop size must be positive");
-    assert!(window_size % 2 == 0, "window_size must be even");
 
     // Step 1: Use STFT, but don't use any overlapping
     let stft = clip.stft(window_size, hop_size, rectangle_window);
@@ -109,8 +109,14 @@ pub fn separate_harmonic_percussion(clip: &AudioClip, window_size: usize, hop_si
     let norms = get_norms(&stft);
 
     // Step 3: Apply median filterings horizontally and vertically to distinguish harmonics and percussion respectively
-    let filt_v = medfilt_v(&norms, window_size + 1);
-    let filt_h = medfilt_h(&norms, window_size + 1);
+    // These two constants are chosen arbitrarily to help determine the window sizes
+    let length_sec: f64 = 0.1;
+    let window_h = make_odd((length_sec * clip.sample_rate / hop_size as f64).ceil() as usize);
+    let filt_h = medfilt_h(&norms, window_h);
+
+    let length_hz: f64 = 100.0;
+    let window_v = make_odd((length_hz * window_size as f64 / clip.sample_rate) as usize);
+    let filt_v = medfilt_v(&norms, window_v);
 
     // Step 4: Transform the filters into masks
     let (mask_h, mask_v) = binary_mask(&filt_h, &filt_v);
@@ -134,6 +140,14 @@ pub fn separate_harmonic_percussion(clip: &AudioClip, window_size: usize, hop_si
 
     // Step 6: Use ISTFT to create two new audio clips
     (inverse_stft(&stft_h, hop_size, rectangle_window), inverse_stft(&stft_v, hop_size, rectangle_window))
+}
+
+fn make_odd(num: usize) -> usize {
+    if num % 2 == 0 {
+        num + 1
+    } else {
+        num
+    }
 }
 
 /// inverse short time fourier transform
