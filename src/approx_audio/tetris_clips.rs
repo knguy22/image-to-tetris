@@ -158,15 +158,28 @@ impl TetrisClips {
     /// creates corresponding pitch-shifted audio clips for skipped intervals and pushes them to self.clips
     #[allow(clippy::cast_precision_loss)]
     fn populate_skipped_intervals(&mut self, intervals: &[Interval<usize, usize>]) {
-        // create iterators to loop through existing combotones so pitch shifted audio clips aren't all the same
-        let combotones: Vec<TetrisClip> = self.clips.iter().take(7).cloned().collect();
-        let combotones_iter = combotones.iter().cycle();
+        // used for scaling
         let avg_rms_mag = self.clips
             .iter()
             .map(|clip| clip.audio.rms_magnitude())
             .sum::<f64>() / self.clips.len() as f64;
 
-        for (interval, combotone) in intervals.iter().zip(combotones_iter) {
+        let lowest_combotone = self.clips.first().unwrap().clone();
+        let highest_combotone = self.clips.last().unwrap().clone();
+        let lowest_fundamental = lowest_combotone.fft.most_significant_frequency();
+        let highest_fundamental = highest_combotone.fft.most_significant_frequency();
+
+        for interval in intervals {
+            // select which combotone to use
+            let interval_center = ((interval.start + interval.stop) / 2) as Sample;
+            let lowest_distance = interval_center - lowest_fundamental;
+            let highest_distance = highest_fundamental - interval_center;
+            let combotone = if lowest_distance <= highest_distance {
+                &lowest_combotone
+            } else {
+                &highest_combotone
+            };
+
             // compute pitch shifted audio
             let target_fundamental = interval.start as Sample;
             let curr_fundamental = combotone.fft.most_significant_frequency();
