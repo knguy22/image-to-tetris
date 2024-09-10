@@ -164,25 +164,29 @@ impl TetrisClips {
             .map(|clip| clip.audio.rms_magnitude())
             .sum::<f64>() / self.clips.len() as f64;
 
-        let lowest_combotone = self.clips.first().unwrap().clone();
-        let highest_combotone = self.clips.last().unwrap().clone();
-        let lowest_fundamental = lowest_combotone.fft.most_significant_frequency();
-        let highest_fundamental = highest_combotone.fft.most_significant_frequency();
+        // candidate combotones to pitch shift with
+        let clips_and_fundamentals = self.clips
+            .iter()
+            .map(|clip| (clip.clone(), clip.fft.most_significant_frequency()))
+            .collect_vec();
 
         for interval in intervals {
             // select which combotone to use
-            let interval_center = ((interval.start + interval.stop) / 2) as Sample;
-            let lowest_distance = interval_center - lowest_fundamental;
-            let highest_distance = highest_fundamental - interval_center;
-            let combotone = if lowest_distance <= highest_distance {
-                &lowest_combotone
-            } else {
-                &highest_combotone
-            };
+            let target_fundamental = interval.start as Sample;
+            let mut interval_distance = std::f32::MAX;
+            let mut curr_fundamental = target_fundamental;
+            let mut combotone: Option<&TetrisClip> = None;
+            for (candidate, candidate_fundamental) in &clips_and_fundamentals {
+                let candidate_distance = (candidate_fundamental - target_fundamental).abs();
+                if candidate_distance < interval_distance {
+                    interval_distance = candidate_distance;
+                    curr_fundamental = *candidate_fundamental;
+                    combotone = Some(&candidate);
+                }
+            }
+            let combotone = combotone.expect("no combotone found in skipped interval");
 
             // compute pitch shifted audio
-            let target_fundamental = interval.start as Sample;
-            let curr_fundamental = combotone.fft.most_significant_frequency();
             let multiplier = target_fundamental / curr_fundamental;
             let fft = combotone.fft.pitch_shift(multiplier);
             let audio = fft.ifft_to_audio_clip();
