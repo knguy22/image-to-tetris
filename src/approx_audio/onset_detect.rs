@@ -12,7 +12,7 @@ pub type Onsets = Vec<usize>;
 
 impl AudioClip {
     pub fn split_by_onsets(&self) -> Vec<AudioClip> {
-        let mut onsets = self.detect_onsets_spectrum();
+        let mut onsets = self.detect_onsets_phase();
 
         // we need to include the beginning and the end in the onsets to include the whole clip
         if onsets[0] != 0 {
@@ -34,7 +34,7 @@ impl AudioClip {
 
     // gives a vector of sample indices that are onsets
     // this currently uses spectrum onset detection
-    #[allow(clippy::cast_precision_loss, clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+    #[allow(clippy::cast_precision_loss, clippy::cast_sign_loss, clippy::cast_possible_truncation, unused)]
     fn detect_onsets_spectrum(&self) -> Onsets {
         // perform short time fourier transform
         let window_size = 2048;
@@ -84,7 +84,7 @@ impl AudioClip {
 
     /// method sourced from here: https://www.audiolabs-erlangen.de/resources/MIR/FMP/C6/C6S1_NoveltyPhase.html
     #[allow(clippy::cast_precision_loss, clippy::cast_sign_loss, clippy::cast_possible_truncation, unused)]
-    pub fn detect_onsets_phase(&self) {
+    pub fn detect_onsets_phase(&self) -> Onsets {
         // perform short time fourier transform
         let window_size = 2048;
         let hop_size = window_size / 4;
@@ -96,8 +96,36 @@ impl AudioClip {
         // take two derivatives
         let diff_1 = find_diffs(&phase);
         let diff_2 = find_diffs(&diff_1);
+        let mut collapsed_diffs = collapse_diffs(&diff_2);
 
-        todo!()
+        // use local averages to find extraordinary diffs
+        let window_sec = 0.1;
+        let window_size = (window_sec * self.sample_rate as Sample / hop_size as Sample).ceil() as usize;
+        let local_avg_diffs = find_local_avgs(&collapsed_diffs, window_size);
+        for (diff, local_avg_diff) in collapsed_diffs.iter_mut().zip(local_avg_diffs.iter()) {
+            *diff = Sample::max(*diff - local_avg_diff, 0.0);
+        }
+
+        // normalize the diffs so we can use them for onset detection
+        let diffs = normalize_diffs(&collapsed_diffs);
+
+        // perform onset detection using the derivative
+        // onsets will typically have non-zero derivative values
+        let mut onsets = Vec::new();
+        let index_iter = (0..self.num_samples).step_by(hop_size);
+        let mut last_onset = None;
+        for (&diff, index) in diffs.iter().zip_eq(index_iter) {
+            // only push onset once the diff is non-zero to a certain degree
+            if last_onset.is_none() && diff > 0.2 {
+                onsets.push(index);
+                last_onset = Some(index);
+            }
+            else if index - last_onset.unwrap_or(0) > (0.2 * self.sample_rate) as usize {
+                last_onset = None;
+            }
+        }
+
+        onsets
     }
 }
 
