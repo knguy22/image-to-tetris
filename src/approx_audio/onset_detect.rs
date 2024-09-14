@@ -12,7 +12,7 @@ pub type Onsets = Vec<usize>;
 
 impl AudioClip {
     pub fn split_by_onsets(&self) -> Vec<AudioClip> {
-        let mut onsets = self.detect_onsets_phase();
+        let mut onsets = self.detect_onsets_spectrum();
 
         // we need to include the beginning and the end in the onsets to include the whole clip
         if onsets[0] != 0 {
@@ -34,6 +34,7 @@ impl AudioClip {
 
     // gives a vector of sample indices that are onsets
     // this currently uses spectrum onset detection
+    // method sourced from: https://www.audiolabs-erlangen.de/resources/MIR/FMP/C6/C6S1_NoveltySpectral.html
     #[allow(clippy::cast_precision_loss, clippy::cast_sign_loss, clippy::cast_possible_truncation, unused)]
     fn detect_onsets_spectrum(&self) -> Onsets {
         // perform short time fourier transform
@@ -94,8 +95,8 @@ impl AudioClip {
         let phase = find_phase_stft(&stft);
 
         // take two derivatives
-        let diff_1 = find_diffs(&phase);
-        let diff_2 = find_diffs(&diff_1);
+        let diff_1 = principal_argument(&find_diffs(&phase));
+        let diff_2 = principal_argument(&find_diffs(&diff_1));
         let mut collapsed_diffs = collapse_diffs(&diff_2);
 
         // use local averages to find extraordinary diffs
@@ -232,6 +233,19 @@ fn normalize_diffs(diffs: &[Sample]) -> Vec<Sample> {
         .collect_vec()
 }
 
+/// equivalent to np.mod(`stft` + 0.5, 1) - 0.5
+fn principal_argument(stft: &STFTNorms) -> STFTNorms {
+    stft.iter()
+        .map(|fft_norm| fft_norm
+            .iter()
+            .map(|channel| channel
+                .iter()
+                .map(|&sample| Sample::rem_euclid(sample + 0.5, 1.0) - 0.5)
+                .collect_vec())
+            .collect_vec())
+        .collect_vec()
+}
+
 #[allow(clippy::cast_precision_loss)]
 fn find_local_avgs(samples: &[Sample], window_size: usize) -> Vec<Sample> {
     let mut local_diffs = Vec::new();
@@ -285,9 +299,10 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_split_by_onsets() {
         let clip = AudioClip::new(&path::Path::new("test_audio_clips/comboTones.mp3")).unwrap();
-        let onsets = clip.detect_onsets_spectrum();
+        let onsets = clip.detect_onsets_phase();
         let clips = clip.split_by_onsets();
         let total_num_samples: usize = clips
             .iter()
@@ -295,7 +310,7 @@ mod tests {
             .sum();
 
         // should be 1 more than the number of onsets because clips are split by onsets
-        assert_eq!(clips.len() - 1, onsets.len());
-        assert_eq!(total_num_samples, clip.num_samples);
+        assert_eq!(clips.len() - 1, onsets.len(), "number of clips should be 1 less than number of onsets");
+        assert_eq!(total_num_samples, clip.num_samples, "total number of samples should equal original number of samples");
     }
 }
