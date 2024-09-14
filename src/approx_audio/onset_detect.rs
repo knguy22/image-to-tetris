@@ -12,15 +12,18 @@ pub type Onsets = Vec<usize>;
 
 impl AudioClip {
     pub fn split_by_onsets(&self) -> Vec<AudioClip> {
-        let mut onsets = self.detect_onsets_phase();
+        let mut onsets = self.detect_onsets_spectrum();
 
         // we need to include the beginning and the end in the onsets to include the whole clip
-        if onsets[0] != 0 {
+        if onsets[0] > 0 {
             onsets.insert(0, 0);
         }
-        if onsets[onsets.len() - 1] != self.num_samples {
+        assert!(onsets.first().unwrap() == &0);
+
+        if onsets[onsets.len() - 1] < self.num_samples {
             onsets.push(self.num_samples);
         }
+        assert!(onsets.last().unwrap() == &self.num_samples);
 
         onsets
             .iter()
@@ -286,6 +289,19 @@ fn dump_diffs(diffs: &[Sample], output: &str) -> Result<()> {
 mod tests {
     use super::*;
     use std::path;
+
+    #[test]
+    fn test_diffs() {
+        let clip = AudioClip::new(&path::Path::new("test_audio_clips/comboTones.mp3")).unwrap();
+
+        let window_size = 2048;
+        let hop_size = window_size / 4;
+        let stft = clip.stft(window_size, hop_size, hanning_window);
+        let norms = get_norms(&stft);
+        let diffs = find_diffs(&norms);
+
+        assert!(diffs.iter().all(|diff| diff.len() == diffs[0].len()));
+    }
 
     #[test]
     fn test_onsets() {
