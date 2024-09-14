@@ -117,11 +117,11 @@ impl AudioClip {
         let mut last_onset = None;
         for (&diff, index) in diffs.iter().zip_eq(index_iter) {
             // only push onset once the diff is non-zero to a certain degree
-            if last_onset.is_none() && diff > 0.2 {
+            if last_onset.is_none() && diff > 0.175 {
                 onsets.push(index);
                 last_onset = Some(index);
             }
-            else if index - last_onset.unwrap_or(0) > (0.2 * self.sample_rate) as usize {
+            else if index - last_onset.unwrap_or(0) > (0.1 * self.sample_rate) as usize {
                 last_onset = None;
             }
         }
@@ -262,7 +262,7 @@ fn find_local_avgs(samples: &[Sample], window_size: usize) -> Vec<Sample> {
         }
         assert!(r - l > 0, "r - l should never <= 0");
 
-        local_diffs.push(window_sum / (r - l) as Sample);
+        local_diffs.push(window_sum / window_size as Sample);
         window_sum -= samples[l];
     }
 
