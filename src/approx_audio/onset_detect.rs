@@ -12,7 +12,7 @@ pub type Onsets = Vec<usize>;
 
 impl AudioClip {
     pub fn split_by_onsets(&self) -> Vec<AudioClip> {
-        let mut onsets = self.detect_onsets_spectrum();
+        let mut onsets = self.detect_onsets_phase();
 
         // we need to include the beginning and the end in the onsets to include the whole clip
         if onsets[0] != 0 {
@@ -97,7 +97,7 @@ impl AudioClip {
         // take two derivatives
         let diff_1 = principal_argument(&find_diffs(&phase));
         let diff_2 = principal_argument(&find_diffs(&diff_1));
-        let mut collapsed_diffs = collapse_diffs(&diff_2);
+        let mut collapsed_diffs = collapse_diffs(&filter_non_negs_diffs(&diff_2));
 
         // use local averages to find extraordinary diffs
         let window_sec = 0.1;
@@ -192,6 +192,7 @@ fn filter_non_negs_diffs(stft: &STFTNorms) -> STFTNorms {
         .collect_vec()
 }
 
+/// collapses the diffs into a single number for each time step
 fn collapse_diffs(stft: &STFTNorms) -> Vec<Sample> {
     stft
         .iter()
