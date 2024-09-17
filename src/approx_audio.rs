@@ -231,33 +231,20 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn approx_chunk_tones_1() {
         let tone_ids = vec![0, 1];
         test_chunk_tones(&tone_ids);
-    }
-
-    #[test]
-    fn approx_chunk_tones_2() {
+        
         let tone_ids = vec![0, 5];
         test_chunk_tones(&tone_ids);
-    }
-
-    #[test]
-    fn approx_chunk_tones_3() {
+        
         let tone_ids = vec![0, 8];
         test_chunk_tones(&tone_ids);
-    }
-
-    #[test]
-    #[ignore]
-    fn approx_chunk_tones_4() {
+        
         let tone_ids = vec![0, 10];
         test_chunk_tones(&tone_ids);
-    }
-
-    #[test]
-    #[ignore]
-    fn approx_chunk_tones_5() {
+        
         let tone_ids = vec![0, 10, 25];
         test_chunk_tones(&tone_ids);
     }

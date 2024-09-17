@@ -1,8 +1,14 @@
-use super::audio_clip::Sample;
+use crate::utils::check_command_result;
+use super::audio_clip::{AudioClip, Sample};
 use super::fft::{FFTResult, FFTSample};
 
-use itertools::Itertools;
+use std::fs;
+use std::path::Path;
+use std::process::Command;
+
+use anyhow::Result;
 use rustfft::num_complex::Complex;
+use itertools::Itertools;
 
 /// precomputed chromatic difference; 2.0^(1/12)
 pub static CHROMATIC_MULTIPLIER: Sample = 1.059_463_1;
@@ -10,8 +16,34 @@ pub static CHROMATIC_MULTIPLIER: Sample = 1.059_463_1;
 /// the frequency and magnitude of a bin
 type FreqBin = (Sample, Vec<FFTSample>);
 
+impl AudioClip {
+    #[allow(unused)]
+    pub fn pitch_shift(&self, multiplier: Sample) -> Result<Self> {
+        let tmp_input = Path::new("tmp_input.wav");
+        let tmp_output = Path::new("tmp_output.wav");
+
+        // dump and resample the audio using pitch shifting
+        self.write(Some(tmp_input))?;
+        let resample_command = Command::new("ffmpeg")
+            .arg("-i")
+            .arg(tmp_input)
+            .arg("-filter:a")
+            .arg(format!("asetrate={}*{},aresample={}", self.sample_rate, multiplier, self.sample_rate))
+            .arg(tmp_output)
+            .output()?;
+        check_command_result(&resample_command)?;
+        let res = Self::new(tmp_output)?;
+
+        // cleanup
+        fs::remove_file(tmp_input)?;
+        fs::remove_file(tmp_output)?;
+
+        Ok(res)
+    }
+}
+
 impl FFTResult {
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, unused)]
     pub fn pitch_shift(&self, multiplier: Sample) -> Self {
         assert!(multiplier >= 0.0);
 
