@@ -10,7 +10,7 @@ mod windowing;
 use audio_clip::{AudioClip, Sample};
 use fft::separate_harmonic_percussion;
 use pitch::CHROMATIC_MULTIPLIER;
-use tetris_clips::{TetrisClips, MIN_FREQ};
+use tetris_clips::TetrisClips;
 use crate::utils::progress_bar;
 
 use std::fs;
@@ -143,8 +143,8 @@ impl InputAudioClip {
         let mut fft_samples: Vec<(OrderedFloat<Sample>, OrderedFloat<Sample>, OrderedFloat<Sample>)> = Vec::new();
         for (freq, samples) in chunk_fft.iter_zip_bins() {
             let magnitude = samples.iter().fold(0.0, |a, &b| a + b.norm());
-            // score is used to account for how higher notes take up more frequency bins
-            let score = (freq / MIN_FREQ) * magnitude;
+            // score is used to account for how higher notes take up more frequency bins and scale logarithmically
+            let score = freq.ln() * magnitude;
             fft_samples.push((OrderedFloat(score), OrderedFloat(magnitude), OrderedFloat(freq)));
         }
         let mut heap = BinaryHeap::from(fft_samples);
@@ -152,7 +152,7 @@ impl InputAudioClip {
 
         // track added notes
         let mut curr_note_tracker: Lapper<usize, usize> = Lapper::new(Vec::new());
-        while let Some((score, mag, freq)) = heap.pop() {
+        while let Some((score, _mag, freq)) = heap.pop() {
             if score < max_score / 3.0 || score == 0.0 {
                 break; 
             }
