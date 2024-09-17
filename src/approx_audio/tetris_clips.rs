@@ -189,7 +189,8 @@ impl TetrisClips {
             // compute pitch shifted audio
             let multiplier = target_fundamental / curr_fundamental;
             let fft = combotone.fft.pitch_shift(multiplier);
-            let audio = fft.ifft_to_audio_clip();
+            // let audio = fft.ifft_to_audio_clip();
+            let audio = combotone.audio.pitch_shift(multiplier).unwrap();
 
             // normalize audio
             let curr_rms_mag = audio.rms_magnitude();
