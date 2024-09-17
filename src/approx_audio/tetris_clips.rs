@@ -9,7 +9,7 @@ use itertools::Itertools;
 use rust_lapper::{Lapper, Interval};
 
 // using the frequencies here: https://en.wikipedia.org/wiki/Piano_key_frequencies
-const MIN_FREQ: Sample = 65.40639; // C great octave
+pub const MIN_FREQ: Sample = 65.40639; // C great octave
 const MAX_FREQ: Sample = 1046.502; // C''' 3-line octave
 const INVALID_CLIP_ID: usize = usize::MAX;
 

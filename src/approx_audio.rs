@@ -10,7 +10,7 @@ mod windowing;
 use audio_clip::{AudioClip, Sample};
 use fft::separate_harmonic_percussion;
 use pitch::CHROMATIC_MULTIPLIER;
-use tetris_clips::TetrisClips;
+use tetris_clips::{TetrisClips, MIN_FREQ};
 use crate::utils::progress_bar;
 
 use std::fs;
@@ -140,18 +140,20 @@ impl InputAudioClip {
 
         // heap contains (magnitude, frequency)
         let chunk_fft = chunk.fft();
-        let mut fft_samples: Vec<(OrderedFloat<Sample>, OrderedFloat<Sample>)> = Vec::new();
+        let mut fft_samples: Vec<(OrderedFloat<Sample>, OrderedFloat<Sample>, OrderedFloat<Sample>)> = Vec::new();
         for (freq, samples) in chunk_fft.iter_zip_bins() {
             let magnitude = samples.iter().fold(0.0, |a, &b| a + b.norm());
-            fft_samples.push((OrderedFloat(magnitude), OrderedFloat(freq)));
+            // score is used to account for how higher notes take up more frequency bins
+            let score = (freq / MIN_FREQ) * magnitude;
+            fft_samples.push((OrderedFloat(score), OrderedFloat(magnitude), OrderedFloat(freq)));
         }
         let mut heap = BinaryHeap::from(fft_samples);
-        let max_magnitude = heap.peek().unwrap_or(&(OrderedFloat(0.0), OrderedFloat(0.0))).0;
+        let max_score = heap.peek().unwrap_or(&(OrderedFloat(0.0), OrderedFloat(0.0), OrderedFloat(0.0))).0;
 
         // track added notes
         let mut curr_note_tracker: Lapper<usize, usize> = Lapper::new(Vec::new());
-        while let Some((mag, freq)) = heap.pop() {
-            if mag < max_magnitude / 3.0 || mag == 0.0 {
+        while let Some((score, mag, freq)) = heap.pop() {
+            if score < max_score / 3.0 || score == 0.0 {
                 break; 
             }
 
@@ -166,7 +168,7 @@ impl InputAudioClip {
                 let start = (freq as Sample / CHROMATIC_MULTIPLIER) as usize;
                 let stop = (freq as Sample * CHROMATIC_MULTIPLIER) as usize;
                 let interval = Interval { start, stop, val: 0 };
-                let multiplier = *(mag / max_magnitude);
+                let multiplier = *(score / max_score);
                 output.add_mut(&note_clip.audio, multiplier);
                 curr_note_tracker.insert(interval);
             }
