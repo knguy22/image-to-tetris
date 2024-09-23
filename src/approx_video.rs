@@ -1,5 +1,4 @@
 use crate::approx_image;
-use crate::approx_audio;
 use crate::cli::{Config, GlobalData};
 use crate::utils::{check_command_result, progress_bar};
 
@@ -44,14 +43,6 @@ pub fn run(source: &Path, output: &Path, config: &Config, glob: &GlobalData, vid
         .arg(AUDIO_PATH)
         .output()?;
     check_command_result(&gen_audio_command)?;
-
-    // approximate the audio file if wanted
-    if video_config.approx_audio {
-        approx_audio::run(Path::new(AUDIO_PATH), Path::new(AUDIO_PATH))?;
-    } 
-    else {
-        println!("Skipping audio approximation");
-    }
 
     // approximate the source images
     let images: Vec<_> = fs::read_dir(SOURCE_IMG_DIR)?
@@ -120,7 +111,7 @@ pub fn init(source: &Path, output: &Path, config: &Config, glob: &mut GlobalData
     assert!(!output.exists(), "output file already exists");
 
     // load config
-    let mut video_config = VideoConfig::new(source, config)?;
+    let mut video_config = VideoConfig::new(source)?;
 
     // modify the config based on resized skins
     approx_image::draw::resize_skins(&mut glob.skins, video_config.image_width, video_config.image_height, config.board_width, config.board_height).unwrap();
@@ -142,12 +133,11 @@ pub struct VideoConfig {
     pub image_width: u32,
     pub image_height: u32,
     fps: i32,
-    approx_audio: bool,
 }
 
 impl VideoConfig {
     // loads video metadata
-    fn new(path: &Path, config: &Config) -> Result<VideoConfig> {
+    fn new(path: &Path) -> Result<VideoConfig> {
         let source = format::input(path)?;
         let input = source.streams().best(ffmpeg_next::media::Type::Video).expect("failed to find video stream");
         let fps = input.avg_frame_rate();
@@ -157,7 +147,6 @@ impl VideoConfig {
             image_width: decoder.width(),
             image_height: decoder.height(),
             fps: fps.numerator() / fps.denominator(),
-            approx_audio: config.approx_audio,
         })
     }
 }
@@ -177,7 +166,6 @@ mod tests {
             board_width: 63,
             board_height: 35,
             prioritize_tetrominos: PrioritizeColor::No,
-            approx_audio: false,
         };
 
         let mut glob = GlobalData::new();

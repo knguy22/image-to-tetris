@@ -389,10 +389,9 @@ mod tests {
         let board_height = 17;
         let mut glob = GlobalData::new();
         let config = Config {
-            board_width: board_width,
-            board_height: board_height,
+            board_width,
+            board_height,
             prioritize_tetrominos: PrioritizeColor::Yes,
-            approx_audio: false,
         };
         run(&source, &output, &config, &mut glob);
     }

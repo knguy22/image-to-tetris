@@ -14,7 +14,6 @@ pub struct Config {
     pub board_width: usize,
     pub board_height: usize,
     pub prioritize_tetrominos: PrioritizeColor,
-    pub approx_audio: bool,
 }
 
 #[derive(Debug, Parser)]
@@ -28,10 +27,6 @@ pub struct Cli {
     # [arg(short, long, default_value_t = false)]
     pub prioritize_tetrominos: bool,
 
-    /// flag for whether to approximate audio or not, only used with video
-    #[arg(short, long, default_value_t = false)]
-    pub approx_audio: bool,
-
     #[command(subcommand)]
     pub command: Commands
 }
@@ -43,9 +38,6 @@ pub enum Commands {
 
     /// approximates a single image using tetris blocks
     ApproxImage{source: PathBuf, output: PathBuf, board_width: usize, board_height: usize},
-
-    /// approximates a single audio file using tetris sound clips
-    ApproxAudio{source: PathBuf, output: PathBuf},
 
     /// approximates a single video using tetris blocks
     ApproxVideo{source: PathBuf, output: PathBuf, board_width: usize, board_height: usize},
