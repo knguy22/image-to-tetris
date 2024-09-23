@@ -11,11 +11,53 @@ a few rules in order to attempt to be faithful to the Tetris spirit:
 by adding or removing the skins in `./assets` so that this program can change which skins it has available.
 3. Each skin has 9 minos of different colors/designs such that they correspond to the 9 common types of minos (hurry-up garbage, regular garbage, Z, L, O, S, I, J, T), and these mino designs will only be used with the correct piece shape.
 
+```sh
+# Get started approximating an image
+> cargo run --release -- approx-image source.png output.png 32 32
+
+# Example approximating a video
+> cargo run --release -- approx-video source.mp4 output.mp4 32 32
+
+```
+
 ## Requirements
 
-The skins used for this application come from the [Jstris Customization Database](https://docs.google.com/spreadsheets/d/1xO8DTORacMmSJAQicpJscob7WUkOVuaNH0wzkR_X194/htmlview). I do not own the copyright for any of these images. Once you have chosen the skins you want to use, create the directory `./assets` and place the skins' files there. At runtime, `image-to-tetris` will pick blocks from the skins assorted there.
+The skins used for this application come from the [Jstris Customization Database](https://docs.google.com/spreadsheets/d/1xO8DTORacMmSJAQicpJscob7WUkOVuaNH0wzkR_X194/htmlview). IMPORTANT: I do not own the copyright for any of these images. Once you have chosen the skins you want to use, create the directory `./assets` and place the skins' files there. At runtime, `image-to-tetris` will pick blocks from the skins assorted there.
 
 Integration testing will source test images from the `./sources` directory. Make sure to have at least 1 image there and to not mix non-image files inside.
 
 The `approx_video` functionality requires `ffmpeg`'s cli functionality to work, and it also uses `ffmpeg-next` for video processing 
 reasons.
+
+## Options
+
+### approx-image
+```sh
+Usage: image-to-tetris approx-image <SOURCE> <OUTPUT> <BOARD_WIDTH> <BOARD_HEIGHT>
+
+Arguments:
+  <SOURCE>
+  <OUTPUT>
+  <BOARD_WIDTH>
+  <BOARD_HEIGHT>
+```
+
+### approx-video
+```
+Usage: image-to-tetris approx-video <SOURCE> <OUTPUT> <BOARD_WIDTH> <BOARD_HEIGHT>
+
+Arguments:
+  <SOURCE>
+  <OUTPUT>
+  <BOARD_WIDTH>
+  <BOARD_HEIGHT>
+```
+
+### Other Options
+```
+  -t, --threads <THREADS>      number of threads to use; default is 4
+  -p, --prioritize-tetrominos  flag for whether to prioritize tetrominos or not; increases image color but reduces accuracy
+  -h, --help                   Print help
+  -V, --version                Print version
+```
+
