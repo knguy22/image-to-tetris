@@ -1,6 +1,16 @@
 # Image to Tetris
 
-[![Example video to tetris](https://img.youtube.com/vi/Hat_GgtkLCA/0.jpg)](https://www.youtube.com/watch?v=Hat_GgtkLCA)
+## Example
+
+Credits to Soultrain for taking this original photo.
+
+### Before
+![A sunset](./examples/sunset_1280.jpg)
+
+### After
+![A sunset in tetris](./examples/sunset_1280_tetris.png)
+
+## Overview
 
 This project aims to be able to approximate arbitrary images using valid board configurations for Tetris. This project follows 
 a few rules in order to attempt to be faithful to the Tetris spirit:
