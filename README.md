@@ -1,5 +1,7 @@
 # Image to Tetris
 
+[![Example video to tetris](https://img.youtube.com/vi/Hat_GgtkLCA/0.jpg)](https://www.youtube.com/watch?v=Hat_GgtkLCA)
+
 This project aims to be able to approximate arbitrary images using valid board configurations for Tetris. This project follows 
 a few rules in order to attempt to be faithful to the Tetris spirit:
 
