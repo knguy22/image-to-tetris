@@ -10,6 +10,10 @@ Credits to Soultrain for taking this original photo.
 ### After
 ![A sunset in tetris](./examples/sunset_1280_tetris.png)
 
+### Video to Tetris
+
+Videos can be approximated too. For example, here is [Never Gonna Give You Up](https://www.youtube.com/watch?v=Hat_GgtkLCA) by Rick Astley in Tetris form.
+
 ## Overview
 
 This project aims to be able to approximate arbitrary images using valid board configurations for Tetris. This project follows 
